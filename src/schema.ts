@@ -40,7 +40,12 @@ export const ReviewRecordSchema = z.object({
   base_sha: z.string(),
   head_sha: z.string(),
   guardian_sha: z.string().nullable().optional(),
-  reviewed_at: z.string(),
+  // Validated here rather than trusted downstream: dedupe orders reviews by this
+  // field, and an unparseable value would otherwise reach Date.parse as NaN,
+  // where every comparison is false and the first record silently wins.
+  reviewed_at: z
+    .string()
+    .refine((s) => Number.isFinite(Date.parse(s)), "reviewed_at is not a parseable timestamp"),
   finder_model: z.string(),
   skeptic_model: z.string().nullable().optional(),
   had_graph: z.boolean(),

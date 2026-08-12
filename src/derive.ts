@@ -54,13 +54,21 @@ function corpusOf(records: ReviewRecord[]): ReadonlyArray<readonly [string, numb
  *
  * A rerun is a correction, not extra evidence — counting both would let a
  * reviewer improve its record simply by being run twice.
+ *
+ * Ordering is by parsed instant, not by string. Today's writer emits UTC with a
+ * uniform offset, where the two agree — but a lexicographic comparison is only
+ * accidentally correct, and it inverts the moment two offsets differ
+ * (`14:00+03:00` sorts after `12:00+00:00` while happening an hour earlier).
+ * The schema guarantees these parse, so no NaN reaches this comparison.
  */
 function dedupe(records: ReviewRecord[]): ReviewRecord[] {
   const winners = new Map<string, ReviewRecord>();
   for (const record of records) {
     const key = `${record.url}|${record.head_sha}|${identityId(genomeOf(record))}`;
     const held = winners.get(key);
-    if (!held || record.reviewed_at > held.reviewed_at) winners.set(key, record);
+    if (!held || Date.parse(record.reviewed_at) > Date.parse(held.reviewed_at)) {
+      winners.set(key, record);
+    }
   }
   return [...winners.values()];
 }

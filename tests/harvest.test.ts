@@ -22,6 +22,16 @@ describe("harvest", () => {
     expect(result.warnings).toEqual([]);
   });
 
+  it("refuses an unparseable reviewed_at at the boundary", () => {
+    const record = JSON.parse(
+      readFileSync("tests/fixtures/martian-reviews.sample.jsonl", "utf8").split("\n")[0]!,
+    ) as Record<string, unknown>;
+    const result = harvest(JSON.stringify({ ...record, reviewed_at: "whenever" }));
+    expect(result.records).toEqual([]);
+    expect(result.warnings.length).toBe(1);
+    expect(result.warnings[0]).toContain("reviewed_at");
+  });
+
   it("skips a well-formed line that fails the schema, naming the line", () => {
     const result = harvest('{"url":"u","project":"p"}');
     expect(result.records).toEqual([]);

@@ -43,6 +43,16 @@ describe("deriveTrackRecords", () => {
     expect(find(twice).claims).toBe(find(once).claims);
   });
 
+  it("orders reruns by instant, not by string form", () => {
+    // 14:00+03:00 is 11:00Z — an hour EARLIER than 12:00Z, though it sorts
+    // later as a string. Lexicographic comparison fails this; parsing passes it.
+    const first = { ...records[0]!, reviewed_at: "2026-08-12T12:00:00+00:00", findings: [] };
+    const earlierButSortsLater = { ...records[0]!, reviewed_at: "2026-08-12T14:00:00+03:00" };
+    const track = deriveTrackRecords([first, earlierButSortsLater]);
+    expect(track.length).toBe(1);
+    expect(track[0]!.claims).toBe(0); // the 12:00Z record won, as it should
+  });
+
   it("keeps the later review when a rerun supersedes", () => {
     const first = records[0]!;
     const rerun = { ...first, reviewed_at: "2099-01-01T00:00:00Z", findings: [] };
