@@ -8,7 +8,9 @@
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "generate": "bun src/cli.ts"
+    "generate": "bun src/cli.ts",
+    "birth": "bun src/cli-birth.ts",
+    "anchor": "bun src/cli-anchor.ts"
   },
   "author": "",
   "license": "MIT",

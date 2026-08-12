@@ -130,10 +130,16 @@ anyone holding a genome computes both without a chain, today. A contract would
 not create an entity; it would announce one. An attestation announces the same
 thing, on the same chain, in a public registry, with no code of ours in it.
 
-**The keyless address undercuts what a token would buy.** An NFT's practical
-advantage is appearing in a wallet — but the owner address has no private key by
-construction, so the token would sit in a wallet nobody can open. Explorer
-visibility by address remains, and an attestation has that too.
+**~~The keyless address undercuts what a token would buy.~~ Withdrawn 2026-08-12
+after review.** The argument ran: an NFT's advantage is appearing in a wallet,
+and the owner address has no private key, so the token would sit somewhere
+nobody can open. It does not hold. An ERC-5192 token is non-transferable by
+design, so the missing key costs it nothing — a soulbound token's value is
+display, and display needs no key. The point is struck rather than deleted
+because a spec that quietly loses its weakest argument teaches nothing.
+
+The decision stands on the two reasons that survive, and it did not need a
+third.
 
 **Deferring costs nothing, and that is unusual.** Because identities are
 content-addressed, a token minted later attaches to exactly the same entities,

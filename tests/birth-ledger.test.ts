@@ -1,17 +1,19 @@
 import { describe, expect, it } from "vitest";
 import { loadBirths, announced } from "../src/birth/ledger.js";
+import { ownerAddress } from "../src/identity.js";
 
-const record = (id: string) => ({
+const ID_A = `0x${"11".repeat(32)}` as const;
+const ID_B = `0x${"22".repeat(32)}` as const;
+
+const record = (id: `0x${string}`) => ({
   identity_id: id,
-  entity: "0x0000000000000000000000000000000000000001",
+  // Derived, because the ledger now refuses a pair that disagrees.
+  entity: ownerAddress(id),
   first_seen: 1_786_527_600,
   tx_hash: `0x${"cd".repeat(32)}`,
   attestation_uid: `0x${"ef".repeat(32)}`,
   announced_at: "2026-08-17T09:00:00+00:00",
 });
-
-const ID_A = `0x${"11".repeat(32)}`;
-const ID_B = `0x${"22".repeat(32)}`;
 
 describe("loadBirths", () => {
   it("reads an empty ledger", () => {
@@ -35,8 +37,23 @@ describe("loadBirths", () => {
   });
 
   it("treats a case difference as the same identity, not a second one", () => {
-    const mixed = JSON.stringify([record(ID_A), record(ID_A.toUpperCase().replace("0X", "0x"))]);
+    const upper = ID_A.toUpperCase().replace("0X", "0x") as `0x${string}`;
+    const mixed = JSON.stringify([record(ID_A), { ...record(ID_A), identity_id: upper }]);
     expect(() => loadBirths(mixed)).toThrow(/already announced/i);
+  });
+
+  it("refuses an entity that is not the address of its identity", () => {
+    // Unchecked, such a row would suppress that identity's real birth through
+    // `announced()` — it would look announced while nothing correct existed.
+    const wrong = JSON.stringify([
+      { ...record(ID_A), entity: "0x000000000000000000000000000000000000dEaD" },
+    ]);
+    expect(() => loadBirths(wrong)).toThrow(/not the address derived/i);
+  });
+
+  it("refuses an announced_at that is not a timestamp", () => {
+    const wrong = JSON.stringify([{ ...record(ID_A), announced_at: "not-a-date" }]);
+    expect(() => loadBirths(wrong)).toThrow(/parseable timestamp/i);
   });
 });
 

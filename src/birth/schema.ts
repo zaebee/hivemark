@@ -14,7 +14,7 @@ import type { Genome } from "../types.js";
 export const BIRTH_SCHEMA =
   "bytes32 identityId,address entity,string provider,string finderModel," +
   "string skepticModel,string contextMode,string guardianVersion," +
-  "uint16 genomeSchemaVersion,uint64 firstSeen";
+  "string knownFields,uint16 genomeSchemaVersion,uint64 firstSeen";
 
 const RESOLVER = "0x0000000000000000000000000000000000000000" as const;
 const REVOCABLE = true;
@@ -36,6 +36,11 @@ export function encodeBirth(genome: Genome, firstSeen: number): string {
     { name: "skepticModel", type: "string", value: genome.skeptic_model ?? "" },
     { name: "contextMode", type: "string", value: genome.context_mode },
     { name: "guardianVersion", type: "string", value: genome.guardian_version },
+    // Part of the hash, so it has to be part of the record. Omitting it made the
+    // schema's central promise false: a reader rebuilding the genome from the
+    // published fields arrived at a different identity than the one named, and
+    // the only way to supply it was a convention documented nowhere.
+    { name: "knownFields", type: "string", value: genome.known_fields.join(",") },
     { name: "genomeSchemaVersion", type: "uint16", value: genome.schema_version },
     { name: "firstSeen", type: "uint64", value: firstSeen },
   ]);

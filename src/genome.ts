@@ -50,7 +50,11 @@ export function genomeOf(record: ReviewRecord): Genome {
     known_fields: KNOWN_FIELDS,
     provider: providerOf(record.finder_model),
     finder_model: record.finder_model,
-    skeptic_model: record.skeptic_model ?? null,
+    // An empty string and null both mean "no skeptic ran", and the upstream
+    // schema admits either. Collapsed here so one configuration cannot become
+    // two identities — and so a published birth record, where both encode to
+    // the same empty field, cannot read as self-contradictory.
+    skeptic_model: record.skeptic_model === "" ? null : (record.skeptic_model ?? null),
     context_mode: record.had_graph ? "graph" : "diff-only",
     guardian_version: record.guardian_sha,
   };

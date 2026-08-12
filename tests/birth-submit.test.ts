@@ -63,6 +63,25 @@ describe("buildBirthRequest", () => {
     expect(() => buildBirthRequest(lying)).toThrow(/does not match its genome/i);
   });
 
+  it("refuses a plan whose provider contradicts its finder model", () => {
+    // provider is an expression of finder_model — the rule avatar.ts already
+    // enforces. Publishing the two in disagreement would permanently name a
+    // provider the finder contradicts.
+    //
+    // The plan is internally consistent — identity and entity both derive from
+    // this genome — so the earlier two checks pass and only this one can catch
+    // it. A genome that merely differed would fail the identity check first and
+    // prove nothing about this rule.
+    const lyingGenome: Genome = { ...genome, finder_model: "qwen2.5-coder:7b" };
+    const inconsistent: BirthPlan = {
+      identity_id: identityId(lyingGenome),
+      entity: ownerAddress(identityId(lyingGenome)),
+      genome: lyingGenome,
+      firstSeen: plan.firstSeen,
+    };
+    expect(() => buildBirthRequest(inconsistent)).toThrow(/belongs to ollama/i);
+  });
+
   it("refuses a plan whose entity is not the address of its identity", () => {
     const wrongEntity = {
       ...plan,

@@ -65,12 +65,31 @@ describe("encodeBirth", () => {
   });
 
   it("publishes enough to recompute the identity it names", () => {
-    // The property the whole schema exists for: a reader rebuilds the genome
-    // from the record and arrives at the same identity.
+    // The property the whole schema exists for.
+    //
+    // Every field below comes from the decoded record and nothing from the
+    // fixture. The first version of this test passed `known_fields` in from the
+    // genome — supplying the one input the record was missing, so it asserted
+    // the property while hiding that it did not hold.
     const byName = decode(encodeBirth(genome, FIRST_SEEN));
     const rebuilt: Genome = {
       schema_version: Number(byName.genomeSchemaVersion),
-      known_fields: genome.known_fields,
+      known_fields: String(byName.knownFields).split(","),
+      provider: String(byName.provider) as Genome["provider"],
+      finder_model: String(byName.finderModel),
+      skeptic_model: String(byName.skepticModel) === "" ? null : String(byName.skepticModel),
+      context_mode: String(byName.contextMode) as Genome["context_mode"],
+      guardian_version: String(byName.guardianVersion),
+    };
+    expect(identityId(rebuilt)).toBe(String(byName.identityId));
+  });
+
+  it("recomputes the identity for a skeptic-less genome too", () => {
+    const without: Genome = { ...genome, skeptic_model: null };
+    const byName = decode(encodeBirth(without, FIRST_SEEN));
+    const rebuilt: Genome = {
+      schema_version: Number(byName.genomeSchemaVersion),
+      known_fields: String(byName.knownFields).split(","),
       provider: String(byName.provider) as Genome["provider"],
       finder_model: String(byName.finderModel),
       skeptic_model: String(byName.skepticModel) === "" ? null : String(byName.skepticModel),

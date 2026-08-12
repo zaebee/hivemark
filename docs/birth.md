@@ -13,9 +13,10 @@ genome and the address derives from it, so anyone holding a genome computes both
 without a chain. A contract would not create an entity, only announce one — and
 an attestation announces the same thing with none of our code on the chain.
 
-The keyless address also undercuts what a token buys: an NFT's practical
-advantage is appearing in a wallet, and that address has no private key by
-construction.
+An earlier draft of this page argued that the keyless address undercuts a token,
+since an NFT's advantage is appearing in a wallet. That reasoning was withdrawn
+under review: a soulbound token is non-transferable anyway, so the missing key
+costs it nothing — its value is display, which needs no key.
 
 The option stays open. Because identities are content-addressed, a token minted
 later attaches to exactly the same entities, retroactively. What is *not* claimed
@@ -35,7 +36,7 @@ SchemaRegistry at `0x4200000000000000000000000000000000000020` with
 | | |
 |---|---|
 | schema | `BIRTH_SCHEMA` in `src/birth/schema.ts` |
-| UID | `0x1269b8bd47c44047fac2fd6b7a7934610159b0a4f8bf3916edca95787001d0da` |
+| UID | `0x6ca5f932f49e5ac467c1ca24c5af39800a12df874d3856b4afdd54800c07ed02` |
 
 The UID is derived, so attestations prepared before registration resolve the
 moment it exists.

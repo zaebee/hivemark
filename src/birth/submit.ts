@@ -1,4 +1,5 @@
 import { EAS_CONTRACT } from "../attest/domain.js";
+import { providerOf } from "../genome.js";
 import { identityId, ownerAddress } from "../identity.js";
 import { BIRTH_SCHEMA_UID, encodeBirth } from "./schema.js";
 import type { BirthPlan } from "./plan.js";
@@ -42,6 +43,18 @@ export function buildBirthRequest(plan: BirthPlan): BirthRequest {
   if (entity.toLowerCase() !== plan.entity.toLowerCase()) {
     throw new Error(
       `birth plan names entity ${plan.entity}, but that identity's address is ${entity}`,
+    );
+  }
+
+  // `provider` is an expression of `finder_model`, not an independent field —
+  // the rule `avatar.ts` already enforces when it derives the palette rather
+  // than trusting the genome. A record published with the two disagreeing would
+  // permanently name a provider the finder contradicts.
+  const stated = plan.genome.provider;
+  const actual = providerOf(plan.genome.finder_model);
+  if (stated !== actual) {
+    throw new Error(
+      `birth plan states provider ${stated}, but its finder ${plan.genome.finder_model} belongs to ${actual}`,
     );
   }
 

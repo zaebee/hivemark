@@ -1,4 +1,5 @@
 import { byCodeUnit } from "../canonical.js";
+import { dedupe } from "../derive.js";
 import { genomeOf } from "../genome.js";
 import { identityId, ownerAddress } from "../identity.js";
 import type { ReviewRecord } from "../schema.js";
@@ -26,7 +27,10 @@ export function planBirths(
 ): BirthPlan[] {
   const earliest = new Map<`0x${string}`, { genome: Genome; firstSeen: number }>();
 
-  for (const record of records) {
+  // The same dedupe the track record applies. Without it a superseded re-run
+  // could set an identity's birth date while `derive` ignores that very row, so
+  // the two would disagree about a review that no longer counts.
+  for (const record of dedupe(records)) {
     const genome = genomeOf(record);
     const id = identityId(genome);
     const seenAt = Math.floor(Date.parse(record.reviewed_at) / 1000);

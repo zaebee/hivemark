@@ -1,16 +1,28 @@
 import { z } from "zod";
+import { ownerAddress } from "../identity.js";
 
 const Hex32 = z.string().regex(/^0x[0-9a-fA-F]{64}$/);
 const Address = z.string().regex(/^0x[0-9a-fA-F]{40}$/);
 
-export const BirthRecordSchema = z.object({
-  identity_id: Hex32,
-  entity: Address,
-  first_seen: z.number().int().min(0),
-  tx_hash: Hex32,
-  attestation_uid: Hex32,
-  announced_at: z.string(),
-});
+export const BirthRecordSchema = z
+  .object({
+    identity_id: Hex32,
+    entity: Address,
+    first_seen: z.number().int().min(0),
+    tx_hash: Hex32,
+    attestation_uid: Hex32,
+    announced_at: z
+      .string()
+      .refine((s) => Number.isFinite(Date.parse(s)), "announced_at is not a parseable timestamp"),
+  })
+  // Shape is not enough: `entity` is derivable from `identity_id`, so a pair
+  // that disagrees is a record contradicting itself. Left unchecked, such a row
+  // would still suppress that identity's real birth through `announced()` —
+  // the entity would look announced while nothing correct had been published.
+  .refine(
+    (r) => r.entity.toLowerCase() === ownerAddress(r.identity_id as `0x${string}`).toLowerCase(),
+    { message: "entity is not the address derived from identity_id" },
+  );
 
 export type BirthRecord = z.infer<typeof BirthRecordSchema>;
 
