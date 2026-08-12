@@ -1,4 +1,5 @@
 import { EAS, Offchain, OffchainAttestationVersion, SchemaEncoder } from "@ethereum-attestation-service/eas-sdk";
+import { fromStoredAttestation } from "./attest.js";
 import type { AttestationEnvelope } from "./attest.js";
 import { CLAIM_SCHEMA, CLAIM_SCHEMA_UID } from "./schema.js";
 import { ownerAddress } from "../identity.js";
@@ -69,15 +70,7 @@ export function verifyEnvelope(envelope: AttestationEnvelope): VerificationResul
       new EAS(envelope.domain.address),
     );
 
-    const attestation = {
-      ...envelope.attestation,
-      domain: { ...envelope.attestation.domain, chainId: BigInt(envelope.attestation.domain.chainId) },
-      message: {
-        ...envelope.attestation.message,
-        time: BigInt(envelope.attestation.message.time),
-        expirationTime: BigInt(envelope.attestation.message.expirationTime),
-      },
-    };
+    const attestation = fromStoredAttestation(envelope.attestation);
 
     const valid = offchain.verifyOffchainAttestationSignature(envelope.signer, attestation);
     if (!valid) {

@@ -42,8 +42,18 @@ export interface AttestationEnvelope {
   readonly attestation: StoredAttestation;
 }
 
+/**
+ * These two are inverses, and they sit together for that reason rather than for
+ * reuse — `fromStoredAttestation` has one caller.
+ *
+ * The pairing is the point. Every bigint field one of them stringifies, the
+ * other has to restore. Kept apart, a field added to the SDK's shape could be
+ * handled in one direction and forgotten in the other, and the symptom would be
+ * signature verification failing on attestations that are perfectly good.
+ */
+
 /** Narrow the SDK's bigint fields to strings so the envelope survives JSON. */
-function toStoredAttestation(attestation: SignedOffchainAttestation): StoredAttestation {
+export function toStoredAttestation(attestation: SignedOffchainAttestation): StoredAttestation {
   return {
     ...attestation,
     domain: { ...attestation.domain, chainId: attestation.domain.chainId.toString() },
@@ -51,6 +61,19 @@ function toStoredAttestation(attestation: SignedOffchainAttestation): StoredAtte
       ...attestation.message,
       time: attestation.message.time.toString(),
       expirationTime: attestation.message.expirationTime.toString(),
+    },
+  };
+}
+
+/** Widen the stored strings back to the bigints the SDK's verifier expects. */
+export function fromStoredAttestation(stored: StoredAttestation): SignedOffchainAttestation {
+  return {
+    ...stored,
+    domain: { ...stored.domain, chainId: BigInt(stored.domain.chainId) },
+    message: {
+      ...stored.message,
+      time: BigInt(stored.message.time),
+      expirationTime: BigInt(stored.message.expirationTime),
     },
   };
 }

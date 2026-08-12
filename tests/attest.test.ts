@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { attestClaim } from "../src/attest/attest.js";
+import { attestClaim, fromStoredAttestation, toStoredAttestation } from "../src/attest/attest.js";
 import { loadSigner } from "../src/attest/signer.js";
 import { CLAIM_SCHEMA_UID } from "../src/attest/schema.js";
 import type { Claim } from "../src/types.js";
@@ -61,5 +61,26 @@ describe("attestClaim", () => {
     expect(BigInt(envelope.attestation.domain.chainId)).toBe(8453n);
     expect(BigInt(envelope.attestation.message.time)).toBe(1_755_000_000n);
     expect(BigInt(envelope.attestation.message.expirationTime)).toBe(0n);
+  });
+
+  it("restores every field the stored form narrowed, and nothing else", async () => {
+    // The invariant the stored/restored pair exists for: a bigint field
+    // stringified on the way out has to come back a bigint, or the verifier
+    // hands the SDK a wrong-typed message and good attestations fail to verify.
+    // Asserting the whole object rather than three named fields is what makes
+    // this catch a field added to the SDK's shape and handled in one direction.
+    const envelope = await attestClaim(claim, signer, 1_755_000_000n);
+    const restored = fromStoredAttestation(envelope.attestation);
+
+    expect(restored.domain.chainId).toBe(8453n);
+    expect(restored.message.time).toBe(1_755_000_000n);
+    expect(restored.message.expirationTime).toBe(0n);
+    expect(typeof restored.uid).toBe("string");
+
+    // Round trip: narrowing what was just restored must reproduce the stored
+    // form exactly, so neither direction can quietly drop or add a field.
+    expect(JSON.parse(JSON.stringify(toStoredAttestation(restored)))).toEqual(
+      JSON.parse(JSON.stringify(envelope.attestation)),
+    );
   });
 });
