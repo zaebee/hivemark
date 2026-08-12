@@ -70,4 +70,22 @@ describe("verifyEnvelope", () => {
     expect(said).toContain("time");
     expect(result.unverifiable.length).toBeGreaterThanOrEqual(2);
   });
+
+  it("still calls it attested when only the denormalized identity_id was edited, but not ok", async () => {
+    const envelope = await attestClaim(claim, signer, 1_755_000_000n);
+    const edited = { ...envelope, identity_id: `0x${"ff".repeat(32)}` as const };
+    const result = verifyEnvelope(edited);
+    expect(result.attested).toBe(true);
+    expect(result.ok).toBe(false);
+    expect(result.failures.join(" ")).toMatch(/identity_id/);
+  });
+
+  it("still calls it attested when only the denormalized claim_hash was edited, but not ok", async () => {
+    const envelope = await attestClaim(claim, signer, 1_755_000_000n);
+    const edited = { ...envelope, claim_hash: `0x${"ff".repeat(32)}` as const };
+    const result = verifyEnvelope(edited);
+    expect(result.attested).toBe(true);
+    expect(result.ok).toBe(false);
+    expect(result.failures.join(" ")).toMatch(/claim_hash/);
+  });
 });
