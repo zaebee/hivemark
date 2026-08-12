@@ -119,9 +119,50 @@ collapsed into one score:
 
 ### Badge
 
-An ERC-721 with transfers locked (ERC-5192 `locked()`), minted **once per
-identity birth**. Track record is resolved dynamically through `tokenURI`, so
-the cost is paid per entity, not per review.
+**Retracted 2026-08-12, before implementation.** This section specified an
+ERC-721 with transfers locked (ERC-5192), minted once per identity. It is
+replaced by an **EAS birth attestation** carrying the genome, for reasons that
+only became clear once the rest of the design existed.
+
+**A token cannot confer existence here, because identity is content-addressed.**
+`identity_id` is the hash of the genome and the address is derived from it, so
+anyone holding a genome computes both without a chain, today. A contract would
+not create an entity; it would announce one. An attestation announces the same
+thing, on the same chain, in a public registry, with no code of ours in it.
+
+**The keyless address undercuts what a token would buy.** An NFT's practical
+advantage is appearing in a wallet — but the owner address has no private key by
+construction, so the token would sit in a wallet nobody can open. Explorer
+visibility by address remains, and an attestation has that too.
+
+**Deferring costs nothing, and that is unusual.** Because identities are
+content-addressed, a token minted later attaches to exactly the same entities,
+retroactively. Unlike the signing domain — which had to be settled before the
+first signature or invalidate everything — this decision stays open. Writing
+permanent, unpatchable on-chain code to buy something available later is the
+wrong trade for a first version.
+
+What is **not** claimed: that a token and an attestation are equivalent in
+meaning. A token reads culturally as an object, an attestation as a record, and
+for a project about giving digital entities standing that difference is real. It
+is a reason the option is kept open rather than closed.
+
+### Birth attestation
+
+One EAS onchain attestation per identity, the first time it is seen, carrying:
+
+```
+identityId   bytes32     entity address (derived, keyless)
+provider, finderModel, skepticModel, contextMode, guardianVersion
+genomeSchemaVersion       firstSeen uint64
+```
+
+The whole genome is published, not just its hash — the same principle as
+`leafDomain` in the anchor schema. A reader who has the record can recompute the
+identity, the address and the bee without asking us for anything.
+
+`firstSeen` is the earliest `reviewed_at` among that identity's reviews, so it is
+derived from data rather than from when we got round to announcing.
 
 **Ownership.** The owner address is derived from the genome:
 
@@ -252,7 +293,8 @@ key in CI would be the largest new attack surface in the project — the one thi
 `attest` was careful to avoid. `docs/attestation-signers.md` gains a row for it:
 this key spends, so it is not the signing key and must not be confused with one.
 
-**3. SBT mint — rare.** Only on the birth of a new identity.
+**3. Birth attestation — rare.** Only the first time an identity is seen. Three
+exist in the current corpus, so this is a handful of transactions, not a stream.
 
 ### Cost
 
@@ -310,7 +352,7 @@ identities — visible as a new generation rather than as corruption of old data
 | re-run of the same PR | dedup by `claimHash`; no duplicate attestation |
 | human disagrees with the skeptic | new **superseding** attestation; history never rewritten |
 | anchor tx fails or reorgs | idempotent retry; a missed week is recorded as a gap, never backfilled silently |
-| identity already minted | contract reverts — one SBT per genome |
+| identity already announced | refused — one birth attestation per genome |
 
 ### Survivorship bias must be displayed
 
@@ -338,8 +380,8 @@ ordinary review.
   later `reviewed_at` while both remain in history.
 - **Merkle:** a valid proof verifies; a tampered claim does not.
 - **Address:** deterministic and matching the published derivation.
-- **Contract:** transfer reverts (ERC-5192); minting a known genome twice
-  reverts.
+- **Birth:** an identity already announced is not announced twice; the published
+  genome recomputes to the identity_id it claims.
 - **End-to-end on real data:** `benchmarks/martian-reviews.jsonl` in
   codegraph-brain holds 36 real reviews and 116 findings. The first run must
   build track records from that **actual** history, not from synthetic
@@ -385,12 +427,12 @@ This milestone is independently useful: if the numbers turn out uninteresting,
 nothing has been spent finding out.
 
 **Milestone 2 — verifiability.** `attest` (free, signed), then `anchor`, then
-the SBT contract. Each of the three is separately shippable in that order, and
+the birth attestation. Each of the three is separately shippable in that order, and
 the first of them still costs nothing.
 
 Milestone 1 is complete and merged. The second implementation plan covers
-**`attest` only** — no wallet, no transaction, no key in CI. `anchor` and the SBT
-contract each get their own plan, and the questions they raise (funding a
+**`attest` only** — no wallet, no transaction, no key in CI. `anchor` and the
+birth attestation each get their own plan, and the questions they raise (funding a
 wallet, where the key lives, how a missed week is recorded) are deferred to
 them. The one decision `attest` cannot defer is the signing domain, because it
 is covered by every signature — settled above.
