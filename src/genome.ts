@@ -52,6 +52,6 @@ export function genomeOf(record: ReviewRecord): Genome {
     finder_model: record.finder_model,
     skeptic_model: record.skeptic_model ?? null,
     context_mode: record.had_graph ? "graph" : "diff-only",
-    guardian_version: record.guardian_sha ?? null,
+    guardian_version: record.guardian_sha,
   };
 }

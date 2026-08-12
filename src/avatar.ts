@@ -38,9 +38,14 @@ const PALETTES: Record<Provider, Palette> = {
  */
 const INK = "var(--hivemark-ink, #191B16)";
 
-/** Generation marker: a Guardian revision maps to a band count. */
-function bandCount(guardianVersion: string | null): number {
-  if (!guardianVersion) return 1;
+/**
+ * Generation marker: a Guardian revision maps to a band count.
+ *
+ * No null branch — the published contract requires `guardian_sha` on every
+ * record, so a genome without one cannot reach here. A non-hex head still can
+ * (nothing constrains the string's shape), and falls back to a single band.
+ */
+function bandCount(guardianVersion: string): number {
   const head = Number.parseInt(guardianVersion.slice(0, 2), 16);
   return Number.isNaN(head) ? 1 : 2 + (head % 3);
 }

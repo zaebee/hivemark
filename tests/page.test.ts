@@ -47,20 +47,54 @@ describe("renderPage", () => {
     expect(renderPage([make()])).toContain("cal_dot_com");
   });
 
-  it("warns when two identities reviewed near-disjoint corpora", () => {
+  it("quantifies the overlap rather than issuing a bare warning", () => {
     const graph = make({ corpus: [["cal_dot_com", 10]] });
     const diff = make({
       identity_id: `0x${"22".repeat(32)}`,
       genome: { ...make().genome, context_mode: "diff-only" },
       corpus: [["keycloak", 4]],
     });
-    expect(renderPage([graph, diff]).toLowerCase()).toContain("not a controlled comparison");
+    const html = renderPage([graph, diff]);
+    expect(html).toContain("share 0 of the 2 projects");
+    expect(html.toLowerCase()).toContain("not a controlled comparison");
   });
 
-  it("omits the warning when identities share their corpus", () => {
+  it("still reports a high overlap, letting the number carry the severity", () => {
+    // No threshold suppresses this: 3 of 4 is mild, and the reader can see that.
+    const a = make({ corpus: [["grafana", 5], ["sentry", 2], ["keycloak", 1]] });
+    const b = make({
+      identity_id: `0x${"22".repeat(32)}`,
+      corpus: [["grafana", 5], ["sentry", 2], ["keycloak", 1], ["discourse", 3]],
+    });
+    expect(renderPage([a, b])).toContain("share 3 of the 4 projects");
+  });
+
+  it("caveats a subset, which an overlap-against-the-smaller check would miss", () => {
+    // The larger reviewer saw projects the smaller never touched — the confound
+    // is present even though every project of A appears in B.
     const a = make({ corpus: [["grafana", 5]] });
-    const b = make({ identity_id: `0x${"22".repeat(32)}`, corpus: [["grafana", 5]] });
+    const b = make({
+      identity_id: `0x${"22".repeat(32)}`,
+      corpus: [["grafana", 5], ["keycloak", 4]],
+    });
+    expect(renderPage([a, b])).toContain("share 1 of the 2 projects");
+  });
+
+  it("omits the caveat entirely when corpora are identical", () => {
+    const a = make({ corpus: [["grafana", 5]] });
+    const b = make({ identity_id: `0x${"22".repeat(32)}`, corpus: [["grafana", 9]] });
     expect(renderPage([a, b]).toLowerCase()).not.toContain("not a controlled comparison");
+  });
+
+  it("names the worst-overlapping pair when several exist", () => {
+    const shared = make({ corpus: [["grafana", 5]] });
+    const alsoShared = make({ identity_id: `0x${"22".repeat(32)}`, corpus: [["grafana", 5]] });
+    const stranger = make({
+      identity_id: `0x${"33".repeat(32)}`,
+      genome: { ...make().genome, context_mode: "diff-only" },
+      corpus: [["keycloak", 4]],
+    });
+    expect(renderPage([shared, alsoShared, stranger])).toContain("share 0 of the 2 projects");
   });
 
   it("escapes markup inside a model name it does accept", () => {

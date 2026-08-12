@@ -15,7 +15,8 @@ export interface Genome {
   readonly finder_model: string;
   readonly skeptic_model: string | null;
   readonly context_mode: "graph" | "diff-only";
-  readonly guardian_version: string | null;
+  /** Never null: the published contract requires it on every record. */
+  readonly guardian_version: string;
 }
 
 export interface Claim {

@@ -4,6 +4,7 @@ import { RawFindingSchema, ReviewRecordSchema } from "../src/schema.js";
 
 const FIXTURE = "tests/fixtures/martian-reviews.sample.jsonl";
 const PYDANTIC_SCHEMA = "tests/fixtures/finding.schema.json";
+const CONTRACT_SCHEMA = "tests/fixtures/reviewrecord.schema.json";
 
 describe("ReviewRecordSchema", () => {
   it("validates every record in the real fixture", () => {
@@ -28,6 +29,73 @@ describe("ReviewRecordSchema", () => {
       findings: [],
     };
     expect(ReviewRecordSchema.safeParse(bad).success).toBe(false);
+  });
+});
+
+/**
+ * Drift guard for the outer review record.
+ *
+ * `cgis.guardian.martian.ReviewRecord` reached PyPI in codegraph-brain 0.11.0,
+ * so this half is now a published contract too. Regenerate with:
+ *
+ *   pip install codegraph-brain==0.11.0
+ *   python -c "import json;from cgis.guardian.martian import ReviewRecord;\
+ *              print(json.dumps(ReviewRecord.model_json_schema(),indent=2,sort_keys=True))" \
+ *     > tests/fixtures/reviewrecord.schema.json
+ *
+ * The assertion is deliberately *projection*, not equality. hivemark consumes a
+ * subset — it never reads token counts or durations — and demanding those fields
+ * would break the pipeline over data it does not use. What must hold is that we
+ * invent nothing and promise nothing the contract does not guarantee.
+ */
+describe("ReviewRecordSchema is a faithful projection of the published contract", () => {
+  const contract = JSON.parse(readFileSync(CONTRACT_SCHEMA, "utf8")) as {
+    required: string[];
+    properties: Record<string, { type?: string; anyOf?: Array<{ type?: string }> }>;
+  };
+
+  const ours = ReviewRecordSchema.shape;
+  const nullableInContract = (name: string): boolean =>
+    (contract.properties[name]?.anyOf ?? []).some((v) => v.type === "null");
+
+  it("invents no field the contract does not declare", () => {
+    for (const name of Object.keys(ours)) {
+      expect(Object.keys(contract.properties), `${name} is not in the contract`).toContain(name);
+    }
+  });
+
+  it("never requires a field the contract leaves optional", () => {
+    const contractRequired = new Set(contract.required);
+    for (const [name, field] of Object.entries(ours)) {
+      if (field.isOptional()) continue;
+      expect(contractRequired, `we require ${name}, the contract does not`).toContain(name);
+    }
+  });
+
+  it("accepts null exactly where the contract does", () => {
+    for (const [name, field] of Object.entries(ours)) {
+      // A field we allow to be null must be nullable upstream, or we would
+      // manufacture a value the producer never emits.
+      if (field.isNullable()) {
+        expect(nullableInContract(name), `we allow null for ${name}, the contract does not`).toBe(
+          true,
+        );
+      }
+    }
+  });
+
+  it("agrees that guardian_sha is present and never null", () => {
+    // The field that decides a genome's generation. If this ever loosens
+    // upstream, the identity model needs revisiting, not a silent fallback.
+    expect(contract.required).toContain("guardian_sha");
+    expect(nullableInContract("guardian_sha")).toBe(false);
+    expect(ours.guardian_sha.isNullable()).toBe(false);
+  });
+
+  it("agrees that skeptic_model may be null", () => {
+    // A badge without a stinger depends on this staying nullable.
+    expect(nullableInContract("skeptic_model")).toBe(true);
+    expect(ours.skeptic_model.isNullable()).toBe(true);
   });
 });
 

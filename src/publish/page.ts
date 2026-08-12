@@ -7,14 +7,10 @@ const SURVIVORSHIP =
   "survivorship-biased by construction: every track record here is " +
   "systematically optimistic.";
 
-const CONFOUNDED =
-  "These identities reviewed near-disjoint sets of projects, so the rates " +
-  "below are not a controlled comparison — a difference between them may be a " +
-  "difference between corpora rather than between reviewers.";
-
 export function renderPage(tracks: TrackRecord[]): string {
   const notes = [`<p class="note">${esc(SURVIVORSHIP)}</p>`];
-  if (corporaAreDisjoint(tracks)) notes.push(`<p class="note">${esc(CONFOUNDED)}</p>`);
+  const divergence = leastOverlapping(tracks);
+  if (divergence) notes.push(`<p class="note">${esc(confoundedNote(divergence))}</p>`);
 
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
@@ -72,22 +68,69 @@ ${avatarSvg(track.genome, 96)}
 </dl></section>`;
 }
 
+interface Divergence {
+  readonly a: TrackRecord;
+  readonly b: TrackRecord;
+  readonly shared: number;
+  readonly union: number;
+}
+
 /**
- * Whether any two identities reviewed corpora that barely overlap.
+ * The worst-overlapping pair of identities, or null when every pair reviewed
+ * exactly the same projects.
  *
  * Cards sitting side by side read as a comparison whether or not one is
- * warranted, so the page has to say when it is not.
+ * warranted, so the page has to say when it is not. Two things this
+ * deliberately does NOT do:
+ *
+ * It does not apply an overlap threshold. A threshold would assert that above
+ * some percentage a comparison becomes controlled, which is untrue — it only
+ * becomes less confounded. Suppressing the caveat at 51% overlap trades a
+ * warning that is always on for one that is silently absent when it matters.
+ *
+ * It does not treat a subset as agreement. An earlier version compared against
+ * `min(|A|,|B|)`, so a reviewer whose corpus was wholly contained in another's
+ * passed without comment — even though the larger reviewer saw projects the
+ * smaller never touched, which is exactly the confound in question.
+ *
+ * What replaces both is a number. The note reports the actual overlap, so it
+ * reads as mild at "9 of 10" and alarming at "1 of 5" without the code having to
+ * decide which is which.
  */
-function corporaAreDisjoint(tracks: TrackRecord[]): boolean {
+function leastOverlapping(tracks: TrackRecord[]): Divergence | null {
+  let worst: Divergence | null = null;
+
   for (let i = 0; i < tracks.length; i += 1) {
     for (let j = i + 1; j < tracks.length; j += 1) {
-      const a = new Set(tracks[i]!.corpus.map(([p]) => p));
-      const b = new Set(tracks[j]!.corpus.map(([p]) => p));
-      const shared = [...a].filter((p) => b.has(p)).length;
-      if (shared < Math.min(a.size, b.size)) return true;
+      const a = tracks[i]!;
+      const b = tracks[j]!;
+      const setA = new Set(a.corpus.map(([p]) => p));
+      const setB = new Set(b.corpus.map(([p]) => p));
+      const shared = [...setA].filter((p) => setB.has(p)).length;
+      const union = new Set([...setA, ...setB]).size;
+
+      if (shared === union) continue; // identical corpora — nothing to caveat
+      if (!worst || shared * worst.union < worst.shared * union) {
+        worst = { a, b, shared, union };
+      }
     }
   }
-  return false;
+
+  return worst;
+}
+
+/** Name an identity distinctly: two reviewers can share a context mode. */
+function describe(track: TrackRecord): string {
+  return `${track.genome.provider} · ${track.genome.context_mode} · ${track.genome.guardian_version.slice(0, 7)}`;
+}
+
+function confoundedNote(d: Divergence): string {
+  return (
+    `These reviewers did not all see the same projects, so the rates below are not a ` +
+    `controlled comparison — a difference between reviewers may be a difference between ` +
+    `codebases. At their most divergent, ${describe(d.a)} and ${describe(d.b)} ` +
+    `share ${d.shared} of the ${d.union} projects they reviewed between them.`
+  );
 }
 
 function esc(value: string): string {

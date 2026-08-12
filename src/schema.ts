@@ -39,7 +39,11 @@ export const ReviewRecordSchema = z.object({
   project: z.string(),
   base_sha: z.string(),
   head_sha: z.string(),
-  guardian_sha: z.string().nullable().optional(),
+  // Required and non-nullable in the published contract. Modelled that way here
+  // too: a record without it would yield an identity that cannot say which
+  // Guardian produced it, and a generation marker guessed from nothing is worse
+  // than a refusal.
+  guardian_sha: z.string(),
   // Validated here rather than trusted downstream: dedupe orders reviews by this
   // field, and an unparseable value would otherwise reach Date.parse as NaN,
   // where every comparison is false and the first record silently wins.
@@ -47,7 +51,9 @@ export const ReviewRecordSchema = z.object({
     .string()
     .refine((s) => Number.isFinite(Date.parse(s)), "reviewed_at is not a parseable timestamp"),
   finder_model: z.string(),
-  skeptic_model: z.string().nullable().optional(),
+  // Required but nullable: null means the skeptic pass did not run, which is a
+  // real configuration and the reason a badge can lack a stinger.
+  skeptic_model: z.string().nullable(),
   had_graph: z.boolean(),
   pr_slice: z.string(),
   parse_failed: z.boolean(),
