@@ -78,6 +78,35 @@ export function fromStoredAttestation(stored: StoredAttestation): SignedOffchain
   };
 }
 
+/**
+ * The moment the review happened, not the moment we signed it.
+ *
+ * EAS reads `time` as when an attestation was created, and this deliberately
+ * departs from that. Two reasons, both discovered by running the pipeline twice
+ * rather than by reasoning about it.
+ *
+ * The wall clock made every run mint different UIDs for claims that had not
+ * changed — the same non-determinism the deterministic salt was chosen to
+ * avoid, reintroduced through another field, and invisible until two dry runs
+ * produced two different Merkle roots over identical data.
+ *
+ * Worse, the weekly anchor buckets by this field. With a signing timestamp, an
+ * anchor covering "the week of 12 August" would really cover whichever week the
+ * pipeline last ran — so re-running in October would have anchored August's
+ * reviews as October's, asserting something untrue about when they existed.
+ *
+ * The cost is that easscan will show this time as the attestation's creation
+ * date, which it is not. That is stated in the README and in
+ * `docs/anchoring.md` rather than left for someone to discover.
+ */
+function reviewTimeOf(claim: Claim): bigint {
+  const parsed = Date.parse(claim.reviewed_at);
+  if (!Number.isFinite(parsed)) {
+    throw new Error(`claim has an unparseable reviewed_at: ${claim.reviewed_at}`);
+  }
+  return BigInt(Math.floor(parsed / 1000));
+}
+
 /** Constructed without a provider: nothing here touches the network. */
 const offchain = new Offchain(
   { address: SIGNING_DOMAIN.address, chainId: SIGNING_DOMAIN.chainId, version: SIGNING_DOMAIN.version },
@@ -96,18 +125,20 @@ const offchain = new Offchain(
  * `expirationTime` is 0 (never expires) and `revocable` is true, matching the
  * schema's own revocability. Revocation itself is an onchain action and belongs
  * to a later milestone; declaring it here only keeps that door open.
+ *
+ * `time` comes from the review, not the wall clock — see `reviewTimeOf`.
  */
 export async function attestClaim(
   claim: Claim,
   signer: Signer,
-  now: bigint = BigInt(Math.floor(Date.now() / 1000)),
+  time: bigint = reviewTimeOf(claim),
 ): Promise<AttestationEnvelope> {
   const attestation = await offchain.signOffchainAttestation(
     {
       schema: CLAIM_SCHEMA_UID,
       // The reviewer's own soulbound address, recomputed from its identity.
       recipient: ownerAddress(claim.identity_id),
-      time: now,
+      time,
       expirationTime: 0n,
       revocable: true,
       refUID: `0x${"00".repeat(32)}`,
