@@ -18,11 +18,22 @@ same hash, for which no private key exists.
 **Milestone 1 (done):** offchain track records, page, shields badges,
 genome-derived bee badges. No wallet, no contract, no gas.
 
-**Milestone 2, step 1 (this):** every claim is signed as an EAS-format offchain
+**Milestone 2, step 1 (done):** every claim is signed as an EAS-format offchain
 attestation bound to the Base mainnet domain, and verifies against the public key
-alone — still no wallet, no transaction, no key in CI.
+alone — no wallet, no transaction, no key in CI.
 
-**Still ahead:** a weekly Merkle anchor for timestamps, then the SBT contract.
+**Milestone 2, step 2 (this):** one Merkle root per calendar week, published as
+an EAS onchain attestation, so an attestation can be shown to have existed no
+later than a given block. Run by hand — see `docs/anchoring.md`. A skipped week
+stays a gap and is never backfilled, because an anchor published late would
+assert that its contents existed by a date that has now passed.
+
+**Still ahead:** the SBT contract.
+
+An attestation's `time` is the moment the **review** happened, not the moment it
+was signed — a deliberate departure from how EAS reads that field, because the
+weekly anchor buckets by it and a signing timestamp would file old reviews under
+whichever week the pipeline last ran. See `docs/anchoring.md`.
 
 ### What a signature does and does not say
 

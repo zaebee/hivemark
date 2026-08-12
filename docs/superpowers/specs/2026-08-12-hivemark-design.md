@@ -234,14 +234,47 @@ attestations, plus period bounds and count, onchain on Base. This is what a
 signature alone cannot give: proof that a claim existed **no later than** a
 given date. Hundreds of reviews still cost one transaction per week.
 
+**Settled 2026-08-12, before implementation.** The root travels as an **EAS
+onchain attestation** under its own schema, not as a contract of our own. A
+contract to store 32 bytes a week would be a permanent liability — written,
+tested, deployed and then never touched — to reproduce something the schema
+registry already does. Using EAS also means the anchor appears on easscan beside
+the claims it covers, and reuses every piece already built.
+
+Registering the claim schema moves into this milestone too, since it is the
+first step that spends gas at all. A pleasant consequence: the schema UID is
+derived rather than assigned, so **every attestation signed before registration
+resolves retroactively** the moment the schema exists.
+
+The anchoring key is a **separate wallet holding a minimal balance**, and the
+anchor is **run by hand**. Weekly cadence does not need automation, and a funded
+key in CI would be the largest new attack surface in the project — the one thing
+`attest` was careful to avoid. `docs/attestation-signers.md` gains a row for it:
+this key spends, so it is not the signing key and must not be confused with one.
+
 **3. SBT mint — rare.** Only on the birth of a new identity.
 
 ### Cost
 
-Contract deployment is a one-time single-digit-dollar item on an L2; mints occur
-only when a genome is new; the anchor is one transaction per week. Attestations,
-avatars and the page are free. **Verify current gas before committing to
-figures** — they move.
+**Measured 2026-08-12, correcting an earlier estimate that was wrong by two
+orders of magnitude.** This document previously described the running cost as
+roughly a coffee a month. At Base's gas price of 0.0060 gwei and ETH at $1,883:
+
+| | |
+|---|---|
+| one anchor transaction (~120k gas) | **$0.0014** |
+| schema registration (~200k gas, one-off) | **$0.0023** |
+| a full year of weekly anchors | **$0.07** |
+
+Seven cents a year. Gas moves, so re-measure before quoting these — but the
+conclusion survives a hundredfold increase, which puts a year at seven dollars.
+
+This changes what the constraint actually is. **Money is not the limit; key
+custody is.** The anchoring key spends funds, unlike the signing key, which
+spends nothing and could therefore be treated casually by comparison. Every
+decision about the anchor should be argued on operational risk, never on cost.
+
+Attestations, avatars and the page remain free.
 
 The chain is the *showcase* layer, not the *rigour* layer. Rigour comes from
 Guardian. Anchoring adds permanence, public timestamps and independent

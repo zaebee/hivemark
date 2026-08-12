@@ -63,6 +63,24 @@ describe("attestClaim", () => {
     expect(BigInt(envelope.attestation.message.expirationTime)).toBe(0n);
   });
 
+  it("stamps the review's time, not the clock, so a rerun mints the same uid", async () => {
+    // Two signings with no explicit time. A wall-clock default would give these
+    // different uids, which is exactly what broke the anchor's weekly bucketing
+    // before this was found.
+    const first = await attestClaim(claim, signer);
+    const second = await attestClaim(claim, signer);
+    expect(first.attestation.uid).toBe(second.attestation.uid);
+    expect(first.attestation.message.time).toBe(
+      String(Math.floor(Date.parse(claim.reviewed_at) / 1000)),
+    );
+  });
+
+  it("refuses a claim whose reviewed_at cannot be parsed", async () => {
+    await expect(attestClaim({ ...claim, reviewed_at: "whenever" }, signer)).rejects.toThrow(
+      /unparseable reviewed_at/i,
+    );
+  });
+
   it("restores every field the stored form narrowed, and nothing else", async () => {
     // The invariant the stored/restored pair exists for: a bigint field
     // stringified on the way out has to come back a bigint, or the verifier
