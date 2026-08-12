@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { run } from "../src/cli.js";
 import { loadSigner } from "../src/attest/signer.js";
 import { verifyEnvelope } from "../src/attest/verify.js";
@@ -62,5 +63,24 @@ describe("attestation over the real corpus", () => {
       const result = verifyEnvelope(envelope);
       expect(result.ok, result.failures.join("; ")).toBe(true);
     }
+  });
+});
+
+describe("cli entry point on a real failure", () => {
+  // A subprocess, not a call into `main` directly: what's under test is the
+  // `main().catch(...)` wiring at the bottom of src/cli.ts itself, which only
+  // runs when the module is invoked as an entry point.
+  it("exits non-zero with a clean stderr line, never the key or a stack dump", () => {
+    const badKey = "not-a-real-private-key";
+    const result = spawnSync(
+      "bun",
+      ["src/cli.ts", "tests/fixtures/martian-reviews.sample.jsonl", "dist-cli-entry-test"],
+      { env: { ...process.env, HIVEMARK_SIGNING_KEY: badKey }, encoding: "utf8" },
+    );
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("hivemark:");
+    expect(result.stderr).not.toContain(badKey);
+    expect(result.stderr).not.toContain("    at "); // no stack trace
   });
 });

@@ -76,4 +76,16 @@ async function main(): Promise<void> {
   }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) main();
+// The runtime already exits non-zero on an unhandled rejection (verified: both
+// bun and node do). This catch exists for message quality, not exit status —
+// so a script reading this CLI's output sees one clean line instead of a
+// runtime-level stack dump. `err.message` only, never `cause` or the raw
+// value: `main` reaches `loadSigner`, and the same key-hygiene rule that keeps
+// its thrown message free of key material would be defeated by printing
+// anything beyond that message here.
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main().catch((err: unknown) => {
+    console.error(`hivemark: ${err instanceof Error ? err.message : "unknown error"}`);
+    process.exitCode = 1;
+  });
+}
