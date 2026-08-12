@@ -106,6 +106,34 @@ describe("proposalsFrom", () => {
     expect([...distances].sort((a, b) => a - b)).toEqual(distances);
   });
 
+  it("does not propose a configuration already run on an older revision", () => {
+    // The failure this catches: subtraction by identity would miss it, because
+    // a candidate carries the newest revision while the identity that ran it
+    // carries whichever was current then, so their hashes differ. It surfaced
+    // only on the real corpus — the fixtures above give every genome the same
+    // revision, so the case could not arise.
+    const onOldRevisions: Vocabulary = {
+      ...vocab,
+      newestGuardian: "revision-3",
+      existing: [
+        genome({ guardian_version: "revision-1" }),
+        genome({
+          guardian_version: "revision-2",
+          provider: "mistral",
+          finder_model: "mistral-medium-latest",
+          skeptic_model: "mistral-medium-latest",
+        }),
+      ],
+    };
+    const proposals = proposalsFrom(onOldRevisions);
+
+    // Still two — the same two as when everything shared a revision.
+    expect(proposals).toHaveLength(2);
+    // And nothing at distance 0, which is what an already-run configuration
+    // dressed in a new revision would look like.
+    for (const p of proposals) expect(p.distance).toBeGreaterThan(0);
+  });
+
   it("omits a candidate no pair of parents can cover", () => {
     // One parent only: nothing can be recombined, so nothing is reachable even
     // though the vocabulary would enumerate four combinations.
