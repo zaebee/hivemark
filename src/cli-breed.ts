@@ -15,6 +15,11 @@ import type { ReviewRecord } from "./schema.js";
 function main(): void {
   const args = process.argv.slice(2);
   const outIndex = args.indexOf("--out");
+  if (outIndex !== -1 && args[outIndex + 1] === undefined) {
+    // Silently writing nothing would be the worst outcome: the run looks like a
+    // success and the file the caller asked for is simply absent.
+    throw new Error("--out needs a directory");
+  }
   const outDir = outIndex === -1 ? null : (args[outIndex + 1] ?? null);
   // The guard on `outIndex === -1` is load-bearing: without `--out` the index is
   // -1, so `outIndex + 1` is 0 and the first corpus path would be silently

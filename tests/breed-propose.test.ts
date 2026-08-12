@@ -93,12 +93,54 @@ describe("proposalsFrom", () => {
     }
   });
 
-  it("is deterministic in content and order", () => {
-    const once = proposalsFrom(vocab).map((p) => p.identity_id);
-    const twice = proposalsFrom({ ...vocab, existing: [...vocab.existing].reverse() }).map(
-      (p) => p.identity_id,
-    );
+  it("is deterministic in content and order, whole objects included", () => {
+    // Comparing only identity_id would have missed it: `nearest`, `differsIn`
+    // and `parents` all depend on which existing identity is examined first,
+    // and ties are guaranteed whenever one configuration ran under several
+    // Guardian revisions. `differsIn` is a claim about what an experiment
+    // controls for, so it must not change because arguments were reordered.
+    const once = proposalsFrom(vocab);
+    const twice = proposalsFrom({ ...vocab, existing: [...vocab.existing].reverse() });
     expect(twice).toEqual(once);
+  });
+
+  it("picks the same nearest when two existing identities tie", () => {
+    // The same configuration under two revisions: both are equally near, so
+    // something other than arrival order has to decide.
+    const tied: Vocabulary = {
+      ...vocab,
+      existing: [
+        genome({ guardian_version: "rev-a" }),
+        genome({ guardian_version: "rev-b" }),
+        genome({
+          provider: "mistral",
+          finder_model: "mistral-medium-latest",
+          skeptic_model: "mistral-medium-latest",
+        }),
+      ],
+    };
+    const forward = proposalsFrom(tied);
+    const backward = proposalsFrom({ ...tied, existing: [...tied.existing].reverse() });
+    expect(backward.map((p) => p.nearest)).toEqual(forward.map((p) => p.nearest));
+    expect(backward.map((p) => p.differsIn)).toEqual(forward.map((p) => p.differsIn));
+  });
+
+  it("does not merge two configurations whose slot values share a separator", () => {
+    // A joined key would collide here: "a b" + sep + "c" equals "a" + sep +
+    // "b c" for any single-character separator that can appear in a model name.
+    const spaced: Vocabulary = {
+      finderModels: ["gemini-a b", "gemini-a"],
+      skepticModels: ["gemini-c", "gemini-b c"],
+      contextModes: ["graph"],
+      newestGuardian: "newest",
+      existing: [
+        genome({ finder_model: "gemini-a b", skeptic_model: "gemini-c" }),
+        genome({ finder_model: "gemini-a", skeptic_model: "gemini-b c" }),
+      ],
+    };
+    // Four combinations, two already run — so two proposals, and neither of the
+    // two existing ones may vanish into the other.
+    expect(proposalsFrom(spaced)).toHaveLength(2);
   });
 
   it("orders by distance ascending", () => {

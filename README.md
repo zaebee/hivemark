@@ -47,7 +47,7 @@ whichever week the pipeline last ran. See `docs/anchoring.md`.
 
 `bun run breed <corpus.jsonl>...` names the reviewer configurations nobody has
 run yet, reachable by recombining the ones who have — closing the loop from
-track records back to new reviews. A proposal has an identity and a bee but no
+track records back to new reviews. A proposal has an identity but no
 claims and no birth: it becomes an entity only by being run. See
 `docs/breeding.md`.
 

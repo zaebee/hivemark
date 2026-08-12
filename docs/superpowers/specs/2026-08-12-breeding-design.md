@@ -116,7 +116,6 @@ Every argument that is not `--out` or its value is a corpus path. Per proposal:
 ```
 finder · skeptic · context           distance 1 from ae9d8013 (skeptic)
   identity   0x…      no birth, no claims — nothing has run yet
-  bee        mistral · graph · with stinger
   parents    ae9d8013 × 1889b8a4
 ```
 
@@ -140,6 +139,12 @@ configurations run on 5 Guardian revisions:
 Verified against the corpus before this document was committed, rather than
 predicted and hoped for.
 
+**Confirmed on implementation.** The corpus had grown to 89 reviews by then, and
+the count held: five proposals, four cross-provider, all at distance 1. It only
+held after two bugs were found by running — subtraction keyed on identity rather
+than configuration, which returned two already-run configurations as proposals,
+and a CLI that dropped its first argument.
+
 If those five turn out uninteresting, that is the honest outcome and it cost
 nothing to learn.
 
@@ -147,7 +152,7 @@ nothing to learn.
 
 | situation | behaviour |
 |---|---|
-| a candidate equals an existing identity | omitted — it is a fact, not a proposal |
+| a candidate matches a configuration already run | omitted — it is a fact, not a proposal. Matched on the three heritable slots, not on the identity hash: the same configuration under an older revision hashes differently and would otherwise return as a proposal at distance 0 |
 | no parent pair covers a candidate | not proposed; it is unreachable from this corpus |
 | corpus contains one identity | no proposals, and that is correct, not an error |
 | a model name outside the provider table | refused by `providerOf`, as everywhere else |
