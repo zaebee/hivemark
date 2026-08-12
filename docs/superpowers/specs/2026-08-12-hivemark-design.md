@@ -504,3 +504,19 @@ doing *before* breeding rather than after.
 The constraint from §Badge still binds: proportions may be read from the genome
 and never from the track record. A body responding to confirmations would make a
 fixed identity look mutable.
+
+**Agreed direction for where the ratios come from, once breeding exists.** The
+base should be the measured morphology of *Apis mellifera*, cited — that turns
+the constants from one person's taste into a fact about the world, which is the
+standard every other number in this project is held to. Individual variation
+then comes from bits of `identity_id`, within bounds tight enough that a bee
+stays a bee. Determinism survives, since identical genomes hash identically; what
+changes is that two distinct identities differ in build and not only in colour
+and wing count.
+
+Deliberately after breeding, not before: interpolation should be seen working on
+one fixed set of proportions before a second source of variation is added to it.
+
+The tempting third source is refused. Numbers from a review — confirmed, refuted,
+impact — are track record, and a bee that filled out as findings were confirmed
+would look alive at the cost of showing a fixed identity as mutable.

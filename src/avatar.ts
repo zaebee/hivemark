@@ -1,3 +1,4 @@
+import { bodyPlan, RATIO, type BodyPlan } from "./body.js";
 import { providerOf } from "./genome.js";
 import { identityId } from "./identity.js";
 import type { Genome, Provider } from "./types.js";
@@ -11,9 +12,9 @@ import type { Genome, Provider } from "./types.js";
  * mutable. When a track record is shown, it belongs to a layer drawn outside
  * this SVG.
  *
- * The parts also make lineage legible, which a hash-derived identicon cannot do:
- * a child's hash is unrelated to its parents', but a crossbred genome visibly
- * wears the wings of one parent and the palette of the other.
+ * Geometry lives in `body.ts` and this file only draws it. The split is what
+ * keeps positions out of the renderer: nothing here may invent a coordinate,
+ * because every one it needs is already on the plan.
  */
 
 interface Palette {
@@ -38,40 +39,104 @@ const PALETTES: Record<Provider, Palette> = {
  */
 const INK = "var(--hivemark-ink, #191B16)";
 
-/**
- * Generation marker: a Guardian revision maps to a band count.
- *
- * No null branch — the published contract requires `guardian_sha` on every
- * record, so a genome without one cannot reach here. A non-hex head still can
- * (nothing constrains the string's shape), and falls back to a single band.
- */
-function bandCount(guardianVersion: string): number {
-  const head = Number.parseInt(guardianVersion.slice(0, 2), 16);
-  return Number.isNaN(head) ? 1 : 2 + (head % 3);
+const n = (value: number): string => value.toFixed(2);
+
+function ellipse(cx: number, cy: number, rx: number, ry: number, fill: string, plan: BodyPlan, cls = ""): string {
+  const classAttr = cls === "" ? "" : ` class="${cls}"`;
+  return (
+    `<ellipse${classAttr} cx="${n(cx)}" cy="${n(cy)}" rx="${n(rx)}" ry="${n(ry)}" ` +
+    `fill="${fill}" stroke="${INK}" stroke-width="${n(plan.strokeWidth)}"/>`
+  );
 }
 
-/** Which model does the finding — a shape, not a colour, so it reads within a palette. */
-function eyeShape(finderModel: string): string {
-  const m = finderModel.toLowerCase();
-  if (m.includes("flash")) {
-    return `<circle cx="88" cy="50" r="7" fill="${INK}"/><circle cx="112" cy="50" r="7" fill="${INK}"/>`;
-  }
-  if (m.includes("pro") || m.includes("medium") || m.includes("70b")) {
-    return `<ellipse cx="86" cy="50" rx="10" ry="7" fill="${INK}"/><ellipse cx="114" cy="50" rx="10" ry="7" fill="${INK}"/>`;
-  }
-  return `<ellipse cx="88" cy="50" rx="5" ry="9" fill="${INK}"/><ellipse cx="112" cy="50" rx="5" ry="9" fill="${INK}"/>`;
+function wings(plan: BodyPlan, palette: Palette): string {
+  const pairs = plan.rearWing === null ? [plan.wing] : [plan.rearWing, plan.wing];
+  return pairs
+    .flatMap((pair, index) => {
+      // The rear pair sits behind and is drawn first, so it reads as underneath.
+      const opacity =
+        index === 0 && plan.rearWing !== null ? RATIO.rearWingOpacity : RATIO.wingOpacity;
+      return (["l", "r"] as const).map((side) => {
+        const cx = plan.axis + (side === "l" ? -1 : 1) * (pair.reach + pair.rx * RATIO.wingClear);
+        return (
+          `<ellipse class="hm-wing hm-wing-${side}" cx="${n(cx)}" cy="${n(pair.cy)}" ` +
+          `rx="${n(pair.rx)}" ry="${n(pair.ry)}" fill="${palette.wing}" ` +
+          `fill-opacity="${opacity}" stroke="${INK}" stroke-width="${n(plan.strokeWidth)}"/>`
+        );
+      });
+    })
+    .join("");
 }
 
-function bands(count: number, palette: Palette): string {
-  const out: string[] = [];
-  for (let i = 0; i < count; i += 1) {
-    const y = 132 + i * (108 / (count + 0.6));
-    const height = 46 / (count + 1);
-    out.push(
-      `<rect class="hm-band" x="58" y="${y.toFixed(1)}" width="84" height="${height.toFixed(1)}" fill="${palette.dark}" opacity="0.92"/>`,
+function bands(plan: BodyPlan, palette: Palette): string {
+  const { abdomen, bands: count } = plan;
+  // Bands share the abdomen's vertical span, inset so the first and last do not
+  // sit on its rim. Their thickness follows from how many there are.
+  const span = abdomen.ry * 2 * RATIO.bandSpan;
+  const top = abdomen.cy - span / 2;
+  const thickness = span / (count * 2 - 1);
+
+  return Array.from({ length: count }, (_, i) => {
+    const y = top + i * thickness * 2;
+    return (
+      `<rect class="hm-band" x="${n(plan.axis - abdomen.rx)}" y="${n(y)}" ` +
+      `width="${n(abdomen.rx * 2)}" height="${n(thickness)}" fill="${palette.dark}" opacity="0.92"/>`
     );
-  }
-  return out.join("");
+  }).join("");
+}
+
+/**
+ * Eye proportions per shape.
+ *
+ * A table rather than a chain of conditionals: which shape a model gets is a
+ * fact about eyes, not a decision the renderer makes, and adding a fourth means
+ * adding a row instead of another branch.
+ */
+const EYE_SHAPE: Record<BodyPlan["eyes"], { readonly rx: number; readonly ry: number }> = {
+  round: { rx: RATIO.eyeRound, ry: RATIO.eyeRound },
+  wide: { rx: RATIO.eyeWideRx, ry: RATIO.eyeWideRy },
+  narrow: { rx: RATIO.eyeNarrowRx, ry: RATIO.eyeNarrowRy },
+};
+
+function eyes(plan: BodyPlan): string {
+  const { head, unit, axis } = plan;
+  const dx = RATIO.eyeOffset * unit;
+  const cy = head.cy - unit * RATIO.eyeRise;
+  const ratio = EYE_SHAPE[plan.eyes];
+  const shape = { rx: ratio.rx * unit, ry: ratio.ry * unit };
+
+  return (["l", "r"] as const)
+    .map((side) => {
+      const cx = axis + (side === "l" ? -dx : dx);
+      return `<ellipse cx="${n(cx)}" cy="${n(cy)}" rx="${n(shape.rx)}" ry="${n(shape.ry)}" fill="${INK}"/>`;
+    })
+    .join("");
+}
+
+function antennae(plan: BodyPlan): string {
+  const { antenna, axis, unit } = plan;
+  return (["l", "r"] as const)
+    .map((side) => {
+      const dir = side === "l" ? -1 : 1;
+      const fromX = axis + dir * unit * RATIO.antennaRootOffset;
+      const toX = axis + dir * antenna.spread;
+      const midX = axis + dir * unit * RATIO.antennaControlOffset;
+      return (
+        `<path d="M${n(fromX)} ${n(antenna.fromY)} Q${n(midX)} ${n(antenna.toY + unit * RATIO.antennaControlDrop)} ${n(toX)} ${n(antenna.toY)}" ` +
+        `fill="none" stroke="${INK}" stroke-width="${n(plan.strokeWidth)}" stroke-linecap="round"/>` +
+        `<circle cx="${n(toX)}" cy="${n(antenna.toY)}" r="${n(antenna.tip)}" fill="${INK}"/>`
+      );
+    })
+    .join("");
+}
+
+function stinger(plan: BodyPlan): string {
+  if (plan.stinger === null) return "";
+  const { from, to, halfWidth } = plan.stinger;
+  return (
+    `<polygon class="hm-stinger" points="${n(plan.axis)},${n(from)} ` +
+    `${n(plan.axis - halfWidth)},${n(to)} ${n(plan.axis + halfWidth)},${n(to)}" fill="${INK}"/>`
+  );
 }
 
 /**
@@ -85,46 +150,33 @@ function bands(count: number, palette: Palette): string {
  */
 export function avatarSvg(genome: Genome, size = 120): string {
   const palette = PALETTES[providerOf(genome.finder_model)];
-  const hasStinger = genome.skeptic_model !== null;
-  const seesStructure = genome.context_mode === "graph";
+  const plan = bodyPlan(genome);
+
   // Scoped to the identity, not to a trait: several bees are inlined into one
-  // document (the page, the specimen plate), and ids collide there. Sharing an
-  // id is harmless only while every clip has identical geometry — a guarantee
-  // that would break silently the first time the clip varies by trait.
+  // document (the page, the specimen plate), and ids collide there.
   // Deterministic, so identical genomes still render identical SVG.
   const clipId = `hm-abdomen-${identityId(genome).slice(2, 14)}`;
-
-  const rearWings = seesStructure
-    ? `<ellipse class="hm-wing hm-wing-l" cx="62" cy="112" rx="30" ry="12" fill="${palette.wing}" fill-opacity="0.55" stroke="${INK}" stroke-width="2"/>` +
-      `<ellipse class="hm-wing hm-wing-r" cx="138" cy="112" rx="30" ry="12" fill="${palette.wing}" fill-opacity="0.55" stroke="${INK}" stroke-width="2"/>`
-    : "";
-
-  const stinger = hasStinger
-    ? `<polygon class="hm-stinger" points="100,232 93,254 107,254" fill="${INK}"/>`
-    : "";
 
   const label =
     `${providerOf(genome.finder_model)} reviewer, ` +
     `${genome.context_mode} context, ` +
-    `${hasStinger ? "with" : "without"} a skeptic`;
+    `${plan.stinger === null ? "without" : "with"} a skeptic`;
 
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" ` +
-    `viewBox="0 0 200 266" role="img" aria-label="${label}">` +
-    `<defs><clipPath id="${clipId}"><ellipse cx="100" cy="176" rx="42" ry="58"/></clipPath></defs>` +
-    rearWings +
-    `<ellipse class="hm-wing hm-wing-l" cx="56" cy="96" rx="38" ry="15" fill="${palette.wing}" fill-opacity="0.75" stroke="${INK}" stroke-width="2"/>` +
-    `<ellipse class="hm-wing hm-wing-r" cx="144" cy="96" rx="38" ry="15" fill="${palette.wing}" fill-opacity="0.75" stroke="${INK}" stroke-width="2"/>` +
-    stinger +
-    `<ellipse cx="100" cy="176" rx="42" ry="58" fill="${palette.body}" stroke="${INK}" stroke-width="2.5"/>` +
-    `<g clip-path="url(#${clipId})">${bands(bandCount(genome.guardian_version), palette)}</g>` +
-    `<ellipse cx="100" cy="176" rx="42" ry="58" fill="none" stroke="${INK}" stroke-width="2.5"/>` +
-    `<ellipse cx="100" cy="106" rx="32" ry="30" fill="${palette.dark}" stroke="${INK}" stroke-width="2.5"/>` +
-    `<path d="M88 26 Q80 8 70 6" fill="none" stroke="${INK}" stroke-width="2.5" stroke-linecap="round"/>` +
-    `<path d="M112 26 Q120 8 130 6" fill="none" stroke="${INK}" stroke-width="2.5" stroke-linecap="round"/>` +
-    `<circle cx="70" cy="6" r="3.5" fill="${INK}"/><circle cx="130" cy="6" r="3.5" fill="${INK}"/>` +
-    `<circle cx="100" cy="52" r="26" fill="${palette.body}" stroke="${INK}" stroke-width="2.5"/>` +
-    eyeShape(genome.finder_model) +
+    `viewBox="0 0 ${n(plan.width)} ${n(plan.height)}" role="img" aria-label="${label}">` +
+    `<defs><clipPath id="${clipId}">` +
+    `<ellipse cx="${n(plan.axis)}" cy="${n(plan.abdomen.cy)}" rx="${n(plan.abdomen.rx)}" ry="${n(plan.abdomen.ry)}"/>` +
+    `</clipPath></defs>` +
+    wings(plan, palette) +
+    stinger(plan) +
+    ellipse(plan.axis, plan.abdomen.cy, plan.abdomen.rx, plan.abdomen.ry, palette.body, plan) +
+    `<g clip-path="url(#${clipId})">${bands(plan, palette)}</g>` +
+    ellipse(plan.axis, plan.abdomen.cy, plan.abdomen.rx, plan.abdomen.ry, "none", plan) +
+    ellipse(plan.axis, plan.thorax.cy, plan.thorax.rx, plan.thorax.ry, palette.dark, plan) +
+    antennae(plan) +
+    ellipse(plan.axis, plan.head.cy, plan.head.r, plan.head.r, palette.body, plan) +
+    eyes(plan) +
     `</svg>`
   );
 }
