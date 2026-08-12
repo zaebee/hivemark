@@ -23,11 +23,16 @@ DNA-derived avatars. No wallet, no contract, no gas.
 ## Run
 
 ```bash
-npm install
-npm test
-npm run build
-node build/src/cli.js tests/fixtures/martian-reviews.sample.jsonl dist
+bun install
+bun run test
+bun run typecheck
+bun src/cli.ts tests/fixtures/martian-reviews.sample.jsonl dist
 ```
+
+Bun executes the TypeScript sources directly, resolving the `.js` import
+specifiers TypeScript requires — so there is no build step and `tsc` is kept
+only for type checking. Tests still run on vitest; moving them to `bun test` is
+a separate decision, not a consequence of this one.
 
 ## What the first run showed
 
