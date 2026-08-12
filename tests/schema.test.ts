@@ -9,7 +9,7 @@ const CONTRACT_SCHEMA = "tests/fixtures/reviewrecord.schema.json";
 describe("ReviewRecordSchema", () => {
   it("validates every record in the real fixture", () => {
     const lines = readFileSync(FIXTURE, "utf8").trim().split("\n");
-    expect(lines.length).toBe(35);
+    expect(lines).toHaveLength(35);
     for (const line of lines) {
       const parsed = ReviewRecordSchema.safeParse(JSON.parse(line));
       expect(parsed.success, `failed: ${JSON.stringify(parsed.error?.issues)}`).toBe(true);

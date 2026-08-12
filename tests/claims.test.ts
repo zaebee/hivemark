@@ -16,7 +16,7 @@ describe("claimsOf", () => {
   it("produces one claim per finding across the real fixture", () => {
     const claims = records.flatMap(claimsOf);
     const findings = records.reduce((n, r) => n + r.findings.length, 0);
-    expect(claims.length).toBe(findings);
+    expect(claims).toHaveLength(findings);
     expect(claims.length).toBeGreaterThan(0);
   });
 

@@ -14,7 +14,7 @@ describe("planBirths", () => {
   it("names every identity in the corpus when none are announced", () => {
     const plans = planBirths(records, []);
     const distinct = new Set(records.map((r) => identityId(genomeOf(r))));
-    expect(plans.length).toBe(distinct.size);
+    expect(plans).toHaveLength(distinct.size);
     expect(plans.length).toBeGreaterThan(1);
   });
 
@@ -23,7 +23,7 @@ describe("planBirths", () => {
     const existing = [{ identity_id: first } as BirthRecord];
     const plans = planBirths(records, existing);
     expect(plans.some((p) => p.identity_id === first)).toBe(false);
-    expect(plans.length).toBe(planBirths(records, []).length - 1);
+    expect(plans).toHaveLength(planBirths(records, []).length - 1);
   });
 
   it("dates each identity by its earliest review, not by the run", () => {
