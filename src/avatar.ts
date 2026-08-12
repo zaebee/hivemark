@@ -1,4 +1,4 @@
-import { bodyPlan, RATIO, type BodyPlan } from "./body.js";
+import { bodyPlan, DRAWING, type BodyPlan } from "./body.js";
 import { providerOf } from "./genome.js";
 import { identityId } from "./identity.js";
 import type { Genome, Provider } from "./types.js";
@@ -6,11 +6,12 @@ import type { Genome, Provider } from "./types.js";
 /**
  * A reviewer's badge: a bee assembled from its genome.
  *
- * Every visible trait is read from a genome field. Nothing comes from the hash,
- * and nothing comes from the track record — identity is fixed while the record
- * grows, so a body that responded to confirmations would make identity look
- * mutable. When a track record is shown, it belongs to a layer drawn outside
- * this SVG.
+ * Every visible trait is read from a genome field, and so is its build: the
+ * proportions come from hashing individual genome slots, so a body is inherited
+ * slot by slot rather than redrawn from scratch. Nothing comes from the track
+ * record — identity is fixed while the record grows, so a body that responded to
+ * confirmations would make identity look mutable. When a track record is shown,
+ * it belongs to a layer drawn outside this SVG.
  *
  * Geometry lives in `body.ts` and this file only draws it. The split is what
  * keeps positions out of the renderer: nothing here may invent a coordinate,
@@ -55,9 +56,9 @@ function wings(plan: BodyPlan, palette: Palette): string {
     .flatMap((pair, index) => {
       // The rear pair sits behind and is drawn first, so it reads as underneath.
       const opacity =
-        index === 0 && plan.rearWing !== null ? RATIO.rearWingOpacity : RATIO.wingOpacity;
+        index === 0 && plan.rearWing !== null ? DRAWING.rearWingOpacity : DRAWING.wingOpacity;
       return (["l", "r"] as const).map((side) => {
-        const cx = plan.axis + (side === "l" ? -1 : 1) * (pair.reach + pair.rx * RATIO.wingClear);
+        const cx = plan.axis + (side === "l" ? -1 : 1) * pair.offset;
         return (
           `<ellipse class="hm-wing hm-wing-${side}" cx="${n(cx)}" cy="${n(pair.cy)}" ` +
           `rx="${n(pair.rx)}" ry="${n(pair.ry)}" fill="${palette.wing}" ` +
@@ -72,7 +73,7 @@ function bands(plan: BodyPlan, palette: Palette): string {
   const { abdomen, bands: count } = plan;
   // Bands share the abdomen's vertical span, inset so the first and last do not
   // sit on its rim. Their thickness follows from how many there are.
-  const span = abdomen.ry * 2 * RATIO.bandSpan;
+  const span = abdomen.ry * 2 * DRAWING.bandSpan;
   const top = abdomen.cy - span / 2;
   const thickness = span / (count * 2 - 1);
 
@@ -85,44 +86,26 @@ function bands(plan: BodyPlan, palette: Palette): string {
   }).join("");
 }
 
-/**
- * Eye proportions per shape.
- *
- * A table rather than a chain of conditionals: which shape a model gets is a
- * fact about eyes, not a decision the renderer makes, and adding a fourth means
- * adding a row instead of another branch.
- */
-const EYE_SHAPE: Record<BodyPlan["eyes"], { readonly rx: number; readonly ry: number }> = {
-  round: { rx: RATIO.eyeRound, ry: RATIO.eyeRound },
-  wide: { rx: RATIO.eyeWideRx, ry: RATIO.eyeWideRy },
-  narrow: { rx: RATIO.eyeNarrowRx, ry: RATIO.eyeNarrowRy },
-};
-
 function eyes(plan: BodyPlan): string {
-  const { head, unit, axis } = plan;
-  const dx = RATIO.eyeOffset * unit;
-  const cy = head.cy - unit * RATIO.eyeRise;
-  const ratio = EYE_SHAPE[plan.eyes];
-  const shape = { rx: ratio.rx * unit, ry: ratio.ry * unit };
-
+  const { eye, axis } = plan;
   return (["l", "r"] as const)
     .map((side) => {
-      const cx = axis + (side === "l" ? -dx : dx);
-      return `<ellipse cx="${n(cx)}" cy="${n(cy)}" rx="${n(shape.rx)}" ry="${n(shape.ry)}" fill="${INK}"/>`;
+      const cx = axis + (side === "l" ? -eye.dx : eye.dx);
+      return `<ellipse cx="${n(cx)}" cy="${n(eye.cy)}" rx="${n(eye.rx)}" ry="${n(eye.ry)}" fill="${INK}"/>`;
     })
     .join("");
 }
 
 function antennae(plan: BodyPlan): string {
-  const { antenna, axis, unit } = plan;
+  const { antenna, axis } = plan;
   return (["l", "r"] as const)
     .map((side) => {
       const dir = side === "l" ? -1 : 1;
-      const fromX = axis + dir * unit * RATIO.antennaRootOffset;
+      const fromX = axis + dir * antenna.rootDx;
       const toX = axis + dir * antenna.spread;
-      const midX = axis + dir * unit * RATIO.antennaControlOffset;
+      const midX = axis + dir * antenna.controlDx;
       return (
-        `<path d="M${n(fromX)} ${n(antenna.fromY)} Q${n(midX)} ${n(antenna.toY + unit * RATIO.antennaControlDrop)} ${n(toX)} ${n(antenna.toY)}" ` +
+        `<path d="M${n(fromX)} ${n(antenna.fromY)} Q${n(midX)} ${n(antenna.controlY)} ${n(toX)} ${n(antenna.toY)}" ` +
         `fill="none" stroke="${INK}" stroke-width="${n(plan.strokeWidth)}" stroke-linecap="round"/>` +
         `<circle cx="${n(toX)}" cy="${n(antenna.toY)}" r="${n(antenna.tip)}" fill="${INK}"/>`
       );
@@ -175,7 +158,7 @@ export function avatarSvg(genome: Genome, size = 120): string {
     ellipse(plan.axis, plan.abdomen.cy, plan.abdomen.rx, plan.abdomen.ry, "none", plan) +
     ellipse(plan.axis, plan.thorax.cy, plan.thorax.rx, plan.thorax.ry, palette.dark, plan) +
     antennae(plan) +
-    ellipse(plan.axis, plan.head.cy, plan.head.r, plan.head.r, palette.body, plan) +
+    ellipse(plan.axis, plan.head.cy, plan.head.rx, plan.head.ry, palette.body, plan) +
     eyes(plan) +
     `</svg>`
   );

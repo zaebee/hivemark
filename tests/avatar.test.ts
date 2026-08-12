@@ -100,6 +100,33 @@ describe("traits read from the genome", () => {
   });
 });
 
+describe("the renderer draws the measured animal", () => {
+  const bodyEllipses = (svg: string) =>
+    [...svg.matchAll(/<ellipse cx="[\d.]+" cy="[\d.]+" rx="([\d.]+)" ry="([\d.]+)"[^>]*fill="#E3AE3C"/g)].map(
+      (m) => ({ rx: Number(m[1]), ry: Number(m[2]) }),
+    );
+
+  it("draws the head as the measured ellipse, not a circle", () => {
+    // A worker's head is wider than it is tall — 3.62 by 2.45 mm. The drawing's
+    // habit of a circle was a habit, not an observation.
+    const heads = bodyEllipses(avatarSvg(base)).filter((e) => e.rx > e.ry);
+    expect(heads.length).toBeGreaterThan(0);
+  });
+
+  it("gives two identities with different finders different heads", () => {
+    // Both finders are gemini and both carry "flash", so palette and eye shape
+    // are identical and the pictures can differ only in the head's geometry.
+    //
+    // An earlier version of this test compared against gemini-3.5-pro and
+    // proved nothing: that model changes the eye shape too, so the SVGs
+    // differed even with variation switched off entirely. The fixture made the
+    // case unreachable, which is the failure this suite exists to avoid.
+    expect(drawing(avatarSvg(base))).not.toBe(
+      drawing(avatarSvg({ ...base, finder_model: "gemini-3.5-flash" })),
+    );
+  });
+});
+
 describe("provider is derived, not trusted", () => {
   it("reads the palette from finder_model when provider disagrees", () => {
     // provider is an expression of finder_model. A genome carrying a mistral
