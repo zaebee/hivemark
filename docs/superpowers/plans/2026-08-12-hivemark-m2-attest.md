@@ -290,7 +290,7 @@ than trusted. Run:
 
 ```bash
 bun -e '
-import { keccak256, encodePacked, toHex } from "viem";
+import { keccak256, encodePacked, toHex, decodeAbiParameters } from "viem";
 const REGISTRY = "0x4200000000000000000000000000000000000020";
 const schema = "bytes32 identityId,string repo,uint32 pr,string commitSha,string file,uint32 line,string category,string severity,uint8 confidence,uint8 verdict,uint8 impactScore,bytes32 claimHash";
 const uid = keccak256(encodePacked(["string","address","bool"], [schema, "0x0000000000000000000000000000000000000000", true]));
@@ -300,13 +300,27 @@ const data = sel + uid.slice(2);
 const r = await fetch("https://mainnet.base.org", { method:"POST", headers:{"content-type":"application/json"},
   body: JSON.stringify({jsonrpc:"2.0",id:1,method:"eth_call",params:[{to:REGISTRY,data},"latest"]})});
 const j = await r.json();
-console.log("registry lookup:", j.result === "0x" ? "empty (schema not registered yet)" : j.result.slice(0,140));
+// getSchema(bytes32) always returns a full SchemaRecord{uid,resolver,revocable,schema}
+// struct, never bare "0x" — a call to a nonexistent mapping entry still succeeds and
+// comes back as that struct with every field zero-valued, so an unregistered schema
+// must be recognised by decoding and checking the (empty) schema string, not by
+// comparing the raw call result to "0x".
+const [record] = decodeAbiParameters(
+  [{ type: "tuple", components: [
+    { name: "uid", type: "bytes32" },
+    { name: "resolver", type: "address" },
+    { name: "revocable", type: "bool" },
+    { name: "schema", type: "string" },
+  ] }],
+  j.result,
+);
+console.log("registry lookup:", record.schema === "" ? "empty (schema not registered yet)" : record.schema);
 '
 ```
 
 Expected: a `derived uid` value, and a registry lookup that is either empty (our
 schema is not registered — correct, registration is a transaction and belongs to
-the `anchor` milestone) or a record whose returned schema string matches ours.
+the `anchor` milestone) or a record whose decoded schema string matches ours.
 
 **If the derivation cannot be confirmed this way, stop and ask** rather than
 proceeding: an attestation pointing at a UID that never resolves is worse than
