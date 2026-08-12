@@ -58,9 +58,8 @@ function main(): void {
     console.log(
       `  distance   ${p.distance} from ${p.nearest.slice(0, 10)} (${p.differsIn.join(", ")})`,
     );
-    console.log(
-      `  parents    ${p.parents.map(([a, b]) => `${a.slice(0, 10)}×${b.slice(0, 10)}`).join(", ")}\n`,
-    );
+    const parents = p.parents.map(([a, b]) => `${a.slice(0, 10)}×${b.slice(0, 10)}`).join(", ");
+    console.log(`  parents    ${parents}\n`);
   }
 
   if (outDir !== null && outDir !== undefined) {
