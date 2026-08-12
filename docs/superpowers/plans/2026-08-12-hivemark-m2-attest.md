@@ -745,7 +745,8 @@ export async function attestClaim(
   const attestation = await offchain.signOffchainAttestation(
     {
       schema: CLAIM_SCHEMA_UID,
-      recipient: ownerAddressOf(claim),
+      // The reviewer's own soulbound address, recomputed from its identity.
+      recipient: ownerAddress(claim.identity_id),
       time: now,
       expirationTime: 0n,
       revocable: true,
@@ -769,17 +770,18 @@ export async function attestClaim(
     attestation,
   };
 }
-
-/** The reviewer's soulbound address, recomputed from the identity it belongs to. */
-function ownerAddressOf(claim: Claim): string {
-  return ownerAddress(claim.identity_id);
-}
 ```
 
-Add the import it needs at the top of the file:
+The imports at the top of the file are:
 
 ```typescript
+import { EAS, Offchain, OffchainAttestationVersion } from "@ethereum-attestation-service/eas-sdk";
+import type { SignedOffchainAttestation } from "@ethereum-attestation-service/eas-sdk";
+import { EAS_CONTRACT, SIGNING_DOMAIN } from "./domain.js";
+import { CLAIM_SCHEMA_UID, encodeClaim } from "./schema.js";
+import type { Signer } from "./signer.js";
 import { ownerAddress } from "../identity.js";
+import type { Claim } from "../types.js";
 ```
 
 - [ ] **Step 4: Run it to verify it passes**
@@ -1096,11 +1098,45 @@ with the summary line gaining, after the identities line:
 
 - [ ] **Step 4: Update the existing e2e tests to await `run`**
 
-Every existing `run(TEXT)` call in `tests/e2e.test.ts` becomes `await run(TEXT)`, and
-each `it(...)` callback that uses it becomes `async`. The three assertions on
-`output.files.size` must account for `attestations.json` being absent without a
-key: they already call `run(TEXT)` with no options, so add `{ signer: null }` to
-keep them deterministic regardless of the developer's environment.
+`run` is async now, and it reads the environment when no `signer` option is
+given — so the existing tests must pass `{ signer: null }` explicitly, or they
+would start signing on a developer machine that happens to export a key. Replace
+the existing `describe("end-to-end on real Guardian data", ...)` block with:
+
+```typescript
+describe("end-to-end on real Guardian data", () => {
+  it("produces artifacts for every identity found", async () => {
+    const output = await run(TEXT, { signer: null });
+    expect(output.tracks.length).toBeGreaterThan(1);
+    expect(output.files.size).toBe(1 + output.tracks.length * 2);
+    expect(output.files.has("index.html")).toBe(true);
+  });
+
+  it("accounts for every review in the fixture", async () => {
+    const output = await run(TEXT, { signer: null });
+    expect(output.tracks.reduce((n, t) => n + t.reviews, 0)).toBe(35);
+  });
+
+  it("reports harvest warnings rather than hiding them", async () => {
+    const output = await run(`${TEXT}\n{"url":"broken`, { signer: null });
+    expect(output.warnings.length).toBe(1);
+  });
+
+  it("every badge file is valid shields JSON", async () => {
+    for (const [name, body] of (await run(TEXT, { signer: null })).files) {
+      if (!name.startsWith("badge-")) continue;
+      expect(JSON.parse(body).schemaVersion).toBe(1);
+    }
+  });
+
+  it("every avatar file is an svg", async () => {
+    for (const [name, body] of (await run(TEXT, { signer: null })).files) {
+      if (!name.startsWith("avatar-")) continue;
+      expect(body.startsWith("<svg")).toBe(true);
+    }
+  });
+});
+```
 
 - [ ] **Step 5: Run the suite**
 
