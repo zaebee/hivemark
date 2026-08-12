@@ -30,6 +30,7 @@ SchemaRegistry at `0x4200000000000000000000000000000000000020`:
 |---|---|---|
 | claim | `CLAIM_SCHEMA` in `src/attest/schema.ts` | `0x9c6648261df139b4453dd540ed2e8d821a9e775beede14ba9aae9e7202daacfb` |
 | anchor | `ANCHOR_SCHEMA` in `src/anchor/schema.ts` | `0x8ff2e1ad6186bbe4c1ac54ea7d969dcf04a8caa7d31e8ac45127bfa3cfba06bd` |
+| birth | `BIRTH_SCHEMA` in `src/birth/schema.ts` | `0x1269b8bd47c44047fac2fd6b7a7934610159b0a4f8bf3916edca95787001d0da` |
 
 Register each with `resolver = 0x0` and `revocable = true` — those two values are
 part of what the UID is derived from, so a different choice produces a different
