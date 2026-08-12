@@ -13,6 +13,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "@ethereum-attestation-service/eas-sdk": "^2.9.1",
     "viem": "2.55.13",
     "zod": "3.25.76"
   },
