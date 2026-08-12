@@ -1,4 +1,5 @@
 import { providerOf } from "./genome.js";
+import { identityId } from "./identity.js";
 import type { Genome, Provider } from "./types.js";
 
 /**
@@ -81,7 +82,12 @@ export function avatarSvg(genome: Genome, size = 120): string {
   const palette = PALETTES[providerOf(genome.finder_model)];
   const hasStinger = genome.skeptic_model !== null;
   const seesStructure = genome.context_mode === "graph";
-  const clipId = `hm-abdomen-${bandCount(genome.guardian_version)}`;
+  // Scoped to the identity, not to a trait: several bees are inlined into one
+  // document (the page, the specimen plate), and ids collide there. Sharing an
+  // id is harmless only while every clip has identical geometry — a guarantee
+  // that would break silently the first time the clip varies by trait.
+  // Deterministic, so identical genomes still render identical SVG.
+  const clipId = `hm-abdomen-${identityId(genome).slice(2, 14)}`;
 
   const rearWings = seesStructure
     ? `<ellipse class="hm-wing hm-wing-l" cx="62" cy="112" rx="30" ry="12" fill="${palette.wing}" fill-opacity="0.55" stroke="${INK}" stroke-width="2"/>` +

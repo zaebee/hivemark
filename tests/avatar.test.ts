@@ -20,6 +20,16 @@ const base: Genome = {
 
 const countOf = (svg: string, re: RegExp) => (svg.match(re) ?? []).length;
 
+/**
+ * Compare the drawing, not the identity stamped into it.
+ *
+ * The clip id is scoped to the genome's identity so many bees can be inlined in
+ * one document. Two genomes may therefore render the same picture under
+ * different ids — which is correct: they look alike but are not the same
+ * subject. Normalising the id is how a test asks about appearance alone.
+ */
+const drawing = (svg: string) => svg.replace(/hm-abdomen-[0-9a-f]+/g, "hm-abdomen");
+
 describe("avatarSvg", () => {
   it("is deterministic", () => {
     expect(avatarSvg(base)).toBe(avatarSvg({ ...base }));
@@ -86,7 +96,7 @@ describe("traits read from the genome", () => {
     // Only genome fields exist here, so the guard is that two genomes equal in
     // every visible trait render identically even when schema_version differs.
     const withOtherVersion = { ...base, schema_version: 99 };
-    expect(avatarSvg(withOtherVersion)).toBe(avatarSvg(base));
+    expect(drawing(avatarSvg(withOtherVersion))).toBe(drawing(avatarSvg(base)));
   });
 });
 
@@ -97,7 +107,20 @@ describe("provider is derived, not trusted", () => {
     // crossbreeding study produced exactly this inconsistency.
     const lying = { ...base, provider: "gemini" as const, finder_model: "mistral-medium-latest" };
     const honest = { ...base, provider: "mistral" as const, finder_model: "mistral-medium-latest" };
-    expect(avatarSvg(lying)).toBe(avatarSvg(honest));
+    // Same picture; different identities, because the genomes differ. The clip
+    // id follows identity, so only the drawing is compared here.
+    expect(drawing(avatarSvg(lying))).toBe(drawing(avatarSvg(honest)));
+    expect(avatarSvg(lying)).not.toBe(avatarSvg(honest));
+  });
+
+  it("scopes its clip id to the identity so inlined bees cannot collide", () => {
+    const a = avatarSvg(base);
+    const b = avatarSvg({ ...base, context_mode: "diff-only" });
+    const idOf = (svg: string) => svg.match(/id="(hm-abdomen-[0-9a-f]+)"/)?.[1];
+    expect(idOf(a)).toBeDefined();
+    expect(idOf(a)).not.toBe(idOf(b));
+    // Same genome, same id — the SVG stays byte-identical.
+    expect(idOf(avatarSvg({ ...base }))).toBe(idOf(a));
   });
 
   it("refuses a model it cannot place", () => {
