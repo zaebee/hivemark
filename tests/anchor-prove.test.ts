@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { periodId } from "../src/anchor/period.js";
 import { proveInclusion, checkInclusion } from "../src/anchor/prove.js";
 import { rootOf } from "../src/anchor/tree.js";
 import type { AnchorRecord } from "../src/anchor/ledger.js";
@@ -7,7 +8,7 @@ const UIDS = [`0x${"11".repeat(32)}`, `0x${"22".repeat(32)}`, `0x${"33".repeat(3
 
 const records: AnchorRecord[] = [
   {
-    period: "2026-W33",
+    period: periodId("2026-W33"),
     root: rootOf(UIDS),
     count: 3,
     uids: [...UIDS],

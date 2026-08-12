@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { periodOf, periodBounds, periodsBetween } from "../src/anchor/period.js";
+import { periodId, periodOf, periodBounds, periodsBetween } from "../src/anchor/period.js";
 
 describe("periodOf", () => {
   it("buckets a timestamp into its ISO week", () => {
@@ -24,27 +24,37 @@ describe("periodOf", () => {
   });
 });
 
-describe("periodBounds", () => {
-  it("returns a half-open range covering exactly seven days", () => {
-    const { start, end } = periodBounds("2026-W33");
-    expect(end - start).toBe(7 * 24 * 60 * 60);
+describe("periodId", () => {
+  it("accepts a week that exists", () => {
+    expect(periodId("2026-W33")).toBe("2026-W33");
   });
 
   it("refuses a week that does not exist in its year", () => {
     // 2025 has 52 ISO weeks. Arithmetic alone would put "2025-W53" in the
     // following year's first week and report bounds for it without complaint.
-    expect(() => periodBounds("2025-W53")).toThrow(/no such ISO week/i);
+    expect(() => periodId("2025-W53")).toThrow(/no such ISO week/i);
     // 2026 does have 53, so the rule is about the year, not a constant.
-    expect(() => periodBounds("2026-W53")).not.toThrow();
+    expect(() => periodId("2026-W53")).not.toThrow();
   });
 
   it("refuses a week number outside the calendar entirely", () => {
-    expect(() => periodBounds("2026-W99")).toThrow(/no such ISO week/i);
-    expect(() => periodBounds("2026-W00")).toThrow(/no such ISO week/i);
+    expect(() => periodId("2026-W99")).toThrow(/no such ISO week/i);
+    expect(() => periodId("2026-W00")).toThrow(/no such ISO week/i);
+  });
+
+  it("refuses a string that is not shaped like a period at all", () => {
+    expect(() => periodId("last week")).toThrow(/unparseable period/i);
+  });
+});
+
+describe("periodBounds", () => {
+  it("returns a half-open range covering exactly seven days", () => {
+    const { start, end } = periodBounds(periodId("2026-W33"));
+    expect(end - start).toBe(7 * 24 * 60 * 60);
   });
 
   it("round-trips with periodOf at both edges", () => {
-    const { start, end } = periodBounds("2026-W33");
+    const { start, end } = periodBounds(periodId("2026-W33"));
     expect(periodOf(new Date(start * 1000).toISOString())).toBe("2026-W33");
     expect(periodOf(new Date((end - 1) * 1000).toISOString())).toBe("2026-W33");
     expect(periodOf(new Date(end * 1000).toISOString())).not.toBe("2026-W33");
@@ -53,7 +63,7 @@ describe("periodBounds", () => {
 
 describe("periodsBetween", () => {
   it("lists every week inclusive, so a gap has a name", () => {
-    expect(periodsBetween("2026-W33", "2026-W36")).toEqual([
+    expect(periodsBetween(periodId("2026-W33"), periodId("2026-W36"))).toEqual([
       "2026-W33",
       "2026-W34",
       "2026-W35",
@@ -62,10 +72,10 @@ describe("periodsBetween", () => {
   });
 
   it("crosses a year boundary", () => {
-    expect(periodsBetween("2026-W52", "2027-W01")).toEqual(["2026-W52", "2026-W53", "2027-W01"]);
+    expect(periodsBetween(periodId("2026-W52"), periodId("2027-W01"))).toEqual(["2026-W52", "2026-W53", "2027-W01"]);
   });
 
   it("returns a single period when from equals to", () => {
-    expect(periodsBetween("2026-W33", "2026-W33")).toEqual(["2026-W33"]);
+    expect(periodsBetween(periodId("2026-W33"), periodId("2026-W33"))).toEqual(["2026-W33"]);
   });
 });

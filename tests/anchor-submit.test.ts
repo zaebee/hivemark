@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { periodId } from "../src/anchor/period.js";
 import { SchemaEncoder } from "@ethereum-attestation-service/eas-sdk";
 import { buildAnchorRequest } from "../src/anchor/submit.js";
 import { ANCHOR_SCHEMA, ANCHOR_SCHEMA_UID } from "../src/anchor/schema.js";
@@ -6,7 +7,7 @@ import { EAS_CONTRACT } from "../src/attest/domain.js";
 import type { AnchorPlan } from "../src/anchor/plan.js";
 
 const plan: AnchorPlan = {
-  period: "2026-W33",
+  period: periodId("2026-W33"),
   root: `0x${"ab".repeat(32)}`,
   count: 2,
   uids: [`0x${"11".repeat(32)}`, `0x${"22".repeat(32)}`],

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { periodId } from "../src/anchor/period.js";
 import { planAnchor } from "../src/anchor/plan.js";
 import type { AnchorRecord } from "../src/anchor/ledger.js";
 import type { AttestationEnvelope } from "../src/attest/attest.js";
@@ -30,18 +31,18 @@ describe("planAnchor", () => {
       envelope(`0x${"bb".repeat(32)}`, W33),
       envelope(`0x${"cc".repeat(32)}`, W34),
     ];
-    const plan = planAnchor(envelopes, [], "2026-W33")!;
+    const plan = planAnchor(envelopes, [], periodId("2026-W33"))!;
     expect(plan.count).toBe(2);
     expect(plan.uids).toEqual([`0x${"aa".repeat(32)}`, `0x${"bb".repeat(32)}`]);
   });
 
   it("returns null for a period with no attestations, rather than an empty root", () => {
-    expect(planAnchor([envelope(`0x${"cc".repeat(32)}`, W34)], [], "2026-W33")).toBeNull();
+    expect(planAnchor([envelope(`0x${"cc".repeat(32)}`, W34)], [], periodId("2026-W33"))).toBeNull();
   });
 
   it("refuses a period that is already anchored", () => {
     const records = [{ period: "2026-W33" } as AnchorRecord];
-    expect(() => planAnchor([envelope(`0x${"aa".repeat(32)}`, W33)], records, "2026-W33")).toThrow(
+    expect(() => planAnchor([envelope(`0x${"aa".repeat(32)}`, W33)], records, periodId("2026-W33"))).toThrow(
       /already anchored/i,
     );
   });
@@ -49,7 +50,7 @@ describe("planAnchor", () => {
   it("orders uids deterministically, so the root does not depend on input order", () => {
     const a = envelope(`0x${"aa".repeat(32)}`, W33);
     const b = envelope(`0x${"bb".repeat(32)}`, W33);
-    expect(planAnchor([a, b], [], "2026-W33")!.root).toBe(planAnchor([b, a], [], "2026-W33")!.root);
+    expect(planAnchor([a, b], [], periodId("2026-W33"))!.root).toBe(planAnchor([b, a], [], periodId("2026-W33"))!.root);
   });
 
   it("counts a repeated uid once, so the anchor cannot overstate its coverage", () => {
@@ -59,14 +60,14 @@ describe("planAnchor", () => {
     const plan = planAnchor(
       [envelope(same, W33), envelope(same, W33), envelope(`0x${"bb".repeat(32)}`, W33)],
       [],
-      "2026-W33",
+      periodId("2026-W33"),
     )!;
     expect(plan.count).toBe(2);
     expect(plan.uids).toEqual([same, `0x${"bb".repeat(32)}`]);
   });
 
   it("reports the period's own bounds, not the range of its attestations", () => {
-    const plan = planAnchor([envelope(`0x${"aa".repeat(32)}`, W33)], [], "2026-W33")!;
+    const plan = planAnchor([envelope(`0x${"aa".repeat(32)}`, W33)], [], periodId("2026-W33"))!;
     expect(plan.periodEnd - plan.periodStart).toBe(7 * 24 * 60 * 60);
   });
 });

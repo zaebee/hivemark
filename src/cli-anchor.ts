@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { byCodeUnit } from "./canonical.js";
 import { gapsIn, loadLedger } from "./anchor/ledger.js";
-import { periodOf } from "./anchor/period.js";
+import { periodId, periodOf } from "./anchor/period.js";
 import { planAnchor } from "./anchor/plan.js";
 import { buildAnchorRequest } from "./anchor/submit.js";
 import type { AttestationEnvelope } from "./attest/attest.js";
@@ -19,7 +19,9 @@ function main(): void {
   const envelopes = JSON.parse(readFileSync(attestationsPath, "utf8")) as AttestationEnvelope[];
   const records = loadLedger(readFileSync(ledgerPath, "utf8"));
 
-  const target = period ?? periodOf(new Date().toISOString());
+  // The command line is where an unchecked string would otherwise enter. A week
+  // that does not exist is refused here rather than deep inside the arithmetic.
+  const target = period === undefined ? periodOf(new Date().toISOString()) : periodId(period);
   const plan = planAnchor(envelopes, records, target);
 
   if (!plan) {

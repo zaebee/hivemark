@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { periodId } from "../src/anchor/period.js";
 import { loadLedger, gapsIn, recordFor } from "../src/anchor/ledger.js";
 
 const record = (period: string) => ({
@@ -47,23 +48,23 @@ describe("loadLedger", () => {
 describe("gapsIn", () => {
   it("names every week with no anchor", () => {
     const records = loadLedger(JSON.stringify([record("2026-W33"), record("2026-W36")]));
-    expect(gapsIn(records, "2026-W33", "2026-W36")).toEqual(["2026-W34", "2026-W35"]);
+    expect(gapsIn(records, periodId("2026-W33"), periodId("2026-W36"))).toEqual(["2026-W34", "2026-W35"]);
   });
 
   it("returns nothing when every week is covered", () => {
     const records = loadLedger(JSON.stringify([record("2026-W33"), record("2026-W34")]));
-    expect(gapsIn(records, "2026-W33", "2026-W34")).toEqual([]);
+    expect(gapsIn(records, periodId("2026-W33"), periodId("2026-W34"))).toEqual([]);
   });
 });
 
 describe("recordFor", () => {
   it("finds an anchored period", () => {
     const records = loadLedger(JSON.stringify([record("2026-W33")]));
-    expect(recordFor(records, "2026-W33")?.period).toBe("2026-W33");
+    expect(recordFor(records, periodId("2026-W33"))?.period).toBe("2026-W33");
   });
 
   it("returns null for a gap rather than the nearest neighbour", () => {
     const records = loadLedger(JSON.stringify([record("2026-W33")]));
-    expect(recordFor(records, "2026-W34")).toBeNull();
+    expect(recordFor(records, periodId("2026-W34"))).toBeNull();
   });
 });

@@ -12,7 +12,17 @@
  * approximated by dividing the epoch by 604800.
  */
 
-export type PeriodId = string;
+declare const periodBrand: unique symbol;
+
+/**
+ * A week that exists, not merely a string shaped like one.
+ *
+ * Branded so the only way to obtain one is `periodId` or `periodOf`, both of
+ * which check. Without that, `"2025-W53"` — a week that does not exist, since
+ * 2025 has 52 — would flow from a command line into bounds arithmetic and come
+ * out denoting a different week entirely.
+ */
+export type PeriodId = string & { readonly [periodBrand]: true };
 
 const DAY = 24 * 60 * 60;
 const WEEK = 7 * DAY;
@@ -44,39 +54,53 @@ function isoYearWeek(at: Date): { year: number; week: number } {
   return { year, week };
 }
 
-export function periodOf(iso: string): PeriodId {
-  const { year, week } = isoYearWeek(parseUtc(iso));
-  return `${year}-W${String(week).padStart(2, "0")}`;
-}
+const format = (year: number, week: number): string =>
+  `${year}-W${String(week).padStart(2, "0")}`;
 
-function parsePeriod(id: PeriodId): { year: number; week: number } {
-  const match = /^(\d{4})-W(\d{2})$/.exec(id);
-  if (!match) throw new Error(`unparseable period: ${id}`);
-  return { year: Number(match[1]), week: Number(match[2]) };
+/** Bounds by arithmetic alone, valid or not — the checking lives in `periodId`. */
+function boundsOf(year: number, week: number): { start: number; end: number } {
+  const jan4 = new Date(Date.UTC(year, 0, 4));
+  const start = Math.floor(mondayOf(jan4).getTime() / 1000) + (week - 1) * WEEK;
+  return { start, end: start + WEEK };
 }
 
 /**
- * Half-open [start, end) in Unix seconds.
+ * Turn a string into a period, or refuse it.
  *
- * The bounds are checked by asking which period they land in. Arithmetic alone
- * will happily compute a start for a week that does not exist — `2025-W53` in a
- * 52-week year lands in `2026-W01`, and `2026-W99` lands eighteen months later —
- * so a period id would silently denote a different week and `gapsIn` would name
- * weeks nobody could anchor. Round-tripping catches an impossible week and an
- * out-of-range one with the same rule, instead of a magic 53.
+ * Existence is checked by asking which period the computed days land in.
+ * Arithmetic alone will happily produce a start for a week that never happened —
+ * `2025-W53` lands in `2026-W01`, `2026-W99` eighteen months out — so the id
+ * would silently denote a different week and `gapsIn` would name weeks nobody
+ * could anchor. The round trip catches an impossible week and an out-of-range
+ * one by the same rule, with no hardcoded 53.
  */
-export function periodBounds(id: PeriodId): { start: number; end: number } {
-  const { year, week } = parsePeriod(id);
-  const jan4 = new Date(Date.UTC(year, 0, 4));
-  const week1Monday = mondayOf(jan4);
-  const start = Math.floor(week1Monday.getTime() / 1000) + (week - 1) * WEEK;
+export function periodId(value: string): PeriodId {
+  const match = /^(\d{4})-W(\d{2})$/.exec(value);
+  if (!match) throw new Error(`unparseable period: ${value}`);
 
-  const landsIn = periodOf(new Date(start * 1000).toISOString());
-  if (landsIn !== id) {
-    throw new Error(`no such ISO week: ${id} (those days belong to ${landsIn})`);
+  const year = Number(match[1]);
+  const week = Number(match[2]);
+  const { start } = boundsOf(year, week);
+  const landed = isoYearWeek(new Date(start * 1000));
+  const landsIn = format(landed.year, landed.week);
+
+  if (landsIn !== value) {
+    throw new Error(`no such ISO week: ${value} (those days belong to ${landsIn})`);
   }
+  return value as PeriodId;
+}
 
-  return { start, end: start + WEEK };
+export function periodOf(iso: string): PeriodId {
+  const { year, week } = isoYearWeek(parseUtc(iso));
+  // Computed from a real instant, so it exists by construction.
+  return format(year, week) as PeriodId;
+}
+
+/** Half-open [start, end) in Unix seconds. */
+export function periodBounds(id: PeriodId): { start: number; end: number } {
+  const match = /^(\d{4})-W(\d{2})$/.exec(id);
+  if (!match) throw new Error(`unparseable period: ${id}`);
+  return boundsOf(Number(match[1]), Number(match[2]));
 }
 
 export function periodsBetween(from: PeriodId, to: PeriodId): PeriodId[] {

@@ -1,11 +1,26 @@
 import { z } from "zod";
-import { periodsBetween, type PeriodId } from "./period.js";
+import { periodId, periodsBetween, type PeriodId } from "./period.js";
 
 const Hex32 = z.string().regex(/^0x[0-9a-fA-F]{64}$/);
 
 export const AnchorRecordSchema = z
   .object({
-    period: z.string().regex(/^\d{4}-W\d{2}$/),
+    /**
+     * Validated into a `PeriodId` at the boundary, not merely shape-checked.
+     * A ledger naming a week that never happened would otherwise load fine and
+     * produce nonsense gaps.
+     */
+    period: z.string().transform((value, ctx) => {
+      try {
+        return periodId(value);
+      } catch (error) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: error instanceof Error ? error.message : "invalid period",
+        });
+        return z.NEVER;
+      }
+    }),
     root: Hex32,
     count: z.number().int().min(1),
     /**
