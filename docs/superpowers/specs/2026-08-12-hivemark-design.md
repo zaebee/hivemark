@@ -253,6 +253,32 @@ ordinary review.
   from Guardian's **actual** history, not from synthetic fixtures. How many
   claims land as `unresolved` is the project's first honest result.
 
+## Implementation language
+
+**TypeScript throughout** — pipeline, showcase and contract tooling.
+
+The competing option was Python, which wins on one real point: Guardian's data
+contracts are pydantic models, so a Python consumer imports them and schema
+drift becomes impossible by construction rather than by discipline.
+
+TypeScript wins anyway because the gap it loses is closable and the gap it wins
+is not:
+
+- **Drift is mechanically solved.** `model_json_schema()` on Guardian's pydantic
+  models emits JSON Schema; types are generated from it and the generation is
+  checked in CI. A schema change upstream then breaks the build instead of
+  silently corrupting track records. Soft risk → hard failure.
+- **Milestone 2 has no Python equivalent.** EAS ships an official TypeScript
+  SDK. In Python, EIP-712 signing and attestation handling are hand-rolled over
+  `eth-account` / `web3.py` — our code where someone else's tested code exists.
+- **The showcase is the web.** Page, shields endpoint and the DNA-derived SVG
+  avatar are native there.
+
+Rust was the original motivation for the `node-kitty` repository this design
+borrows from, and is deliberately not used: for a JSON pipeline and a static
+page it offers the slowest iteration and the thinnest attestation tooling.
+Returning to Rust deserves to be its own decision, not a smuggled one.
+
 ## Delivery order
 
 Phase 1 as described is still too much for one implementation plan — it spans a
