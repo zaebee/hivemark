@@ -43,6 +43,14 @@ was signed — a deliberate departure from how EAS reads that field, because the
 weekly anchor buckets by it and a signing timestamp would file old reviews under
 whichever week the pipeline last ran. See `docs/anchoring.md`.
 
+### Breeding
+
+`bun run breed <corpus.jsonl>...` names the reviewer configurations nobody has
+run yet, reachable by recombining the ones who have — closing the loop from
+track records back to new reviews. A proposal has an identity but no
+claims and no birth: it becomes an entity only by being run. See
+`docs/breeding.md`.
+
 ### What a signature does and does not say
 
 The publisher signs, not the reviewer — reviewers hold no keys by construction.

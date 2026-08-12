@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "generate": "bun src/cli.ts",
     "birth": "bun src/cli-birth.ts",
-    "anchor": "bun src/cli-anchor.ts"
+    "anchor": "bun src/cli-anchor.ts",
+    "breed": "bun src/cli-breed.ts"
   },
   "author": "",
   "license": "MIT",
