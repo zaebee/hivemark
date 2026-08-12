@@ -9,7 +9,7 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "build": "tsc",
-    "generate": "node --experimental-strip-types src/cli.ts"
+    "generate": "npm run build && node build/src/cli.js"
   },
   "author": "",
   "license": "MIT",

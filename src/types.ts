@@ -48,6 +48,14 @@ export interface TrackRecord {
   readonly genome: Genome;
   readonly reviews: number;
   readonly claims: number;
+  /**
+   * Projects this identity actually reviewed, with counts.
+   *
+   * Present because two identities in the real corpus reviewed almost disjoint
+   * project sets, so their rates are not a controlled comparison. Without this
+   * on the card, the page invites exactly the wrong conclusion.
+   */
+  readonly corpus: ReadonlyArray<readonly [project: string, reviews: number]>;
   readonly skeptic: SkepticAxis;
   /** No data in benchmark artifacts. Never inferred from the skeptic. */
   readonly human: { readonly available: false };

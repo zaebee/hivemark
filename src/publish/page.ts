@@ -1,0 +1,97 @@
+import { avatarSvg } from "../avatar.js";
+import { shieldsEndpoint } from "./shields.js";
+import type { TrackRecord } from "../types.js";
+
+const SURVIVORSHIP =
+  "Guardian writes no record for a review that fails, so this data is " +
+  "survivorship-biased by construction: every track record here is " +
+  "systematically optimistic.";
+
+const CONFOUNDED =
+  "These identities reviewed near-disjoint sets of projects, so the rates " +
+  "below are not a controlled comparison — a difference between them may be a " +
+  "difference between corpora rather than between reviewers.";
+
+export function renderPage(tracks: TrackRecord[]): string {
+  const notes = [`<p class="note">${esc(SURVIVORSHIP)}</p>`];
+  if (corporaAreDisjoint(tracks)) notes.push(`<p class="note">${esc(CONFOUNDED)}</p>`);
+
+  return `<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>hivemark</title>
+<style>
+:root{color-scheme:light dark;--fg:#1a1a1a;--bg:#fafafa;--card:#fff;--muted:#666;--line:#e3e3e3}
+@media(prefers-color-scheme:dark){:root{--fg:#e8e8e8;--bg:#161616;--card:#1f1f1f;--muted:#9a9a9a;--line:#333}}
+body{margin:0;padding:2rem 1rem;background:var(--bg);color:var(--fg);
+font:16px/1.6 ui-sans-serif,system-ui,sans-serif}
+main{max-width:62rem;margin:0 auto}
+h1{margin:0 0 .25rem;font-size:1.6rem}
+.sub{color:var(--muted);margin:0 0 1.5rem}
+.note{border-left:3px solid #c94;padding:.5rem 1rem;color:var(--muted);margin:0 0 1rem}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;
+padding:1.25rem;margin:1.25rem 0 0;display:flex;gap:1.25rem;flex-wrap:wrap;align-items:flex-start}
+.card svg{border-radius:8px;flex:none}
+dl{display:grid;grid-template-columns:auto minmax(0,1fr);gap:.2rem 1rem;margin:0;flex:1 1 22rem}
+dt{color:var(--muted)}dd{margin:0;font-variant-numeric:tabular-nums;min-width:0}
+code{font-size:.85em;word-break:break-all}
+.nodata{color:var(--muted);font-style:italic}
+</style></head>
+<body><main>
+<h1>hivemark</h1>
+<p class="sub">Track records for code-review agents, derived from Guardian's own resolved claims.</p>
+${notes.join("\n")}
+${tracks.map(card).join("\n")}
+</main></body></html>`;
+}
+
+function card(track: TrackRecord): string {
+  const s = track.skeptic;
+  const resolved = s.confirmed + s.refuted + s.uncertain;
+  const corpus = track.corpus.map(([p, n]) => `${esc(p)} ×${n}`).join(", ");
+
+  return `<section class="card">
+${avatarSvg(track.identity_id, 96)}
+<dl>
+<dt>identity</dt><dd><code>${esc(track.identity_id)}</code></dd>
+<dt>owner</dt><dd><code>${esc(track.owner_address)}</code></dd>
+<dt>finder</dt><dd>${esc(track.genome.finder_model)}</dd>
+<dt>skeptic</dt><dd>${esc(track.genome.skeptic_model ?? "none")}</dd>
+<dt>context</dt><dd>${esc(track.genome.context_mode)}</dd>
+<dt>guardian</dt><dd><code>${esc(track.genome.guardian_version ?? "unknown")}</code></dd>
+<dt>corpus</dt><dd>${corpus}</dd>
+<dt>reviews</dt><dd>${track.reviews}</dd>
+<dt>claims</dt><dd>${track.claims}</dd>
+<dt>skeptic axis</dt><dd>${s.confirmed} confirmed · ${s.refuted} refuted · ${s.uncertain} uncertain · ${s.unresolved} unresolved</dd>
+<dt>confirmed rate</dt><dd>${resolved === 0 ? '<span class="nodata">no data</span>' : `${Math.round((s.confirmed / resolved) * 100)}% of ${resolved} resolved`}</dd>
+<dt>mean impact</dt><dd>${s.mean_impact ?? '<span class="nodata">no data</span>'}</dd>
+<dt>human axis</dt><dd><span class="nodata">no data</span> — benchmark artifacts carry no findings_applied</dd>
+<dt>badge</dt><dd>${esc(shieldsEndpoint(track).message)}</dd>
+</dl></section>`;
+}
+
+/**
+ * Whether any two identities reviewed corpora that barely overlap.
+ *
+ * Cards sitting side by side read as a comparison whether or not one is
+ * warranted, so the page has to say when it is not.
+ */
+function corporaAreDisjoint(tracks: TrackRecord[]): boolean {
+  for (let i = 0; i < tracks.length; i += 1) {
+    for (let j = i + 1; j < tracks.length; j += 1) {
+      const a = new Set(tracks[i]!.corpus.map(([p]) => p));
+      const b = new Set(tracks[j]!.corpus.map(([p]) => p));
+      const shared = [...a].filter((p) => b.has(p)).length;
+      if (shared < Math.min(a.size, b.size)) return true;
+    }
+  }
+  return false;
+}
+
+function esc(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
