@@ -1,38 +1,106 @@
 import { describe, expect, it } from "vitest";
 import { avatarSvg } from "../src/avatar.js";
+import type { Genome } from "../src/types.js";
 
-const ID_A = `0x${"ab".repeat(32)}` as const;
-const ID_B = `0x${"cd".repeat(32)}` as const;
+const base: Genome = {
+  schema_version: 1,
+  known_fields: [
+    "context_mode",
+    "finder_model",
+    "guardian_version",
+    "provider",
+    "skeptic_model",
+  ],
+  provider: "gemini",
+  finder_model: "gemini-2.5-flash",
+  skeptic_model: "gemini-3.5-flash",
+  context_mode: "graph",
+  guardian_version: "d0d807ef01c556b882dc85b9fc0d2851d92aa1e5",
+};
+
+const countOf = (svg: string, re: RegExp) => (svg.match(re) ?? []).length;
 
 describe("avatarSvg", () => {
   it("is deterministic", () => {
-    expect(avatarSvg(ID_A)).toBe(avatarSvg(ID_A));
+    expect(avatarSvg(base)).toBe(avatarSvg({ ...base }));
   });
 
-  it("differs for different identities", () => {
-    expect(avatarSvg(ID_A)).not.toBe(avatarSvg(ID_B));
-  });
-
-  it("emits a self-contained svg with no external references", () => {
-    const svg = avatarSvg(ID_A);
+  it("emits a self-contained svg that loads nothing", () => {
+    const svg = avatarSvg(base);
     expect(svg.startsWith("<svg")).toBe(true);
     expect(svg).toContain("</svg>");
-    // The xmlns declaration is an identifier, not a fetch, so "no http" is the
-    // wrong assertion. What must be absent is anything that loads: references,
-    // embedded images, scripts.
+    // The xmlns declaration is an identifier, not a fetch, so "no http" would be
+    // the wrong assertion. What must be absent is anything that loads.
     expect(svg).not.toMatch(/href=/i);
-    expect(svg).not.toMatch(/url\(/i);
     expect(svg).not.toMatch(/<image|<script|<foreignObject/i);
+    // `url(#id)` is a same-document fragment reference and loads nothing;
+    // only a url() pointing anywhere else would fetch.
+    expect(svg).not.toMatch(/url\((?!#)/i);
   });
 
-  it("is horizontally mirrored, so a face reads as a face", () => {
-    const cells = [...avatarSvg(ID_B).matchAll(/data-cell="(\d+),(\d+)"/g)].map(
-      ([, col, row]) => `${col},${row}`,
+  it("takes its outline from a theme token, with the literal only as a fallback", () => {
+    const svg = avatarSvg(base);
+    // A fixed dark outline disappears against a dark card, so the token leads.
+    // The literal must survive inside var()'s fallback — an embedder that
+    // defines no token still gets a visible bee — but never as a bare value.
+    expect(svg).toContain("var(--hivemark-ink, #191B16)");
+    expect(svg).not.toMatch(/(?:fill|stroke)="#191B16"/i);
+  });
+});
+
+describe("traits read from the genome", () => {
+  it("gives a graph reviewer two wing pairs and diff-only one", () => {
+    const graph = countOf(avatarSvg(base), /class="hm-wing/g);
+    const diff = countOf(avatarSvg({ ...base, context_mode: "diff-only" }), /class="hm-wing/g);
+    expect(graph).toBe(4);
+    expect(diff).toBe(2);
+  });
+
+  it("gives a stinger only when a skeptic judged the findings", () => {
+    expect(avatarSvg(base)).toContain('class="hm-stinger"');
+    expect(avatarSvg({ ...base, skeptic_model: null })).not.toContain('class="hm-stinger"');
+  });
+
+  it("changes the palette with the provider", () => {
+    const gemini = avatarSvg(base);
+    const ollama = avatarSvg({
+      ...base,
+      provider: "ollama",
+      finder_model: "qwen2.5-coder:7b",
+      skeptic_model: null,
+    });
+    expect(gemini).not.toBe(ollama);
+  });
+
+  it("marks a different Guardian revision as a different generation", () => {
+    const a = countOf(avatarSvg(base), /class="hm-band"/g);
+    const b = countOf(
+      avatarSvg({ ...base, guardian_version: "1ecd9629f46cab10b907dae285d0f58b0eef5e21" }),
+      /class="hm-band"/g,
     );
-    expect(cells.length).toBeGreaterThan(0);
-    for (const cell of cells) {
-      const [col, row] = cell.split(",").map(Number) as [number, number];
-      expect(cells).toContain(`${4 - col},${row}`);
-    }
+    expect(a).not.toBe(b);
+  });
+
+  it("ignores fields that are not part of the body", () => {
+    // Track record must never reach the body: identity is fixed, the record grows.
+    // Only genome fields exist here, so the guard is that two genomes equal in
+    // every visible trait render identically even when schema_version differs.
+    const withOtherVersion = { ...base, schema_version: 99 };
+    expect(avatarSvg(withOtherVersion)).toBe(avatarSvg(base));
+  });
+});
+
+describe("provider is derived, not trusted", () => {
+  it("reads the palette from finder_model when provider disagrees", () => {
+    // provider is an expression of finder_model. A genome carrying a mistral
+    // finder must render as mistral even if the field says otherwise — the
+    // crossbreeding study produced exactly this inconsistency.
+    const lying = { ...base, provider: "gemini" as const, finder_model: "mistral-medium-latest" };
+    const honest = { ...base, provider: "mistral" as const, finder_model: "mistral-medium-latest" };
+    expect(avatarSvg(lying)).toBe(avatarSvg(honest));
+  });
+
+  it("refuses a model it cannot place", () => {
+    expect(() => avatarSvg({ ...base, finder_model: "gpt-4o" })).toThrow(/unrecognised model/i);
   });
 });

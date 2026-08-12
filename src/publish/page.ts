@@ -21,8 +21,10 @@ export function renderPage(tracks: TrackRecord[]): string {
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>hivemark</title>
 <style>
-:root{color-scheme:light dark;--fg:#1a1a1a;--bg:#fafafa;--card:#fff;--muted:#666;--line:#e3e3e3}
-@media(prefers-color-scheme:dark){:root{--fg:#e8e8e8;--bg:#161616;--card:#1f1f1f;--muted:#9a9a9a;--line:#333}}
+:root{color-scheme:light dark;--fg:#1a1a1a;--bg:#fafafa;--card:#fff;--muted:#666;--line:#e3e3e3;
+--hivemark-ink:#191b16}
+@media(prefers-color-scheme:dark){:root{--fg:#e8e8e8;--bg:#161616;--card:#1f1f1f;--muted:#9a9a9a;--line:#333;
+--hivemark-ink:#e8eade}}
 body{margin:0;padding:2rem 1rem;background:var(--bg);color:var(--fg);
 font:16px/1.6 ui-sans-serif,system-ui,sans-serif}
 main{max-width:62rem;margin:0 auto}
@@ -51,7 +53,7 @@ function card(track: TrackRecord): string {
   const corpus = track.corpus.map(([p, n]) => `${esc(p)} ×${n}`).join(", ");
 
   return `<section class="card">
-${avatarSvg(track.identity_id, 96)}
+${avatarSvg(track.genome, 96)}
 <dl>
 <dt>identity</dt><dd><code>${esc(track.identity_id)}</code></dd>
 <dt>owner</dt><dd><code>${esc(track.owner_address)}</code></dd>

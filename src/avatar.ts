@@ -1,46 +1,119 @@
-const GRID = 5;
-const HALF = 3; // columns 0..2 are drawn; 0 and 1 mirror onto 4 and 3
+import { providerOf } from "./genome.js";
+import type { Genome, Provider } from "./types.js";
 
 /**
- * A 5x5 mirrored identicon derived from the identity hash.
+ * A reviewer's badge: a bee assembled from its genome.
  *
- * Deterministic and self-contained: the same DNA always yields the same face,
- * and the SVG loads nothing. The design's one concession to charm — and it
- * costs no mechanism the pipeline does not already have, exactly as kitty
- * appearance derived from kitty dna.
+ * Every visible trait is read from a genome field. Nothing comes from the hash,
+ * and nothing comes from the track record — identity is fixed while the record
+ * grows, so a body that responded to confirmations would make identity look
+ * mutable. When a track record is shown, it belongs to a layer drawn outside
+ * this SVG.
+ *
+ * The parts also make lineage legible, which a hash-derived identicon cannot do:
+ * a child's hash is unrelated to its parents', but a crossbred genome visibly
+ * wears the wings of one parent and the palette of the other.
  */
-export function avatarSvg(id: `0x${string}`, size = 120): string {
-  const bytes = hexToBytes(id);
-  const hue = ((bytes[0] ?? 0) * 360) / 256;
-  const fg = `hsl(${hue.toFixed(1)} 62% 48%)`;
-  const bg = `hsl(${hue.toFixed(1)} 30% 94%)`;
-  const unit = size / GRID;
 
-  const cells: string[] = [];
-  for (let row = 0; row < GRID; row += 1) {
-    for (let col = 0; col < HALF; col += 1) {
-      if ((bytes[1 + row * HALF + col] ?? 0) % 2 === 0) continue;
-      // The centre column is its own mirror, so it must be emitted once.
-      const columns = col === HALF - 1 ? [col] : [col, GRID - 1 - col];
-      for (const c of columns) {
-        cells.push(
-          `<rect data-cell="${c},${row}" x="${(c * unit).toFixed(2)}" y="${(row * unit).toFixed(2)}" ` +
-            `width="${unit.toFixed(2)}" height="${unit.toFixed(2)}" fill="${fg}"/>`,
-        );
-      }
-    }
+interface Palette {
+  readonly body: string;
+  readonly dark: string;
+  readonly wing: string;
+}
+
+const PALETTES: Record<Provider, Palette> = {
+  gemini: { body: "#E3AE3C", dark: "#7E5410", wing: "#BFD8E4" },
+  mistral: { body: "#DC6B3E", dark: "#6F2A11", wing: "#E8CDBF" },
+  ollama: { body: "#8098AC", dark: "#33454F", wing: "#CBDCE4" },
+};
+
+/**
+ * Outline colour.
+ *
+ * A token with a literal fallback, not a fixed near-black: the badge is drawn on
+ * whatever surface embeds it, and a dark outline vanishes against a dark card.
+ * Consumers that define `--hivemark-ink` get theme-correct bees; those that do
+ * not still get a visible one.
+ */
+const INK = "var(--hivemark-ink, #191B16)";
+
+/** Generation marker: a Guardian revision maps to a band count. */
+function bandCount(guardianVersion: string | null): number {
+  if (!guardianVersion) return 1;
+  const head = Number.parseInt(guardianVersion.slice(0, 2), 16);
+  return Number.isNaN(head) ? 1 : 2 + (head % 3);
+}
+
+/** Which model does the finding — a shape, not a colour, so it reads within a palette. */
+function eyeShape(finderModel: string): string {
+  const m = finderModel.toLowerCase();
+  if (m.includes("flash")) {
+    return `<circle cx="88" cy="50" r="7" fill="${INK}"/><circle cx="112" cy="50" r="7" fill="${INK}"/>`;
   }
+  if (m.includes("pro") || m.includes("medium") || m.includes("70b")) {
+    return `<ellipse cx="86" cy="50" rx="10" ry="7" fill="${INK}"/><ellipse cx="114" cy="50" rx="10" ry="7" fill="${INK}"/>`;
+  }
+  return `<ellipse cx="88" cy="50" rx="5" ry="9" fill="${INK}"/><ellipse cx="112" cy="50" rx="5" ry="9" fill="${INK}"/>`;
+}
+
+function bands(count: number, palette: Palette): string {
+  const out: string[] = [];
+  for (let i = 0; i < count; i += 1) {
+    const y = 132 + i * (108 / (count + 0.6));
+    const height = 46 / (count + 1);
+    out.push(
+      `<rect class="hm-band" x="58" y="${y.toFixed(1)}" width="84" height="${height.toFixed(1)}" fill="${palette.dark}" opacity="0.92"/>`,
+    );
+  }
+  return out.join("");
+}
+
+/**
+ * Render the badge.
+ *
+ * `provider` is read from `finder_model` rather than trusted from the field:
+ * it is an expression of the model, not a gene of its own. Crossing the two
+ * independently produces impossible reviewers — a genome claiming gemini while
+ * carrying a qwen finder — and the palette must follow the model that is
+ * actually doing the finding.
+ */
+export function avatarSvg(genome: Genome, size = 120): string {
+  const palette = PALETTES[providerOf(genome.finder_model)];
+  const hasStinger = genome.skeptic_model !== null;
+  const seesStructure = genome.context_mode === "graph";
+  const clipId = `hm-abdomen-${bandCount(genome.guardian_version)}`;
+
+  const rearWings = seesStructure
+    ? `<ellipse class="hm-wing hm-wing-l" cx="62" cy="112" rx="30" ry="12" fill="${palette.wing}" fill-opacity="0.55" stroke="${INK}" stroke-width="2"/>` +
+      `<ellipse class="hm-wing hm-wing-r" cx="138" cy="112" rx="30" ry="12" fill="${palette.wing}" fill-opacity="0.55" stroke="${INK}" stroke-width="2"/>`
+    : "";
+
+  const stinger = hasStinger
+    ? `<polygon class="hm-stinger" points="100,232 93,254 107,254" fill="${INK}"/>`
+    : "";
+
+  const label =
+    `${providerOf(genome.finder_model)} reviewer, ` +
+    `${genome.context_mode} context, ` +
+    `${hasStinger ? "with" : "without"} a skeptic`;
 
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" ` +
-    `viewBox="0 0 ${size} ${size}" role="img" aria-label="reviewer avatar">` +
-    `<rect width="${size}" height="${size}" fill="${bg}"/>${cells.join("")}</svg>`
+    `viewBox="0 0 200 266" role="img" aria-label="${label}">` +
+    `<defs><clipPath id="${clipId}"><ellipse cx="100" cy="176" rx="42" ry="58"/></clipPath></defs>` +
+    rearWings +
+    `<ellipse class="hm-wing hm-wing-l" cx="56" cy="96" rx="38" ry="15" fill="${palette.wing}" fill-opacity="0.75" stroke="${INK}" stroke-width="2"/>` +
+    `<ellipse class="hm-wing hm-wing-r" cx="144" cy="96" rx="38" ry="15" fill="${palette.wing}" fill-opacity="0.75" stroke="${INK}" stroke-width="2"/>` +
+    stinger +
+    `<ellipse cx="100" cy="176" rx="42" ry="58" fill="${palette.body}" stroke="${INK}" stroke-width="2.5"/>` +
+    `<g clip-path="url(#${clipId})">${bands(bandCount(genome.guardian_version), palette)}</g>` +
+    `<ellipse cx="100" cy="176" rx="42" ry="58" fill="none" stroke="${INK}" stroke-width="2.5"/>` +
+    `<ellipse cx="100" cy="106" rx="32" ry="30" fill="${palette.dark}" stroke="${INK}" stroke-width="2.5"/>` +
+    `<path d="M88 26 Q80 8 70 6" fill="none" stroke="${INK}" stroke-width="2.5" stroke-linecap="round"/>` +
+    `<path d="M112 26 Q120 8 130 6" fill="none" stroke="${INK}" stroke-width="2.5" stroke-linecap="round"/>` +
+    `<circle cx="70" cy="6" r="3.5" fill="${INK}"/><circle cx="130" cy="6" r="3.5" fill="${INK}"/>` +
+    `<circle cx="100" cy="52" r="26" fill="${palette.body}" stroke="${INK}" stroke-width="2.5"/>` +
+    eyeShape(genome.finder_model) +
+    `</svg>`
   );
-}
-
-function hexToBytes(hex: string): number[] {
-  const body = hex.slice(2);
-  const out: number[] = [];
-  for (let i = 0; i + 1 < body.length; i += 2) out.push(parseInt(body.slice(i, i + 2), 16));
-  return out;
 }

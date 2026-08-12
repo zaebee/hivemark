@@ -23,7 +23,7 @@ export function run(text: string): RunOutput {
   for (const track of tracks) {
     const short = track.identity_id.slice(2, 14);
     files.set(`badge-${short}.json`, `${JSON.stringify(shieldsEndpoint(track), null, 2)}\n`);
-    files.set(`avatar-${short}.svg`, avatarSvg(track.identity_id, 240));
+    files.set(`avatar-${short}.svg`, avatarSvg(track.genome, 240));
   }
 
   return { tracks, files, warnings };

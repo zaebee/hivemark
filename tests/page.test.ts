@@ -63,10 +63,20 @@ describe("renderPage", () => {
     expect(renderPage([a, b]).toLowerCase()).not.toContain("not a controlled comparison");
   });
 
-  it("escapes model names rather than interpolating them raw", () => {
-    const evil = make({ genome: { ...make().genome, finder_model: "<script>x</script>" } });
+  it("escapes markup inside a model name it does accept", () => {
+    // The dangerous string is not one the provider table rejects — that one
+    // never reaches the page. It is a name that passes as gemini and still
+    // carries markup, since the value comes straight from the artifact.
+    const evil = make({
+      genome: { ...make().genome, finder_model: "gemini-2.5-flash<script>alert(1)</script>" },
+    });
     const html = renderPage([evil]);
-    expect(html).not.toContain("<script>x</script>");
+    expect(html).not.toContain("<script>alert(1)</script>");
     expect(html).toContain("&lt;script&gt;");
+  });
+
+  it("refuses to render a reviewer whose model cannot be placed", () => {
+    const unplaceable = make({ genome: { ...make().genome, finder_model: "gpt-4o" } });
+    expect(() => renderPage([unplaceable])).toThrow(/unrecognised model/i);
   });
 });
