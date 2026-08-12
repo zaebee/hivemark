@@ -23,7 +23,7 @@ describe("end-to-end on real Guardian data", () => {
 
   it("reports harvest warnings rather than hiding them", async () => {
     const output = await run(`${TEXT}\n{"url":"broken`, { signer: null });
-    expect(output.warnings.length).toBe(1);
+    expect(output.warnings).toHaveLength(1);
   });
 
   it("every badge file is valid shields JSON", async () => {
@@ -52,7 +52,7 @@ describe("attestation over the real corpus", () => {
     const signer = loadSigner({ HIVEMARK_SIGNING_KEY: KEY });
     const output = await run(TEXT, { signer });
     const claims = output.tracks.reduce((n, t) => n + t.claims, 0);
-    expect(output.attestations.length).toBe(claims);
+    expect(output.attestations).toHaveLength(claims);
     expect(output.files.has("attestations.json")).toBe(true);
   });
 

@@ -61,7 +61,7 @@ function corpusOf(records: ReviewRecord[]): ReadonlyArray<readonly [string, numb
  * (`14:00+03:00` sorts after `12:00+00:00` while happening an hour earlier).
  * The schema guarantees these parse, so no NaN reaches this comparison.
  */
-function dedupe(records: ReviewRecord[]): ReviewRecord[] {
+export function dedupe(records: readonly ReviewRecord[]): ReviewRecord[] {
   const winners = new Map<string, ReviewRecord>();
   for (const record of records) {
     const key = `${record.url}|${record.head_sha}|${identityId(genomeOf(record))}`;

@@ -40,6 +40,17 @@ describe("genomeOf", () => {
     ]);
   });
 
+  it("treats an empty skeptic model as no skeptic, not as a second configuration", () => {
+    // Both mean the pass did not run, and both publish as an empty field in a
+    // birth record — so they must be one identity, or the record would read as
+    // contradicting itself.
+    const base = records[0]!;
+    const nulled = genomeOf({ ...base, skeptic_model: null });
+    const empty = genomeOf({ ...base, skeptic_model: "" });
+    expect(empty.skeptic_model).toBeNull();
+    expect(empty).toEqual(nulled);
+  });
+
   it("produces more than one distinct genome across the real fixture", () => {
     const distinct = new Set(records.map((r) => JSON.stringify(genomeOf(r))));
     expect(distinct.size).toBeGreaterThan(1);

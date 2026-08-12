@@ -28,7 +28,15 @@ later than a given block. Run by hand — see `docs/anchoring.md`. A skipped wee
 stays a gap and is never backfilled, because an anchor published late would
 assert that its contents existed by a date that has now passed.
 
-**Still ahead:** the SBT contract.
+**Milestone 2, step 3 (this):** each identity is announced once as an EAS birth
+attestation carrying its whole genome, so an outsider can recompute the entity —
+its id, its address and its bee — from the record alone. Run by hand, see
+`docs/birth.md`.
+
+**Milestone 2 is complete.** A soulbound token was specified and dropped:
+identity is content-addressed, so a token cannot confer existence, and one minted
+later would attach to the same entities retroactively. The reasoning is in the
+spec's §Badge.
 
 An attestation's `time` is the moment the **review** happened, not the moment it
 was signed — a deliberate departure from how EAS reads that field, because the
