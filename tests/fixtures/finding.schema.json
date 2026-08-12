@@ -1,0 +1,132 @@
+{
+  "description": "One reviewed defect, anchored to a file (and optionally a line).",
+  "properties": {
+    "anchor": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Anchor"
+    },
+    "category": {
+      "enum": [
+        "logic",
+        "contract",
+        "tests",
+        "types",
+        "ontology",
+        "security"
+      ],
+      "title": "Category",
+      "type": "string"
+    },
+    "confidence": {
+      "maximum": 100,
+      "minimum": 0,
+      "title": "Confidence",
+      "type": "integer"
+    },
+    "evidence": {
+      "title": "Evidence",
+      "type": "string"
+    },
+    "file": {
+      "title": "File",
+      "type": "string"
+    },
+    "fix": {
+      "title": "Fix",
+      "type": "string"
+    },
+    "impact_score": {
+      "anyOf": [
+        {
+          "maximum": 10,
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Impact Score"
+    },
+    "line": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Line"
+    },
+    "problem": {
+      "title": "Problem",
+      "type": "string"
+    },
+    "severity": {
+      "enum": [
+        "critical",
+        "major",
+        "minor"
+      ],
+      "title": "Severity",
+      "type": "string"
+    },
+    "skeptic_note": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Skeptic Note"
+    },
+    "title": {
+      "title": "Title",
+      "type": "string"
+    },
+    "verdict": {
+      "anyOf": [
+        {
+          "enum": [
+            "confirmed",
+            "refuted",
+            "uncertain"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Verdict"
+    }
+  },
+  "required": [
+    "file",
+    "severity",
+    "category",
+    "title",
+    "evidence",
+    "problem",
+    "fix",
+    "confidence"
+  ],
+  "title": "Finding",
+  "type": "object"
+}

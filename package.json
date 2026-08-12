@@ -1,0 +1,26 @@
+{
+  "name": "hivemark",
+  "version": "0.1.0",
+  "description": "Cumulative, independently verifiable track records for code-review agents.",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc",
+    "generate": "node --experimental-strip-types src/cli.ts"
+  },
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "viem": "2.55.13",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.1",
+    "typescript": "5.9.3",
+    "vitest": "3.2.7"
+  },
+  "type": "module"
+}
