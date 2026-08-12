@@ -85,16 +85,25 @@ function bands(plan: BodyPlan, palette: Palette): string {
   }).join("");
 }
 
+/**
+ * Eye proportions per shape.
+ *
+ * A table rather than a chain of conditionals: which shape a model gets is a
+ * fact about eyes, not a decision the renderer makes, and adding a fourth means
+ * adding a row instead of another branch.
+ */
+const EYE_SHAPE: Record<BodyPlan["eyes"], { readonly rx: number; readonly ry: number }> = {
+  round: { rx: RATIO.eyeRound, ry: RATIO.eyeRound },
+  wide: { rx: RATIO.eyeWideRx, ry: RATIO.eyeWideRy },
+  narrow: { rx: RATIO.eyeNarrowRx, ry: RATIO.eyeNarrowRy },
+};
+
 function eyes(plan: BodyPlan): string {
   const { head, unit, axis } = plan;
   const dx = RATIO.eyeOffset * unit;
   const cy = head.cy - unit * RATIO.eyeRise;
-  const shape =
-    plan.eyes === "round"
-      ? { rx: RATIO.eyeRound * unit, ry: RATIO.eyeRound * unit }
-      : plan.eyes === "wide"
-        ? { rx: RATIO.eyeWideRx * unit, ry: RATIO.eyeWideRy * unit }
-        : { rx: RATIO.eyeNarrowRx * unit, ry: RATIO.eyeNarrowRy * unit };
+  const ratio = EYE_SHAPE[plan.eyes];
+  const shape = { rx: ratio.rx * unit, ry: ratio.ry * unit };
 
   return (["l", "r"] as const)
     .map((side) => {
