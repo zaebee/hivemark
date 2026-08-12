@@ -48,3 +48,38 @@ describe("claimsOf", () => {
     expect(claimsOf(withFindings(base, [finding]))[0]!.line).toBeNull();
   });
 });
+
+describe("claim_hash", () => {
+  it("commits to the finding's prose, not only its coordinates", () => {
+    const base = records[0]!;
+    const finding = base.findings[0]!;
+    const other = { ...finding, problem: `${finding.problem} — and another thing` };
+    const a = claimsOf(withFindings(base, [finding]))[0]!.claim_hash;
+    const b = claimsOf(withFindings(base, [other]))[0]!.claim_hash;
+    expect(a).not.toBe(b);
+  });
+
+  it("distinguishes two findings that share file, line and category", () => {
+    const base = records[0]!;
+    const f = base.findings[0]!;
+    const one = { ...f, title: "first", evidence: "a", problem: "p1", fix: "x" };
+    const two = { ...f, title: "second", evidence: "a", problem: "p2", fix: "x" };
+    const claims = claimsOf(withFindings(base, [one, two]));
+    expect(claims[0]!.claim_hash).not.toBe(claims[1]!.claim_hash);
+  });
+
+  it("is stable for the same finding in the same review", () => {
+    const base = records[0]!;
+    expect(claimsOf(base)[0]!.claim_hash).toBe(claimsOf(base)[0]!.claim_hash);
+  });
+
+  it("changes when the same finding is attributed to a different review", () => {
+    const base = records[0]!;
+    const elsewhere = { ...base, head_sha: "0000000000000000000000000000000000000000" };
+    expect(claimsOf(base)[0]!.claim_hash).not.toBe(claimsOf(elsewhere)[0]!.claim_hash);
+  });
+
+  it("is a 32-byte hex string", () => {
+    expect(claimsOf(records[0]!)[0]!.claim_hash).toMatch(/^0x[0-9a-f]{64}$/);
+  });
+});

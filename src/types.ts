@@ -21,6 +21,12 @@ export interface Genome {
 
 export interface Claim {
   readonly identity_id: `0x${string}`;
+  /**
+   * Commitment to the whole finding, including the prose the Claim does not
+   * carry. Metadata alone would collide: two different findings on one file and
+   * line in one category share every field this record keeps.
+   */
+  readonly claim_hash: `0x${string}`;
   readonly url: string;
   readonly project: string;
   readonly head_sha: string;
