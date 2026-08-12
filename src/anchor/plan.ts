@@ -3,6 +3,9 @@ import { periodBounds, periodOf, type PeriodId } from "./period.js";
 import { recordFor, type AnchorRecord } from "./ledger.js";
 import { rootOf } from "./tree.js";
 
+/** Deterministic everywhere, unlike locale-aware comparison. */
+const byCodeUnit = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
+
 export interface AnchorPlan {
   readonly period: PeriodId;
   readonly root: `0x${string}`;
@@ -28,14 +31,25 @@ export function planAnchor(
     throw new Error(`period is already anchored: ${period}`);
   }
 
-  const uids = envelopes
+  // Deduplicated before anything counts them. Two byte-identical findings in one
+  // review produce the same claim_hash, hence the same salt and the same time,
+  // hence one uid twice. None appear in the current corpus, but a repeated leaf
+  // would let `count` overstate what the anchor covers — the record would claim
+  // more evidence than exists.
+  const inPeriod = envelopes
     .filter(
       (e) =>
         periodOf(new Date(Number(e.attestation.message.time) * 1000).toISOString()) === period,
     )
-    .map((e) => e.attestation.uid as `0x${string}`)
-    // Sorted so the root depends on the set, not on the order it was read in.
-    .sort();
+    .map((e) => e.attestation.uid as `0x${string}`);
+
+  // Sorted so the root depends on the set, not on the order it was read in.
+  //
+  // Explicitly by code unit, never `localeCompare`: this ordering decides a
+  // Merkle root, and locale-aware collation varies with the ICU data the runtime
+  // happens to carry. Two machines could then publish different roots for
+  // identical input.
+  const uids = [...new Set(inPeriod)].sort(byCodeUnit);
 
   if (uids.length === 0) return null;
 

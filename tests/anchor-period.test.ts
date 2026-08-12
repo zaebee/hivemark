@@ -30,6 +30,19 @@ describe("periodBounds", () => {
     expect(end - start).toBe(7 * 24 * 60 * 60);
   });
 
+  it("refuses a week that does not exist in its year", () => {
+    // 2025 has 52 ISO weeks. Arithmetic alone would put "2025-W53" in the
+    // following year's first week and report bounds for it without complaint.
+    expect(() => periodBounds("2025-W53")).toThrow(/no such ISO week/i);
+    // 2026 does have 53, so the rule is about the year, not a constant.
+    expect(() => periodBounds("2026-W53")).not.toThrow();
+  });
+
+  it("refuses a week number outside the calendar entirely", () => {
+    expect(() => periodBounds("2026-W99")).toThrow(/no such ISO week/i);
+    expect(() => periodBounds("2026-W00")).toThrow(/no such ISO week/i);
+  });
+
   it("round-trips with periodOf at both edges", () => {
     const { start, end } = periodBounds("2026-W33");
     expect(periodOf(new Date(start * 1000).toISOString())).toBe("2026-W33");

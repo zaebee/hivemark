@@ -27,7 +27,23 @@ export const AnchorRecordSchema = z
 export type AnchorRecord = z.infer<typeof AnchorRecordSchema>;
 
 export function loadLedger(text: string): AnchorRecord[] {
-  const records = z.array(AnchorRecordSchema).parse(JSON.parse(text));
+  // An empty file is refused rather than read as "no anchors yet". Treating it
+  // as an empty ledger is the dangerous reading: the tool would offer to anchor
+  // weeks that are already anchored, and the second root for a week makes it
+  // ambiguous which one a proof should be checked against. A truncated ledger is
+  // a corruption to notice, not a state to tolerate.
+  if (text.trim() === "") {
+    throw new Error("anchor ledger is empty; an unanchored ledger is the text []");
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch (cause) {
+    throw new Error(`anchor ledger is not valid JSON: ${(cause as Error).message}`);
+  }
+
+  const records = z.array(AnchorRecordSchema).parse(parsed);
 
   // One anchor per period. Two roots for one week would mean the record cannot
   // say which one a proof should be checked against.

@@ -35,7 +35,12 @@ function main(): void {
   console.log(`data        ${request.data.slice(0, 66)}…`);
   console.log(`value       ${request.value} wei`);
 
-  const periods = records.map((r) => r.period).sort();
+  // `YYYY-Www` sorts chronologically by code unit because both fields are
+  // zero-padded and fixed width. Explicit rather than default, and not
+  // `localeCompare`, whose collation depends on the runtime's ICU data.
+  const periods = records
+    .map((r) => r.period)
+    .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
   const earliest = periods[0];
   if (earliest !== undefined) {
     const gaps = gapsIn(records, earliest, target);
@@ -44,4 +49,12 @@ function main(): void {
   console.log("\nnothing was sent. see docs/anchoring.md to broadcast this.");
 }
 
-main();
+// Explicit catch for message quality, not exit status — the runtime already
+// exits non-zero on a throw. A stack trace is the wrong output for a tool whose
+// next step a human performs by hand.
+try {
+  main();
+} catch (error) {
+  console.error(`hivemark: ${error instanceof Error ? error.message : "unknown error"}`);
+  process.exitCode = 1;
+}

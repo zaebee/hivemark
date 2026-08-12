@@ -1,7 +1,11 @@
 import { SimpleMerkleTree } from "@openzeppelin/merkle-tree";
-import { LEAF_DOMAIN, leafOf } from "./leaf.js";
+import { leafOf } from "./leaf.js";
 
-export { LEAF_DOMAIN, leafOf };
+// Re-exported so a consumer needs one import for the tree and the leaf rule that
+// makes its roots meaningful. `leafOf` is also used below, so it is imported
+// rather than passed straight through.
+export { LEAF_DOMAIN } from "./leaf.js";
+export { leafOf };
 
 /**
  * Tree construction is the library's job.

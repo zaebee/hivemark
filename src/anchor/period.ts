@@ -55,12 +55,27 @@ function parsePeriod(id: PeriodId): { year: number; week: number } {
   return { year: Number(match[1]), week: Number(match[2]) };
 }
 
-/** Half-open [start, end) in Unix seconds. */
+/**
+ * Half-open [start, end) in Unix seconds.
+ *
+ * The bounds are checked by asking which period they land in. Arithmetic alone
+ * will happily compute a start for a week that does not exist — `2025-W53` in a
+ * 52-week year lands in `2026-W01`, and `2026-W99` lands eighteen months later —
+ * so a period id would silently denote a different week and `gapsIn` would name
+ * weeks nobody could anchor. Round-tripping catches an impossible week and an
+ * out-of-range one with the same rule, instead of a magic 53.
+ */
 export function periodBounds(id: PeriodId): { start: number; end: number } {
   const { year, week } = parsePeriod(id);
   const jan4 = new Date(Date.UTC(year, 0, 4));
   const week1Monday = mondayOf(jan4);
   const start = Math.floor(week1Monday.getTime() / 1000) + (week - 1) * WEEK;
+
+  const landsIn = periodOf(new Date(start * 1000).toISOString());
+  if (landsIn !== id) {
+    throw new Error(`no such ISO week: ${id} (those days belong to ${landsIn})`);
+  }
+
   return { start, end: start + WEEK };
 }
 

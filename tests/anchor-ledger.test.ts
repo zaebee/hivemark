@@ -16,6 +16,17 @@ describe("loadLedger", () => {
     expect(loadLedger("[]")).toEqual([]);
   });
 
+  it("refuses an empty file rather than reading it as no anchors yet", () => {
+    // The dangerous reading: a truncated ledger taken as empty would offer to
+    // re-anchor weeks already anchored.
+    expect(() => loadLedger("")).toThrow(/ledger is empty/i);
+    expect(() => loadLedger("   \n")).toThrow(/ledger is empty/i);
+  });
+
+  it("says plainly when the ledger is not JSON", () => {
+    expect(() => loadLedger("{not json")).toThrow(/not valid JSON/i);
+  });
+
   it("refuses a record missing the uids it claims to cover", () => {
     const { uids: _uids, ...withoutUids } = record("2026-W33");
     expect(() => loadLedger(JSON.stringify([withoutUids]))).toThrow(/uids/i);

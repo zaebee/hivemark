@@ -52,6 +52,19 @@ describe("planAnchor", () => {
     expect(planAnchor([a, b], [], "2026-W33")!.root).toBe(planAnchor([b, a], [], "2026-W33")!.root);
   });
 
+  it("counts a repeated uid once, so the anchor cannot overstate its coverage", () => {
+    // Two byte-identical findings in one review would sign to the same uid,
+    // since the salt and the time both derive from the claim.
+    const same = `0x${"aa".repeat(32)}`;
+    const plan = planAnchor(
+      [envelope(same, W33), envelope(same, W33), envelope(`0x${"bb".repeat(32)}`, W33)],
+      [],
+      "2026-W33",
+    )!;
+    expect(plan.count).toBe(2);
+    expect(plan.uids).toEqual([same, `0x${"bb".repeat(32)}`]);
+  });
+
   it("reports the period's own bounds, not the range of its attestations", () => {
     const plan = planAnchor([envelope(`0x${"aa".repeat(32)}`, W33)], [], "2026-W33")!;
     expect(plan.periodEnd - plan.periodStart).toBe(7 * 24 * 60 * 60);
