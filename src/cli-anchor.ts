@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { byCodeUnit } from "./canonical.js";
 import { gapsIn, loadLedger } from "./anchor/ledger.js";
 import { periodOf } from "./anchor/period.js";
 import { planAnchor } from "./anchor/plan.js";
@@ -36,11 +37,8 @@ function main(): void {
   console.log(`value       ${request.value} wei`);
 
   // `YYYY-Www` sorts chronologically by code unit because both fields are
-  // zero-padded and fixed width. Explicit rather than default, and not
-  // `localeCompare`, whose collation depends on the runtime's ICU data.
-  const periods = records
-    .map((r) => r.period)
-    .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+  // zero-padded and fixed width.
+  const periods = records.map((r) => r.period).sort(byCodeUnit);
   const earliest = periods[0];
   if (earliest !== undefined) {
     const gaps = gapsIn(records, earliest, target);

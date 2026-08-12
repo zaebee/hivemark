@@ -1,10 +1,8 @@
+import { byCodeUnit } from "../canonical.js";
 import type { AttestationEnvelope } from "../attest/attest.js";
 import { periodBounds, periodOf, type PeriodId } from "./period.js";
 import { recordFor, type AnchorRecord } from "./ledger.js";
 import { rootOf } from "./tree.js";
-
-/** Deterministic everywhere, unlike locale-aware comparison. */
-const byCodeUnit = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 
 export interface AnchorPlan {
   readonly period: PeriodId;
