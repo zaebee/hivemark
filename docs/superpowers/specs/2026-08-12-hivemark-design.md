@@ -478,3 +478,23 @@ It is deferred because it is meaningless without track records to select on, and
 because each evaluation costs a paid LLM run — real genetic search needs cheap
 fitness, which this is not. Realistically: lineage plus occasional deliberate
 crossbreeding, with intensity set by budget. Phase 2.
+
+**A parametric body for the bee.** `src/avatar.ts` currently places every part by
+literal coordinate — `cx="100" cy="176" rx="42" ry="58"` and a dozen more. That
+is a drawing transcribed, not a body computed, so changing anything means
+re-deriving the numbers around it by hand.
+
+The refactor worth doing derives the whole figure from a few proportions: head
+radius sets the thorax offset, the thorax sets the wing attachment points, the
+abdomen's length sets where the stinger begins.
+
+The reason it is more than tidying: **proportions are continuous and the current
+traits are not.** Today a genome either has a stinger or does not, one wing pair
+or two. With a parametric body, crossbreeding could interpolate rather than pick
+a slot per trait, so an offspring could be genuinely intermediate instead of a
+patchwork of whichever parent won each field. That makes it a prerequisite worth
+doing *before* breeding rather than after.
+
+The constraint from §Badge still binds: proportions may be read from the genome
+and never from the track record. A body responding to confirmations would make a
+fixed identity look mutable.
