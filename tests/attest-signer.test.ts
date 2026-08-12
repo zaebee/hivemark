@@ -33,4 +33,25 @@ describe("loadSigner", () => {
       /unusable signing key/i,
     );
   });
+
+  it("never leaks the raw value into the thrown error, even via cause", () => {
+    const canary = "0xLEAKCANARY-not-a-key";
+    let caught: unknown;
+    try {
+      loadSigner({ HIVEMARK_SIGNING_KEY: canary });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(Error);
+    const err = caught as Error;
+    expect(err.message).not.toContain("LEAKCANARY");
+    // Walk the cause chain too — a logger that prints `cause` would still
+    // leak the value if it were attached anywhere along the chain.
+    let cause: unknown = err.cause;
+    while (cause !== undefined && cause !== null) {
+      const causeMessage = cause instanceof Error ? cause.message : String(cause);
+      expect(causeMessage).not.toContain("LEAKCANARY");
+      cause = cause instanceof Error ? cause.cause : undefined;
+    }
+  });
 });
