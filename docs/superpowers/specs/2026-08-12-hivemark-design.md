@@ -33,16 +33,28 @@ unresolved, mean impact 4.1" is a calibration.
 
 What makes a reviewer itself:
 
+**Corrected 2026-08-12 after inspecting the actual artifacts.** An earlier draft
+of this document named `guardian_metrics.jsonl` as the source and declared two
+fields unrecorded. Both claims were wrong and are retracted here rather than
+edited into silence: that file is written at runtime and is not in the
+repository, and the artifact that *is* there records more, not less.
+
+The source is `benchmarks/martian-reviews.jsonl` — one record per review,
+carrying identity and findings together.
+
 | field | source today | notes |
 |---|---|---|
-| `provider` | derived from `model` | gemini / ollama / mistral — explicit prefix table; an unrecognised model is a refusal, never an "other" bucket |
-| `model` | `guardian_metrics.jsonl` | ✅ recorded |
-| `skeptic_model` | `guardian_metrics.jsonl` | ✅ recorded; `None` = skeptic off |
-| `impact_threshold` | `guardian_metrics.jsonl` | ✅ recorded |
-| `prompt_version` | — | ❌ **not recorded** (see Known gaps) |
-| `context_mode` | — | ❌ **not recorded** — graph vs bare-diff |
+| `provider` | derived from `finder_model` | gemini / ollama / mistral — explicit prefix table; an unrecognised model is a refusal, never an "other" bucket |
+| `finder_model` | `finder_model` | ✅ |
+| `skeptic_model` | `skeptic_model` | ✅ `None` = skeptic off |
+| `context_mode` | `had_graph` / `pr_slice` | ✅ graph vs diff-only — **recorded after all** |
+| `guardian_version` | `guardian_sha` | ✅ pins the whole Guardian codebase — strictly better than a `prompt_version` string, which could not distinguish two prompts at the same version number |
 | `schema_version` | hivemark | version of this genome schema |
 | `known_fields` | hivemark | explicit set of fields present |
+
+`impact_threshold` is not in this artifact. It is a reporting filter rather than
+a behavioural trait — it hides findings after the fact instead of changing what
+the reviewer finds — so it is deliberately **not** part of the genome.
 
 ### ReviewerIdentity
 
@@ -98,7 +110,10 @@ collapsed into one score:
 1. **Skeptic axis** — confirmed / refuted / uncertain, from Guardian's skeptic.
 2. **Human axis** — `findings_applied` from `rate_review()`: how many findings a
    human actually applied. The weightiest signal, because it is not an LLM
-   grading an LLM.
+   grading an LLM. **Absent from `martian-reviews.jsonl`**, which is benchmark
+   output rather than production review history. The axis is therefore rendered
+   as "no data", never silently backfilled from the skeptic — an LLM grading an
+   LLM is precisely what this axis exists to be independent of.
 3. **Bench axis** — precision/recall from `bench.py` / `calibrate.py`, where the
    identity has been benchmarked.
 
@@ -133,27 +148,28 @@ Guardian's artifacts and Guardian knows nothing about hivemark.
 
 | component | does | in → out |
 |---|---|---|
-| `harvest` | read + normalise artifacts | `guardian_metrics.jsonl` + `FinderRecording` → `Claim[]`, `Genome[]` |
+| `harvest` | read + normalise artifacts | `martian-reviews.jsonl` → `Claim[]`, `Genome[]` |
 | `identity` | content-address a genome | `Genome` → `identity_id` |
 | `attest` | sign one claim | `Claim` → EIP-712 offchain attestation |
 | `anchor` | weekly timestamp | attestations → one Merkle root tx |
 | `derive` | aggregate | `Claim[]` → `TrackRecord` |
 | `publish` | showcase | `TrackRecord` → page + shields JSON + avatar |
 
-### The join seam
+### No join seam
 
-`guardian_metrics.jsonl` carries identity (`model`, `skeptic_model`,
-`impact_threshold`); `FinderRecording` carries the findings and the diff. They
-join on `pr` — but a PR can be reviewed several times (re-run, different
-provider).
+An earlier draft designed a heuristic join between two artifacts and a refusal
+path for ambiguous matches. Inspection removed the problem: one
+`martian-reviews.jsonl` record carries identity *and* findings *and* commit
+coordinates together. There is nothing to join and no ambiguity to refuse.
 
-Phase 1 joins on `(pr, timestamp)` with a tolerance window and **refuses**
-ambiguous matches, naming the candidates. It never picks the closest and
-proceeds. This follows the precedent already set in codegraph-brain #345: an
-ambiguous hit is a false positive.
+What remains is **duplicate review detection**: the same
+`(url, head_sha, genome)` reviewed twice. The later `reviewed_at` supersedes;
+both are kept in history.
 
-A `run_id` written upstream would remove the seam entirely. Not required to
-start.
+The file is append-only and is written while benchmark runs are in progress — it
+grew by one record during the inspection that produced this section. `harvest`
+must therefore tolerate a truncated final line (a partial write) by skipping it
+with a warning, and must never assume a stable record count between reads.
 
 ## Verification
 
@@ -215,8 +231,8 @@ identities — visible as a new generation rather than as corruption of old data
 
 | situation | behaviour |
 |---|---|
-| ambiguous metrics ↔ recording join | refuse, naming candidates |
-| `skeptic_status` = off / failed / partial | claim is `unresolved`; never confirmed by default |
+| truncated final line (concurrent append) | skip with a warning; never abort the run, never guess the rest |
+| `verdict` absent / `skeptic_model` null | claim is `unresolved`; never confirmed by default |
 | `parse_failed` run | not LGTM, not zero-findings — inherits Guardian's care |
 | re-run of the same PR | dedup by `claimHash`; no duplicate attestation |
 | human disagrees with the skeptic | new **superseding** attestation; history never rewritten |
@@ -242,16 +258,20 @@ ordinary review.
 - **Identity (property tests):** same genome → same id; any field change → a
   different id; an unknown field is never equal to a known field carrying a
   default.
-- **Join:** a fixture with two runs of one PR must produce a refusal, not a
-  nearest-match guess.
+- **Harvest robustness:** a fixture whose last line is truncated mid-object must
+  yield every complete record plus one warning — not an exception, and not a
+  silently short result.
+- **Duplicates:** the same `(url, head_sha, genome)` twice must resolve to the
+  later `reviewed_at` while both remain in history.
 - **Merkle:** a valid proof verifies; a tampered claim does not.
 - **Address:** deterministic and matching the published derivation.
 - **Contract:** transfer reverts (ERC-5192); minting a known genome twice
   reverts.
-- **End-to-end on real data:** codegraph-brain already holds real recordings and
-  a populated `guardian_metrics.jsonl`. The first run must build track records
-  from Guardian's **actual** history, not from synthetic fixtures. How many
-  claims land as `unresolved` is the project's first honest result.
+- **End-to-end on real data:** `benchmarks/martian-reviews.jsonl` in
+  codegraph-brain holds 36 real reviews and 116 findings. The first run must
+  build track records from that **actual** history, not from synthetic
+  fixtures. A copy is vendored into hivemark as a frozen fixture so the tests
+  do not depend on a sibling checkout or on a file that grows mid-run.
 
 ## Implementation language
 
@@ -299,12 +319,32 @@ The first implementation plan covers **milestone 1 only**.
 
 ## Known gaps
 
-1. `prompt_version` and `context_mode` are absent from Guardian's artifacts.
-   Phase 1 builds genomes from what is recorded today and marks them incomplete.
-   A small upstream PR closes this; identities will fork when it lands, by
-   design.
-2. The metrics ↔ recording join is heuristic until an upstream `run_id` exists.
+1. **The human axis has no data in this source.** `martian-reviews.jsonl` is
+   benchmark output; `findings_applied` lives in production metrics that are not
+   committed to the repository. Until a production source is wired in, every
+   track record rests on two axes, and the card must say so.
+2. **The corpus is narrow.** All 36 records use `gemini-2.5-flash` as finder and
+   `gemini-3.5-flash` as skeptic. The three distinct genomes differ only in
+   `had_graph` and `guardian_sha`. Cross-provider comparison — the thing that
+   makes "digital entities with different characters" more than a phrase — needs
+   ollama and mistral runs that do not exist yet.
 3. Gas figures in this document are orders of magnitude, not quotes.
+
+## What the first run will show
+
+Stated in advance so the result cannot be quietly reframed afterwards. From the
+36 records currently on disk:
+
+- **3 identities**, differing in `had_graph` (14 graph / 22 diff-only) and one
+  older `guardian_sha`.
+- **116 claims**, resolved by the skeptic as 86 confirmed, 11 refuted, 19
+  uncertain.
+- The interesting comparison available on day one is graph-enabled versus
+  diff-only — the same question as gate G5 in codegraph-brain's own benchmark
+  spec, approached from the reviewer's side rather than the corpus's.
+
+If these numbers turn out to say nothing interesting, that is the honest outcome
+of milestone 1 and it will have cost nothing to learn.
 
 ## Out of scope for phase 1
 
