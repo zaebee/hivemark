@@ -58,7 +58,7 @@
 - [ ] **Step 1: Initialise the project**
 
 ```bash
-cd /home/zaebee/projects/hivemark
+cd path/to/hivemark
 npm init -y
 npm install --save-exact zod@3 viem@2
 npm install --save-dev --save-exact typescript@5 vitest@3 @types/node@22
@@ -127,7 +127,8 @@ The source file is appended to while benchmark runs are in flight. Freeze a dete
 
 ```bash
 mkdir -p tests/fixtures
-head -n 35 /home/zaebee/projects/ownima/codegraph-brain/benchmarks/martian-reviews.jsonl \
+# CODEGRAPH_BRAIN=path/to/your/codegraph-brain checkout
+head -n 35 "$CODEGRAPH_BRAIN/benchmarks/martian-reviews.jsonl" \
   > tests/fixtures/martian-reviews.sample.jsonl
 wc -l tests/fixtures/martian-reviews.sample.jsonl
 ```

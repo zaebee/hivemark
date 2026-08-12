@@ -1,0 +1,250 @@
+{
+  "$defs": {
+    "Finding": {
+      "description": "One reviewed defect, anchored to a file (and optionally a line).",
+      "properties": {
+        "anchor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Anchor"
+        },
+        "category": {
+          "enum": [
+            "logic",
+            "contract",
+            "tests",
+            "types",
+            "ontology",
+            "security"
+          ],
+          "title": "Category",
+          "type": "string"
+        },
+        "confidence": {
+          "maximum": 100,
+          "minimum": 0,
+          "title": "Confidence",
+          "type": "integer"
+        },
+        "evidence": {
+          "title": "Evidence",
+          "type": "string"
+        },
+        "file": {
+          "title": "File",
+          "type": "string"
+        },
+        "fix": {
+          "title": "Fix",
+          "type": "string"
+        },
+        "impact_score": {
+          "anyOf": [
+            {
+              "maximum": 10,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Impact Score"
+        },
+        "line": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Line"
+        },
+        "problem": {
+          "title": "Problem",
+          "type": "string"
+        },
+        "severity": {
+          "enum": [
+            "critical",
+            "major",
+            "minor"
+          ],
+          "title": "Severity",
+          "type": "string"
+        },
+        "skeptic_note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Skeptic Note"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "verdict": {
+          "anyOf": [
+            {
+              "enum": [
+                "confirmed",
+                "refuted",
+                "uncertain"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Verdict"
+        }
+      },
+      "required": [
+        "file",
+        "severity",
+        "category",
+        "title",
+        "evidence",
+        "problem",
+        "fix",
+        "confidence"
+      ],
+      "title": "Finding",
+      "type": "object"
+    }
+  },
+  "description": "One Guardian review of one benchmark PR, stored so it can be re-judged.\n\nDeliberately self-sufficient. Phase 1 could re-score 118 reviews with a\nsecond judge, and later correct a scoring bug across all of them, only\nbecause `results.jsonl` happened to keep every finding's full text \u2014 the\nfinder never had to run again. That was luck; here it is a requirement, so\nthe record carries the SHAs it was produced from, the model that produced\nit, and the untruncated findings.\n\nWhat it does NOT carry is any score. Judging is a separate pass over these\nrows, which is what keeps \"re-judge with a different model\" from meaning\n\"re-run the benchmark\".",
+  "properties": {
+    "base_sha": {
+      "title": "Base Sha",
+      "type": "string"
+    },
+    "completion_tokens": {
+      "title": "Completion Tokens",
+      "type": "integer"
+    },
+    "duration_s": {
+      "title": "Duration S",
+      "type": "number"
+    },
+    "error": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Error"
+    },
+    "finder_model": {
+      "title": "Finder Model",
+      "type": "string"
+    },
+    "findings": {
+      "items": {
+        "$ref": "#/$defs/Finding"
+      },
+      "title": "Findings",
+      "type": "array"
+    },
+    "guardian_sha": {
+      "title": "Guardian Sha",
+      "type": "string"
+    },
+    "had_graph": {
+      "title": "Had Graph",
+      "type": "boolean"
+    },
+    "head_sha": {
+      "title": "Head Sha",
+      "type": "string"
+    },
+    "parse_failed": {
+      "title": "Parse Failed",
+      "type": "boolean"
+    },
+    "pr_slice": {
+      "title": "Pr Slice",
+      "type": "string"
+    },
+    "project": {
+      "title": "Project",
+      "type": "string"
+    },
+    "prompt_tokens": {
+      "title": "Prompt Tokens",
+      "type": "integer"
+    },
+    "reviewed_at": {
+      "title": "Reviewed At",
+      "type": "string"
+    },
+    "skeptic_completion_tokens": {
+      "default": 0,
+      "title": "Skeptic Completion Tokens",
+      "type": "integer"
+    },
+    "skeptic_model": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Skeptic Model"
+    },
+    "skeptic_prompt_tokens": {
+      "default": 0,
+      "title": "Skeptic Prompt Tokens",
+      "type": "integer"
+    },
+    "url": {
+      "title": "Url",
+      "type": "string"
+    }
+  },
+  "required": [
+    "url",
+    "project",
+    "pr_slice",
+    "base_sha",
+    "head_sha",
+    "had_graph",
+    "finder_model",
+    "skeptic_model",
+    "findings",
+    "prompt_tokens",
+    "completion_tokens",
+    "duration_s",
+    "parse_failed",
+    "guardian_sha",
+    "reviewed_at"
+  ],
+  "title": "ReviewRecord",
+  "type": "object"
+}

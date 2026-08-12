@@ -1,0 +1,81 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`deriveTrackRecords > matches a stable snapshot of the real corpus 1`] = `
+[
+  {
+    "claims": 68,
+    "context_mode": "diff-only",
+    "corpus": [
+      [
+        "discourse",
+        10,
+      ],
+      [
+        "grafana",
+        7,
+      ],
+      [
+        "keycloak",
+        4,
+      ],
+    ],
+    "finder_model": "gemini-2.5-flash",
+    "guardian_version": "d0d807ef01c556b882dc85b9fc0d2851d92aa1e5",
+    "reviews": 21,
+    "skeptic": {
+      "confirmed": 53,
+      "mean_impact": 3.9,
+      "refuted": 7,
+      "uncertain": 8,
+      "unresolved": 0,
+    },
+    "skeptic_model": "gemini-3.5-flash",
+  },
+  {
+    "claims": 1,
+    "context_mode": "graph",
+    "corpus": [
+      [
+        "sentry",
+        1,
+      ],
+    ],
+    "finder_model": "gemini-2.5-flash",
+    "guardian_version": "1ecd9629f46cab10b907dae285d0f58b0eef5e21",
+    "reviews": 1,
+    "skeptic": {
+      "confirmed": 0,
+      "mean_impact": 2,
+      "refuted": 0,
+      "uncertain": 1,
+      "unresolved": 0,
+    },
+    "skeptic_model": "gemini-3.5-flash",
+  },
+  {
+    "claims": 43,
+    "context_mode": "graph",
+    "corpus": [
+      [
+        "cal_dot_com",
+        10,
+      ],
+      [
+        "grafana",
+        3,
+      ],
+    ],
+    "finder_model": "gemini-2.5-flash",
+    "guardian_version": "d0d807ef01c556b882dc85b9fc0d2851d92aa1e5",
+    "reviews": 13,
+    "skeptic": {
+      "confirmed": 32,
+      "mean_impact": 4.74,
+      "refuted": 2,
+      "uncertain": 9,
+      "unresolved": 0,
+    },
+    "skeptic_model": "gemini-3.5-flash",
+  },
+]
+`;
