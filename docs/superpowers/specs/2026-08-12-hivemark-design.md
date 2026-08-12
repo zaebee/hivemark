@@ -182,12 +182,52 @@ referenced by `claimHash`:
 identityId   bytes32     repo, pr, commitSha
 file, line               category, severity
 confidence   uint8       verdict uint8
-impactScore  uint8       appliedByHuman bool
-claimHash    bytes32
+impactScore  uint8       claimHash bytes32
 ```
 
 An EIP-712 signature is verifiable by anyone against the public key, without
 trusting the publisher and without touching a network.
+
+**Corrected 2026-08-12, before implementation.** Two things an earlier draft of
+this section got wrong.
+
+`appliedByHuman` was in the field list. It cannot be populated: the human axis
+has no data in benchmark artifacts, as §Track record already states. Signing a
+field we can only ever set to `false` would assert something we did not observe,
+so it is removed. It returns when a production source supplies it.
+
+**Offchain does not mean chain-free.** EAS binds an offchain attestation to a
+chain in its EIP-712 domain — `TypedDataConfig` requires `chainId` and the EAS
+contract `address`, and both are covered by the signature. Verification still
+needs no network, but the domain must be chosen before the first signature and
+cannot change afterwards without invalidating everything signed under it.
+
+The domain is therefore **Base mainnet from the first signature**. Signing costs
+nothing on any chain, so choosing mainnet buys permanence for free and avoids a
+migration that would otherwise discard the whole history. Values, taken from
+`ethereum-attestation-service/eas-contracts` at `deployments/base/` and each
+confirmed to carry bytecode via `eth_getCode` on a public Base RPC:
+
+| | |
+|---|---|
+| chainId | `8453` (matches the RPC's own `eth_chainId`) |
+| EAS | `0x4200000000000000000000000000000000000021` |
+| SchemaRegistry | `0x4200000000000000000000000000000000000020` |
+
+### What a signature claims, and what it does not
+
+The **publisher** signs, not the reviewer. Reviewers hold no keys — their
+addresses are derived from genomes precisely so that no key exists — so an
+attestation reads:
+
+> this hivemark instance observed that identity X made claim Y, which the
+> skeptic resolved as Z
+
+It does **not** assert that the finding is correct. Truth of a claim is the
+skeptic's and the human's business, recorded in `verdict` and `impact_score`;
+the signature covers provenance and integrity only. Anyone reading these as
+proof of correctness has read them wrong, and the published page must say so
+where the attestations are surfaced.
 
 **2. Weekly Merkle anchor — one transaction.** Root of the period's
 attestations, plus period bounds and count, onchain on Base. This is what a
@@ -315,7 +355,12 @@ nothing has been spent finding out.
 the SBT contract. Each of the three is separately shippable in that order, and
 the first of them still costs nothing.
 
-The first implementation plan covers **milestone 1 only**.
+Milestone 1 is complete and merged. The second implementation plan covers
+**`attest` only** — no wallet, no transaction, no key in CI. `anchor` and the SBT
+contract each get their own plan, and the questions they raise (funding a
+wallet, where the key lives, how a missed week is recorded) are deferred to
+them. The one decision `attest` cannot defer is the signing domain, because it
+is covered by every signature — settled above.
 
 ## Known gaps
 
