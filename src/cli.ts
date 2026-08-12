@@ -1,6 +1,9 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { attestClaim, type AttestationEnvelope } from "./attest/attest.js";
+import { loadSigner, type Signer } from "./attest/signer.js";
 import { avatarSvg } from "./avatar.js";
+import { claimsOf } from "./claims.js";
 import { deriveTrackRecords } from "./derive.js";
 import { harvest } from "./harvest.js";
 import { renderPage } from "./publish/page.js";
@@ -11,10 +14,16 @@ export interface RunOutput {
   tracks: TrackRecord[];
   files: Map<string, string>;
   warnings: string[];
+  attestations: AttestationEnvelope[];
 }
 
-/** Pure: text in, files out. Side-effect free so the e2e test needs no disk. */
-export function run(text: string): RunOutput {
+export interface RunOptions {
+  /** Absent means "read the environment"; explicit null means "do not sign". */
+  signer?: Signer | null;
+}
+
+/** Text in, files out. Reads the environment only when `signer` is left unspecified. */
+export async function run(text: string, options: RunOptions = {}): Promise<RunOutput> {
   const { records, warnings } = harvest(text);
   const tracks = deriveTrackRecords(records);
   const files = new Map<string, string>();
@@ -26,19 +35,35 @@ export function run(text: string): RunOutput {
     files.set(`avatar-${short}.svg`, avatarSvg(track.genome, 240));
   }
 
-  return { tracks, files, warnings };
+  const signer = options.signer === undefined ? loadSigner(process.env) : options.signer;
+  const attestations: AttestationEnvelope[] = [];
+  if (signer) {
+    for (const record of records) {
+      for (const claim of claimsOf(record)) {
+        attestations.push(await attestClaim(claim, signer));
+      }
+    }
+    files.set("attestations.json", `${JSON.stringify(attestations, null, 2)}\n`);
+  }
+
+  return { tracks, files, warnings, attestations };
 }
 
-function main(): void {
+async function main(): Promise<void> {
   const [source = "tests/fixtures/martian-reviews.sample.jsonl", outDir = "dist"] =
     process.argv.slice(2);
-  const output = run(readFileSync(source, "utf8"));
+  const output = await run(readFileSync(source, "utf8"));
 
   mkdirSync(outDir, { recursive: true });
   for (const [name, body] of output.files) writeFileSync(join(outDir, name), body, "utf8");
 
   for (const warning of output.warnings) console.warn(`warning: ${warning}`);
   console.log(`${output.tracks.length} identities → ${output.files.size} files in ${outDir}/`);
+  console.log(
+    output.attestations.length > 0
+      ? `  ${output.attestations.length} attestations signed`
+      : "  no signing key configured — claims produced, nothing signed",
+  );
   for (const track of output.tracks) {
     const s = track.skeptic;
     const corpus = track.corpus.map(([p, n]) => `${p}×${n}`).join(" ");

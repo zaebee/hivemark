@@ -16,9 +16,23 @@ same hash, for which no private key exists.
 ## Status
 
 **Milestone 1 (done):** offchain track records, page, shields badges,
-DNA-derived avatars. No wallet, no contract, no gas.
+genome-derived bee badges. No wallet, no contract, no gas.
 
-**Milestone 2:** signed attestations, a weekly Merkle anchor, the SBT contract.
+**Milestone 2, step 1 (this):** every claim is signed as an EAS-format offchain
+attestation bound to the Base mainnet domain, and verifies against the public key
+alone — still no wallet, no transaction, no key in CI.
+
+**Still ahead:** a weekly Merkle anchor for timestamps, then the SBT contract.
+
+### What a signature does and does not say
+
+The publisher signs, not the reviewer — reviewers hold no keys by construction.
+An attestation asserts that this hivemark instance observed a claim and the
+verdict its skeptic reached. It does **not** assert the finding is correct, and
+`verifyEnvelope` returns an `unverifiable` list saying so in as many words.
+
+Signing is optional. With no `HIVEMARK_SIGNING_KEY` in the environment, hivemark
+produces claims and a page and signs nothing. See `docs/attestation-signers.md`.
 
 ## Run
 
