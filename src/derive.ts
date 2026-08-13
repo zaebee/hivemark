@@ -1,3 +1,4 @@
+import { byCodeUnit, canonicalJson } from "./canonical.js";
 import { claimsOf } from "./claims.js";
 import { genomeOf } from "./genome.js";
 import { identityId, ownerAddress } from "./identity.js";
@@ -60,17 +61,46 @@ function corpusOf(records: ReviewRecord[]): ReadonlyArray<readonly [string, numb
  * accidentally correct, and it inverts the moment two offsets differ
  * (`14:00+03:00` sorts after `12:00+00:00` while happening an hour earlier).
  * The schema guarantees these parse, so no NaN reaches this comparison.
+ *
+ * Two records on the same instant are settled by `supersedes` below, and the key
+ * is encoded rather than concatenated. Both exist because the obvious versions
+ * made the result depend on the order the file happened to be written in.
  */
 export function dedupe(records: readonly ReviewRecord[]): ReviewRecord[] {
   const winners = new Map<string, ReviewRecord>();
   for (const record of records) {
-    const key = `${record.url}|${record.head_sha}|${identityId(genomeOf(record))}`;
+    // Encoded, not concatenated. Joining with a delimiter assumes the fields
+    // cannot contain it, and the schema constrains neither alphabet: a url
+    // ending "…/1|abc" with sha "def" collided with url "…/1" and sha "abc|def",
+    // and the loser vanished without a warning.
+    const key = JSON.stringify([record.url, record.head_sha, identityId(genomeOf(record))]);
     const held = winners.get(key);
-    if (!held || Date.parse(record.reviewed_at) > Date.parse(held.reviewed_at)) {
+    if (held === undefined || supersedes(record, held)) {
       winners.set(key, record);
     }
   }
   return [...winners.values()];
+}
+
+/**
+ * Does this record replace the one already held?
+ *
+ * Later wins. On the same instant nothing about time can decide it, so the tie
+ * breaks on content — the greater canonical form — which is arbitrary but
+ * settled, and is the only part that matters: a strict comparison let the tie
+ * fall to whichever record the file happened to list first, so a track record
+ * depended on line order. The design calls it derived from the facts, and the
+ * order of lines in an append-only file is not a fact about a reviewer.
+ *
+ * This is emphatically not a claim about which of two same-second records was
+ * the correction. That is unknowable from the data, and picking deterministically
+ * is the honest response to not knowing.
+ */
+function supersedes(record: ReviewRecord, held: ReviewRecord): boolean {
+  const at = Date.parse(record.reviewed_at);
+  const heldAt = Date.parse(held.reviewed_at);
+  if (at !== heldAt) return at > heldAt;
+  return byCodeUnit(canonicalJson(record), canonicalJson(held)) > 0;
 }
 
 function skepticAxis(claims: Claim[]): SkepticAxis {

@@ -43,6 +43,32 @@ describe("deriveTrackRecords", () => {
     expect(find(twice).claims).toBe(find(once).claims);
   });
 
+  it("resolves a dead-heat rerun the same way whichever order it is read in", () => {
+    // Timestamps in this corpus have second resolution, so a corrected rerun
+    // written inside the same second as the original is a tie. Under a strict
+    // `>` the tie fell to whichever record the file listed first, which made a
+    // track record depend on line order — and the design calls it derived from
+    // the facts, never stored and never tunable. Order is not a fact about a
+    // reviewer.
+    const a = { ...records[0]!, reviewed_at: "2026-08-12T12:00:00Z", findings: [] };
+    const b = { ...records[0]!, reviewed_at: "2026-08-12T12:00:00Z" };
+
+    const forwards = deriveTrackRecords([a, b]);
+    const backwards = deriveTrackRecords([b, a]);
+    expect(forwards).toEqual(backwards);
+  });
+
+  it("keeps two reviews apart when a delimiter appears inside a field", () => {
+    // The dedupe key joined url, head_sha and identity with "|", and neither
+    // field's alphabet is constrained by the schema. Two genuinely different
+    // reviews could therefore collide on one key, and the loser vanished with no
+    // warning — a complete, schema-valid review silently absent from every
+    // downstream count.
+    const left = { ...records[0]!, url: "https://x/pull/1|abc", head_sha: "def" };
+    const right = { ...records[0]!, url: "https://x/pull/1", head_sha: "abc|def", findings: [] };
+    expect(deriveTrackRecords([left, right])[0]!.reviews).toBe(2);
+  });
+
   it("orders reruns by instant, not by string form", () => {
     // 14:00+03:00 is 11:00Z — an hour EARLIER than 12:00Z, though it sorts
     // later as a string. Lexicographic comparison fails this; parsing passes it.
