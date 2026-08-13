@@ -73,6 +73,15 @@ for (const w of warnings) console.warn(`warning: ${w}`);
 
 const tracks = deriveTrackRecords(records).sort((a, b) => b.reviews - a.reviews);
 if (tracks.length === 0) throw new Error(`no identities harvested from ${source}`);
+// Plate IV crosses the second and third identities, so a thinner corpus has no
+// parents to cross. Said plainly here rather than as an undefined dereference
+// three hundred lines below, where the message names neither cause nor cure.
+if (tracks.length < 3) {
+  throw new Error(
+    `plate needs 3 identities to show a crossing, ${source} has ${tracks.length}: ` +
+      `pass a fuller corpus, or drop the crossings section`,
+  );
+}
 
 const named = (t: TrackRecord): string =>
   `${t.genome.context_mode} · ${t.genome.guardian_version === tracks[0]!.genome.guardian_version ? "current" : "older"} Guardian`;

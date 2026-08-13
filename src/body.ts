@@ -214,7 +214,16 @@ export function bodyPlan(genome: Genome, unit: number = UNIT): BodyPlan {
     drawn(DRAWING.antennaSpreadMm + DRAWING.antennaTipMm),
   );
   const width = 2 * (widest + drawn(DRAWING.marginMm));
-  const height = (stinger ? stinger.to : abdomenBottom) + drawn(DRAWING.marginMm);
+  // Wings join the vertical extent for the same reason they join the horizontal
+  // one: the canvas follows the body. They sit well above the abdomen today, so
+  // this changes no output — but a wider wing or a deeper rear-pair drop would
+  // otherwise leave the canvas silently, and did in a probe.
+  const lowest = Math.max(
+    stinger ? stinger.to : abdomenBottom,
+    wing.cy + wing.ry,
+    rearWing === null ? 0 : rearWing.cy + rearWing.ry,
+  );
+  const height = lowest + drawn(DRAWING.marginMm);
 
   return {
     unit,

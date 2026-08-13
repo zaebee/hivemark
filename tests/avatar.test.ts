@@ -72,14 +72,29 @@ describe("traits read from the genome", () => {
   });
 
   it("changes the palette with the provider", () => {
-    const gemini = avatarSvg(base);
-    const ollama = avatarSvg({
-      ...base,
-      provider: "ollama",
-      finder_model: "qwen2.5-coder:7b",
-      skeptic_model: null,
-    });
-    expect(gemini).not.toBe(ollama);
+    // Assert the colours, not merely that the two pictures differ. The earlier
+    // version compared a gemini bee against a qwen one that also differed in eye
+    // shape, head build and stinger — so it passed with all three palettes
+    // collapsed onto gemini's, which a probe confirmed. Nothing pinned a hex.
+    const bodyOf = { gemini: "#E3AE3C", mistral: "#DC6B3E", ollama: "#8098AC" } as const;
+    const finderOf = {
+      gemini: "gemini-2.5-flash",
+      mistral: "mistral-medium-latest",
+      ollama: "qwen2.5-coder:7b",
+    } as const;
+
+    for (const [provider, body] of Object.entries(bodyOf)) {
+      const svg = avatarSvg({
+        ...base,
+        provider: provider as keyof typeof bodyOf,
+        finder_model: finderOf[provider as keyof typeof finderOf],
+      });
+      expect(svg, `${provider} should paint ${body}`).toContain(body);
+      for (const [other, otherBody] of Object.entries(bodyOf)) {
+        if (other === provider) continue;
+        expect(svg, `${provider} must not paint ${other}'s ${otherBody}`).not.toContain(otherBody);
+      }
+    }
   });
 
   it("marks a different Guardian revision as a different generation", () => {

@@ -122,9 +122,14 @@ describe("the canvas follows the body", () => {
       expect(plan.abdomen.cy + plan.abdomen.ry).toBeLessThanOrEqual(plan.height);
       if (plan.stinger !== null) expect(plan.stinger.to).toBeLessThanOrEqual(plan.height);
       expect(plan.axis + plan.abdomen.rx).toBeLessThanOrEqual(plan.width);
-      expect(plan.axis + plan.wing.offset + plan.wing.rx).toBeLessThanOrEqual(plan.width);
-      if (plan.rearWing !== null) {
-        expect(plan.axis + plan.rearWing.offset + plan.rearWing.rx).toBeLessThanOrEqual(plan.width);
+      // Both axes, for both pairs. Checking wings horizontally alone let a probe
+      // drop the rear pair 900 units below a 300-unit canvas with every test
+      // still green, while this test's name promised it contained them.
+      for (const pair of [plan.wing, plan.rearWing]) {
+        if (pair === null) continue;
+        expect(plan.axis + pair.offset + pair.rx).toBeLessThanOrEqual(plan.width);
+        expect(pair.cy - pair.ry).toBeGreaterThanOrEqual(0);
+        expect(pair.cy + pair.ry).toBeLessThanOrEqual(plan.height);
       }
       expect(plan.axis + plan.antenna.spread + plan.antenna.tip).toBeLessThanOrEqual(plan.width);
     }
