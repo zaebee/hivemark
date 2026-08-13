@@ -98,11 +98,13 @@ function extremeHead(want: "low" | "high"): Genome {
   const candidates = Array.from({ length: 400 }, (_, i) =>
     hypothetical({ finder_model: `gemini-${i}-flash`, context_mode: "graph" }),
   );
-  return candidates.sort((a, b) =>
-    want === "low"
-      ? characterMm("headHeight", a) - characterMm("headHeight", b)
-      : characterMm("headHeight", b) - characterMm("headHeight", a),
-  )[0]!;
+  // One pass for one winner. Sorting four hundred genomes to read element zero
+  // would also have mutated the array it was handed.
+  return candidates.reduce((best, candidate) => {
+    const a = characterMm("headHeight", candidate);
+    const b = characterMm("headHeight", best);
+    return (want === "low" ? a < b : a > b) ? candidate : best;
+  });
 }
 
 const VARIATION: ReadonlyArray<{ name: string; genome: Genome; note: string }> = [

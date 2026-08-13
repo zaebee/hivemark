@@ -243,4 +243,4 @@ export function bodyPlan(genome: Genome, unit: number = UNIT): BodyPlan {
   };
 }
 
-export { DRAWING, MORPHOLOGY };
+export { DRAWING };
