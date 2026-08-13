@@ -273,8 +273,25 @@ correlation would need a measured covariance matrix, which none of these sources
 publishes. Independent variation across intervals this narrow cannot produce a
 monster, and the "still a bee" test is what proves it rather than an assumption.
 
-**Castes.** Drones and queens are measured in the primary source and are not
-drawn. There is no reviewer trait they would express.
+**Castes.** Drones and queens are measured in the primary source — queen head
+3.92 × 3.69, thorax 4.83, abdomen 8.08; drone head 2.88 × 4.37, thorax 4.81,
+abdomen 7.01 — and are not drawn. Two independent reasons refuse them, which is
+unusual enough to record.
+
+Ours: no genome field marks a caste, so one would have to be assigned from the
+track record — "the queen is the identity with the best confirmations" — and
+that is exactly the third source §Badge refuses. A body that grew as findings
+were confirmed would show a fixed identity as mutable.
+
+The bees': **caste in *Apis mellifera* is not genetic.** A fertilised egg becomes
+a queen or a worker according to whether the larva is fed royal jelly — one
+genome, different diet. A queen therefore cannot be derived from a genome at all,
+by biology and not merely by our rule.
+
+A drone *is* a genome fact, being haploid from an unfertilised egg. Nothing in a
+reviewer genome corresponds to that either. Worth noting only because a drone has
+no sting, and a bee whose findings no skeptic judged is already drawn without
+one.
 
 **Colour from measurement.** Tergite pigmentation is a real morphometric
 character and the palette is already spoken for: it reads the provider, which is
