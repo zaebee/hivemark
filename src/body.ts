@@ -16,7 +16,7 @@
  * — the constraint from the design's §Badge, which survives this change too.
  */
 
-import { MORPHOLOGY, type CharacterName } from "./morphology.js";
+import type { CharacterName } from "./morphology.js";
 import type { Genome } from "./types.js";
 import { characterMm } from "./variation.js";
 

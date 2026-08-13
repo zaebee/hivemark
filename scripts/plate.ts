@@ -125,11 +125,14 @@ function extremeHead(want: "low" | "high"): Genome {
   );
   // One pass for one winner. Sorting four hundred genomes to read element zero
   // would also have mutated the array it was handed.
-  return candidates.reduce((best, candidate) => {
-    const a = characterMm("headHeight", candidate);
-    const b = characterMm("headHeight", best);
-    return (want === "low" ? a < b : a > b) ? candidate : best;
-  });
+  const beats = (a: number, b: number) => (want === "low" ? a < b : a > b);
+  let best = candidates[0]!;
+  for (const candidate of candidates) {
+    if (beats(characterMm("headHeight", candidate), characterMm("headHeight", best))) {
+      best = candidate;
+    }
+  }
+  return best;
 }
 
 const VARIATION: ReadonlyArray<{ name: string; genome: Genome; note: string }> = [
