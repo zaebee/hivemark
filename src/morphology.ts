@@ -27,10 +27,13 @@ export const SOURCES = {
     "about authorship, competing interests and the study's contribution; PLOS found " +
     "the evidence inconclusive and did not retract it, and raised no concern about " +
     "the measurements. Recorded here so the flag travels with the number.",
-  "sharma-1990":
-    "Sharma SK (1990). Biometric and developmental biology of Apis mellifera L. " +
-    "workers. M.Sc. thesis, Department of Entomology, HPKV, Palampur, India. " +
-    "Unpublished and not opened: read from the discussion of Pathania et al. 2022.",
+  "ibrahim-2017":
+    "Ibrahim MM, Chandel YS, Anil A (2017). Morphometrics of Apis mellifera after " +
+    "Five Decades of its Introduction in North-Western Himalayan Region of India. " +
+    "Pakistan Journal of Zoology 49(4):1397-1403. doi:10.17582/journal.pjz/2017.49.4.1397.1403 " +
+    "Table II, per-apiary means from four sites in Himachal Pradesh at 644-1268 m. " +
+    "NOT INDEPENDENT of pathania-2022: the two report identical error terms across " +
+    "every shared character against different means. Two publications, one method.",
 } as const;
 
 export type SourceKey = keyof typeof SOURCES;
@@ -62,17 +65,14 @@ export interface Character {
 }
 
 export const MORPHOLOGY: Record<CharacterName, Character> = {
-  headHeight: { mm: 2.45, range: [2.45, 3.19], sources: ["pathania-2022", "sharma-1990"] },
-  headWidth: { mm: 3.62, range: [3.62, 3.78], sources: ["pathania-2022", "sharma-1990"] },
-
-  // No second published mean could be read, so these do not vary. One exists —
-  // Ibrahim, Chandel & Anil 2017 give thorax 4.26 and abdomen 5.91 — but its
-  // publisher blocks automated access and the numbers were seen only in search
-  // summaries. Putting the weakest evidence in the system underneath the largest
-  // masses of the silhouette is the trade this file refuses. See
-  // docs/morphology-sources.md for what promotes them.
-  thoraxLength: { mm: 3.72, range: null, sources: ["pathania-2022"] },
-  abdomenLength: { mm: 6.63, range: null, sources: ["pathania-2022"] },
+  // Each endpoint below is a mean published for one named sampled population —
+  // an apiary in Ibrahim et al.'s Table II, or the whole worker sample in
+  // Pathania et al. — never an error bar, and never the widest number on the
+  // page. The same rule governs the wings, where the endpoints are subspecies.
+  headHeight: { mm: 2.45, range: [2.45, 3.22], sources: ["pathania-2022", "ibrahim-2017"] },
+  headWidth: { mm: 3.62, range: [3.62, 3.72], sources: ["pathania-2022", "ibrahim-2017"] },
+  thoraxLength: { mm: 3.72, range: [3.72, 4.38], sources: ["pathania-2022", "ibrahim-2017"] },
+  abdomenLength: { mm: 6.63, range: [5.54, 6.63], sources: ["pathania-2022", "ibrahim-2017"] },
 
   // The wing ranges span two named subspecies — jemenitica at the low end,
   // carnica at the high — so both ends are a described bee rather than an error

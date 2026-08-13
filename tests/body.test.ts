@@ -153,14 +153,27 @@ describe("the body is the measured animal", () => {
     }
   });
 
-  it("varies the head between identities and leaves the abdomen fixed", () => {
-    // Not an aspiration: this is what today's published corpus supports, and
-    // the spec records it in advance so the result cannot be reframed later.
-    const a = bodyPlan(genome);
-    const b = bodyPlan({ ...genome, finder_model: "mistral-medium-latest" });
-    expect(a.head.ry).not.toBe(b.head.ry);
-    expect(MORPHOLOGY.abdomenLength.range).toBeNull();
-    expect(a.abdomen.ry).toBe(b.abdomen.ry);
+  it("varies every region, each from the slot that builds it", () => {
+    // The payoff, and it only became true when a second measurement of thorax
+    // and abdomen was read: all four regions move, and each moves alone. An
+    // earlier version of this test asserted the opposite for the abdomen — that
+    // was the honest state of the literature at the time, not a target.
+    const base = bodyPlan(genome);
+    const cases = [
+      ["head", { finder_model: "mistral-medium-latest" }, (p: typeof base) => p.head.ry],
+      ["thorax", { guardian_version: "1ecd9629f46cab10b907dae285d0f58b0eef5e21" }, (p: typeof base) => p.thorax.ry],
+      ["abdomen", { skeptic_model: "mistral-medium-latest" }, (p: typeof base) => p.abdomen.ry],
+      ["wing", { context_mode: "diff-only" as const }, (p: typeof base) => p.wing.rx],
+    ] as const;
+
+    for (const [region, change, read] of cases) {
+      const moved = bodyPlan({ ...genome, ...change });
+      expect(read(moved), `${region} should follow its own slot`).not.toBe(read(base));
+    }
+    // And no character is left without a published range to move within.
+    for (const name of Object.keys(MORPHOLOGY) as (keyof typeof MORPHOLOGY)[]) {
+      expect(MORPHOLOGY[name].range, `${name} has no range`).not.toBeNull();
+    }
   });
 });
 

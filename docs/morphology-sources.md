@@ -13,7 +13,7 @@ millimetres. Queens and drones are measured by these papers too and are not used
 |---|---|---|
 | `pathania-2022` | Pathania A, Kumar A, Dhiman S (2022). Morphometrics of *Apis mellifera* in North-Western Himalayan region of Himachal Pradesh, India. *J. Entomol. Zool. Stud.* 10(3):105–109. [doi:10.22271/j.ento.2022.v10.i3b.8997](https://doi.org/10.22271/j.ento.2022.v10.i3b.8997) | **Read in full.** Tables 1–3 of the PDF, worker row. |
 | `alkahtani-2021` | AL-Kahtani SN, Taha E-KA (2021). Morphometric study of Yemeni (*Apis mellifera jemenitica*) and Carniolan (*A. m. carnica*) honeybee workers in Saudi Arabia. *PLoS ONE* 16(2):e0247262. | **Read in full**, from the manuscript XML. **Carries an Expression of Concern** — see below. |
-| `sharma-1990` | Sharma SK (1990). Biometric and developmental biology of *Apis mellifera* L. workers. M.Sc. thesis, Dept. of Entomology, HPKV, Palampur, India. | **Secondary.** Unpublished thesis, not opened. Values read from the discussion of `pathania-2022`, in the PDF, by eye. |
+| `ibrahim-2017` | Ibrahim MM, Chandel YS, Anil A (2017). Morphometrics of *Apis mellifera* after Five Decades of its Introduction in North-Western Himalayan Region of India. *Pakistan J. Zool.* 49(4):1397–1403. [doi:10.17582/journal.pjz/2017.49.4.1397.1403](https://doi.org/10.17582/journal.pjz/2017.49.4.1397.1403) | **Table II read directly**, opened by hand after the publisher refused automated access. Four apiaries in Himachal Pradesh, 644–1268 m. |
 
 ### The Expression of Concern on `alkahtani-2021`
 
@@ -34,18 +34,44 @@ varying, which the design already handles.
 
 | character | mm | range | sources | note |
 |---|---|---|---|---|
-| headHeight | 2.45 | 2.45 – 3.19 | `pathania-2022`, `sharma-1990` | high end is Sharma's 3.19 |
-| headWidth | 3.62 | 3.62 – 3.78 | `pathania-2022`, `sharma-1990` | high end is Sharma's 3.78 |
-| thoraxLength | 3.72 | — | `pathania-2022` | **does not vary** — see below |
-| abdomenLength | 6.63 | — | `pathania-2022` | **does not vary** — see below |
+| headHeight | 2.45 | 2.45 – 3.22 | `pathania-2022`, `ibrahim-2017` | high end is Palampur |
+| headWidth | 3.62 | 3.62 – 3.72 | `pathania-2022`, `ibrahim-2017` | high end is Dhaulakuan |
+| thoraxLength | 3.72 | 3.72 – 4.38 | `pathania-2022`, `ibrahim-2017` | high end is Bajaura |
+| abdomenLength | 6.63 | 5.54 – 6.63 | `pathania-2022`, `ibrahim-2017` | low end is Bajaura |
 | forewingLength | 9.27 | 7.94 – 9.27 | `pathania-2022`, `alkahtani-2021` | low end is *jemenitica* 7.94; *carnica* is 9.14 |
 | forewingWidth | 2.98 | 2.44 – 3.53 | `pathania-2022`, `alkahtani-2021` | 2.44 *jemenitica*, 3.53 *carnica* |
 | hindwingLength | 6.20 | 5.85 – 6.74 | `pathania-2022`, `alkahtani-2021` | 5.85 *jemenitica*, 6.74 *carnica* |
 | hindwingWidth | 1.82 | 1.67 – 2.21 | `pathania-2022`, `alkahtani-2021` | 1.67 *jemenitica*, 2.21 *carnica* |
 
-The wing ranges are spans between two *subspecies* of *A. mellifera*, which is
-what makes them defensible as bounds: every value inside is a bee somebody
-measured, and both ends are a named subspecies rather than an error bar.
+The wing ranges are spans between two *subspecies* of *A. mellifera*; the head,
+thorax and abdomen ranges are spans between named sampled populations — four
+Himachal apiaries and Pathania et al.'s worker sample. That is what makes them
+defensible as bounds: every value inside is a bee somebody measured, and each end
+is a described population rather than an error bar.
+
+Ibrahim et al.'s Table II, per apiary, in millimetres:
+
+| site | altitude | head height | head width | thorax | abdomen |
+|---|---|---|---|---|---|
+| Dhaulakuan | 644 m | 3.20 | 3.72 | 4.14 | 5.96 |
+| Nagrota Bagwan | 861 m | 3.14 | 3.65 | 4.30 | 6.07 |
+| Bajaura | 1087 m | 3.19 | 3.64 | 4.38 | 5.54 |
+| Palampur | 1268 m | 3.22 | 3.71 | 4.23 | 6.08 |
+
+**These two papers are not independent, and it is visible in the arithmetic.**
+Their reported error terms are identical, character for character — ±0.10, ±0.09,
+±0.06, ±0.20, ±0.93 — against entirely different means. Same region, same method,
+one shared pool. They are two published means, which is what the rule requires,
+but nobody should read the range as two independent measurements agreeing. Note
+too that Pathania et al.'s single station, Nagrota Bagwan, is one of the four
+sites above.
+
+**`sharma-1990` is dropped.** Head height 3.19 and width 3.78 were attributed to
+that unpublished thesis by Pathania et al.'s discussion, read second-hand. Table
+II above reports 3.19 for head height directly — the same figure — and 3.64–3.72
+for width, never 3.78. Most likely the discussion conflated two sources. A
+first-hand table replaces a second-hand attribution, and the questionable 3.78
+leaves with it.
 
 ## Two claims from the spec, withdrawn on verification
 
@@ -67,37 +93,23 @@ exactly the thing this file exists to catch.
 source that could not be opened, and it moves the forewing maximum by 0.6%. It
 bought nothing that would justify a third unverified number.
 
-## Thorax and abdomen: the search that did not settle them
+## Thorax and abdomen: settled, and how
 
-The spec predicted these two might not vary, and they do not. But the reason is
-sharper than "no second measurement exists" — one exists and could not be read.
+The spec predicted these two might never vary, and for most of this work they did
+not: their second measurement sat behind a publisher that returns 403 to
+automated requests, and numbers seen only in search summaries were refused as too
+weak to put underneath the largest masses of the silhouette.
 
-**The candidate.** Ibrahim MM, Chandel YS, Anil A (2017). *Morphometrics of Apis
-mellifera after Five Decades of its Introduction in North-Western Himalayan
-Region of India.* Pakistan J. Zool. 49(4):1397–1403,
-[doi:10.17582/journal.pjz/2017.49.4.1397.1403](https://doi.org/10.17582/journal.pjz/2017.49.4.1397.1403).
-Reported as thorax length 4.26, abdomen length 5.91, head 3.19 × 3.68, forewing
-9.13 × 3.00.
+**Resolved 2026-08-13.** The article was opened by hand in a browser and Table II
+was read from it. That was the promotion path this file specified, and it was
+taken. Thorax and abdomen now have ranges, so every character in the model varies
+and a genome differing in any slot differs in the region that slot builds. The
+three collected identities share two slots, so they differ in thorax and wings
+only — a fact about the corpus, not about the model.
 
-**Why it is not in the table.** Those numbers were seen only in search-engine
-summaries. Semantic Scholar holds no abstract for the DOI, and the publisher
-(researcherslinks.com) returns 403 to automated requests, including for the
-PDF — despite the record being marked CC-BY. Encoding a measurement read from a
-search summary would put the weakest evidence in the system underneath the
-largest mass in the silhouette.
-
-**How to promote it.** Open the article by hand in a browser and read Table 1.
-If thorax 4.26 and abdomen 5.91 are confirmed, add `ibrahim-2017` to `SOURCES`,
-give `thoraxLength` the range 3.72–4.26 and `abdomenLength` the range
-5.91–6.63, and the two largest parts of the bee begin to vary with no other
-change.
-
-**A caution to carry if it is promoted.** `pathania-2022` and this paper report
-*identical* ± terms across every shared character — 0.10, 0.09, 0.06, 0.20,
-0.93, 0.18, 0.08 — against different means. Same region, same method, same
-pooled error: they are two publications, but not two independent measurements.
-The range would still be a real span between two published means, and that
-weaker independence should be stated where it is used.
+What did not change: the rule. No range was widened, no number was estimated, and
+nothing was accepted that had not been read. The gap closed because the evidence
+arrived, which is the only way this file allows a gap to close.
 
 ## Searches run, including the ones that found nothing
 

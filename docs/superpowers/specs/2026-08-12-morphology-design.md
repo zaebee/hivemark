@@ -85,56 +85,83 @@ about the distribution of anything.
 
 | character | low | high | second source |
 |---|---|---|---|
-| head height | 2.45 | 3.19 | Sharma 1990 |
-| head width | 3.62 | 3.78 | Sharma 1990 |
-| forewing length | 7.64 | 9.70 | Dyer & Seeley 1987 (across altitudes) |
-| hindwing length | 6.20 | 6.43 | Sharma 1990 |
-| hindwing width | 1.82 | 1.925 | Sharma 1990 |
-| thorax length | — | — | **none — does not vary** |
-| abdomen length | — | — | **none — does not vary** |
-| forewing width | — | — | **none — does not vary** |
+| head height | 2.45 | 3.22 | Ibrahim et al. 2017, Palampur |
+| head width | 3.62 | 3.72 | Ibrahim et al. 2017, Dhaulakuan |
+| thorax length | 3.72 | 4.38 | Ibrahim et al. 2017, Bajaura |
+| abdomen length | 5.54 | 6.63 | Ibrahim et al. 2017, Bajaura |
+| forewing length | 7.94 | 9.27 | AL-Kahtani & Taha 2021, *jemenitica* |
+| forewing width | 2.44 | 3.53 | AL-Kahtani & Taha 2021, both subspecies |
+| hindwing length | 5.85 | 6.74 | AL-Kahtani & Taha 2021, both subspecies |
+| hindwing width | 1.67 | 2.21 | AL-Kahtani & Taha 2021, both subspecies |
 
-Secondary sources, in full:
+**Updated 2026-08-13, and the table above is not the one this section was
+drafted with.** Every entry has changed since. See `docs/morphology-sources.md`
+for the provenance of each endpoint; the two paragraphs below record what the
+first draft got wrong, because a spec that quietly acquires better numbers
+teaches nothing about how they were got.
 
-- Sharma SK (1990). *Biometric and developmental biology of Apis mellifera L.
-  workers.* M.Sc. thesis, Department of Entomology, HPKV, Palampur, India.
-- Ruttner F (2013). *Biogeography and Taxonomy of Honeybees.* Springer. Forewing
-  length 9.33 mm — inside the Dyer & Seeley interval, so it widens nothing.
-- Dyer FC, Seeley TD (1987). *Interspecific comparisons of endothermy in
-  honey-bees (Apis).* J Exp Biol 127:1–26.
+Second sources, in full:
 
-**Read through a secondary source, and marked as such.** All three comparison
-values are taken from Pathania et al.'s discussion section, not from the
-originals — the Sharma thesis is unpublished and the other two were not opened.
-Each range is therefore provisional. Verifying them against the originals is a
-task in the implementation plan, and a value that fails verification loses its
-range: the character reverts to the single primary measurement and stops
-varying. Failing to verify is not a reason to keep a number; it is the reason
-the number is flagged here.
+- Ibrahim MM, Chandel YS, Anil A (2017). *Morphometrics of Apis mellifera after
+  Five Decades of its Introduction in North-Western Himalayan Region of India.*
+  Pakistan J. Zool. 49(4):1397–1403. Table II, four apiaries at 644–1268 m.
+- AL-Kahtani SN, Taha E-KA (2021). *Morphometric study of Yemeni and Carniolan
+  honeybee workers in Saudi Arabia.* PLoS ONE 16(2):e0247262. Carries an
+  Expression of Concern; see `docs/morphology-sources.md`.
 
-### The corpus is thin, and the consequence is stated in advance
+**Three candidates from the first draft were dropped on verification, and the
+paragraph that justified them is struck with them.** It read: "all three
+comparison values are taken from Pathania et al.'s discussion section, not from
+the originals... each range is therefore provisional." That was the right
+caution, and acting on it removed all three. Sharma 1990 (head 3.19 × 3.78) is an
+unpublished thesis whose head width no first-hand table supports; Ruttner 2013
+(forewing 9.33) was second-hand and widened nothing; Dyer & Seeley 1987
+(forewing 7.64–9.70) is an interspecific endothermy study, not a survey of
+*A. mellifera* across altitudes, so the claim attributed to it does not match its
+subject. Every endpoint in the table above was read from a table with our own
+eyes.
 
-Stated now so the outcome cannot be quietly reframed afterwards. With the
-sources listed above, **the head and the wings vary and the thorax and abdomen
-do not.** The abdomen is the largest mass in the silhouette, so most of what a
-reader sees will be identical between reviewers.
+### The corpus was thin, and then it was not
 
-The cause is not an oversight. Pathania et al. write that "present findings add
-information on thorax length and abdomen length" — theirs is the first published
-measurement of those characters in this population, so there is no second mean
-to bound a range with.
+Left standing as written, because the prediction was right at the time and the
+way it resolved is the point.
 
-Two honest outcomes, and the design accommodates either:
+**Stated in advance:** with the sources then readable, the head and the wings
+would vary and the thorax and abdomen would not. The abdomen is the largest mass
+in the silhouette, so most of what a reader saw would be identical between
+reviewers. Pathania et al. write that "present findings add information on thorax
+length and abdomen length" — theirs was the first published measurement of those
+characters for that population, and there was no second mean to bound a range
+with.
 
-- Widening the source corpus supplies second means for thorax and abdomen, and
-  those characters begin to vary with no change to any rule. This is a research
-  task in the plan, not a code change.
-- No second measurement is found, and the abdomen stays fixed. That is recorded
-  as a finding about the literature, and nothing is fudged to compensate.
+Two honest outcomes were named, and the design accommodated either: a wider
+source corpus supplies the second means and those characters begin to vary with
+no change to any rule, or none is found and the abdomen stays fixed, recorded as
+a finding about the literature.
 
-What is refused either way is inventing a plausible-looking range, or reaching
-for the pooled standard error again once it is inconvenient that the honest rule
-produced a dull bee.
+**What happened, 2026-08-13:** the first. A second measurement existed — Ibrahim,
+Chandel & Anil 2017 — behind a publisher that refuses automated requests, so
+numbers seen only in search summaries were rejected as too weak to sit underneath
+the largest mass of the bee. The article was then opened by hand and its Table II
+read. Every character now has a range, so any two genomes differing in a slot
+differ in the region that slot builds.
+
+**What that does and does not mean for the real corpus.** The three collected
+identities share `finder_model` and `skeptic_model`, so their heads and abdomens
+are identical — correctly, since those reviewers really are identical in those
+respects. They differ in thorax (3.82 against 3.87 mm) and forewing (8.63 against
+8.85 mm), both small. The mechanism is general; the corpus is still narrow, which
+is §Known gaps in the main spec and not something morphology can fix.
+
+No rule moved to get there. What is worth keeping from the episode is that the
+dull outcome was written down *before* it was known which one would happen, so
+the good one could not be presented as the plan working.
+
+**One caveat the new numbers carry.** Pathania et al. 2022 and Ibrahim et al.
+2017 report identical error terms across every shared character — ±0.10, ±0.09,
+±0.06, ±0.20, ±0.93 — against different means, and Pathania's single station is
+one of Ibrahim's four sites. Two published means, which is what the rule
+requires; not two independent studies, which nobody should claim.
 
 ## Two constants, two different kinds of claim
 

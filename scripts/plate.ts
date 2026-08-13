@@ -347,13 +347,16 @@ ${genomeRows(v.genome)}</div>
 <tbody>${CHARACTERS}</tbody>
 </table>
 <div class="note">
-<p><strong>Two of the largest parts do not vary, and that is the honest result rather than a gap in
-the code.</strong> Thorax and abdomen length have one published mean each — Pathania et al. state
-theirs is the first for that population — so there is no second value to bound a range with. A second
-measurement does exist (Ibrahim, Chandel &amp; Anil 2017), and its publisher blocks automated access,
-so it was not read and is not used. The wings vary, but <span class="mono">context_mode</span> holds
-two values, so a wing has exactly two builds. Only the head is driven by a slot with an open
-vocabulary, which is why it is the row shown above.</p>
+<p><strong>Every character here varies, and one of them nearly did not.</strong> Thorax and abdomen
+length had a single published mean each for most of this work — Pathania et al. state theirs is the
+first for that population — and the second measurement sat behind a publisher that refuses automated
+requests. Numbers seen only in search summaries were refused as too weak to sit underneath the
+largest mass of the bee. The article was opened by hand instead, and its four apiaries supply the
+other end of both ranges. No rule was relaxed to get there.</p>
+<p>The head is still the row shown above because it is the only region driven by a slot with an open
+vocabulary. <span class="mono">context_mode</span> holds two values, so a wing has exactly two
+builds; <span class="mono">guardian_version</span> and <span class="mono">skeptic_model</span> hold
+as many as the corpus has seen.</p>
 </div>
 </section>
 
