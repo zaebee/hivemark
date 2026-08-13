@@ -32,6 +32,15 @@ function main(): void {
   const request = buildAnchorRequest(plan);
   console.log(`period      ${plan.period}  [${plan.periodStart}, ${plan.periodEnd})`);
   console.log(`covers      ${plan.count} attestations`);
+  // The coverage edge beside the calendar edge. The guard refuses a week that has
+  // not closed; nothing can tell whether the input file is current, so a Monday
+  // anchor built on a Friday harvest would lose the weekend silently. Seeing how
+  // far the newest attestation sits from the period's end is what catches it.
+  console.log(
+    `newest      ${new Date(plan.newestCovered * 1000).toISOString()} ` +
+      `(${Math.round((plan.periodEnd - plan.newestCovered) / 3600)}h before the period ends — ` +
+      `re-harvest if that looks stale)`,
+  );
   console.log(`root        ${plan.root}`);
   console.log(`to          ${request.to}`);
   console.log(`schema      ${request.schema}`);

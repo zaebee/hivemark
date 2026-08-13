@@ -36,6 +36,27 @@ Register each with `resolver = 0x0` and `revocable = true` — those two values 
 part of what the UID is derived from, so a different choice produces a different
 UID and the attestations will not resolve.
 
+**Look each UID up on easscan first.** A UID is global and derived from the
+schema text alone, so if anyone anywhere has registered the identical string with
+the same resolver and revocable flag, it already exists — attestations resolve
+against it and no transaction is needed. Registering it again does not fail
+safely into a no-op: EAS rejects it and the gas is spent on a revert. The script
+cannot check this offline.
+
+Do not hand-assemble the calls. `bun scripts/register-schemas.ts` prints the
+exact `to`, `value` and `data` for all three and sends nothing. It re-derives
+each UID from the calldata it just built and compares it against a **literal**
+written in the script, not against the constant the code computes — an earlier
+version compared against the computed constant, which made the check
+`keccak(x) === keccak(x)` and printed a cheerful ✓ for a schema no attestation
+names. On a mismatch the calldata is withheld rather than printed under a
+warning, and the script exits non-zero.
+
+The UIDs in the table above are pinned in `tests/schema-uids.test.ts` against the
+constants and against this file. If that test fails, a schema string was edited:
+that is a breaking change needing a fresh registration and a decision about every
+attestation signed under the old UID, not a test to update.
+
 Both UIDs are derived rather than assigned, so **every attestation already signed
 becomes resolvable on easscan the moment the claim schema exists**. Nothing needs
 re-signing.
@@ -71,6 +92,31 @@ recorded may as well not have happened.
 
 `active`, `retired` (rotated out; its past anchors remain valid) or
 `compromised` (do not trust anchors from it after the stated date).
+
+## Never anchor a week that is still running
+
+The dry run refuses it, and this is why. One anchor per period is enforced, in
+the ledger and again in `planAnchor`. So anchoring on a Thursday publishes a root
+over that week and closes it: every review made on the Friday, Saturday and
+Sunday lands in a week that can never be anchored again.
+
+That is strictly worse than missing the week. A gap is visible — `gapsIn` lists
+it, the dry run prints it, and the attestations in it are honestly unbounded in
+time. A half-covered week looks finished from the outside, and nothing in the
+record distinguishes "these are all the attestations of that week" from "these
+are the ones that happened to exist by Thursday".
+
+Wait for the period to close, then anchor. The guard takes the current time as
+an argument rather than reading the clock, so it can be tested at a chosen
+instant — this project has already shipped one bug from time taken off the clock.
+
+**Re-harvest and re-sign before anchoring, every time.** The guard closes one
+door and not the other: it knows the week has ended, and knows nothing about
+whether the file it was handed is current. Anchoring on Monday from a corpus last
+synced on Friday loses the weekend from the only anchor that week will ever have
+— the same half-covered week, entered from the other side. The dry run prints
+`newest`, the time of the latest attestation it covers, next to the period's end.
+If those are far apart, the input is stale, not the week quiet.
 
 ## A missed week
 

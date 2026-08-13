@@ -11,6 +11,16 @@ export interface AnchorPlan {
   readonly uids: `0x${string}`[];
   readonly periodStart: number;
   readonly periodEnd: number;
+  /**
+   * The latest attestation time this anchor covers.
+   *
+   * Printed beside the period's own bounds so a human sees the coverage edge
+   * next to the calendar edge. The guard stops an anchor from being too early
+   * for the week; nothing can stop it from being built on a stale input file,
+   * and a Monday anchor over a Friday harvest loses the weekend just as
+   * silently. This is what makes that visible before broadcast.
+   */
+  readonly newestCovered: number;
 }
 
 /**
@@ -24,9 +34,27 @@ export function planAnchor(
   envelopes: readonly AttestationEnvelope[],
   records: readonly AnchorRecord[],
   period: PeriodId,
+  nowSeconds: number = Math.floor(Date.now() / 1000),
 ): AnchorPlan | null {
   if (recordFor(records, period)) {
     throw new Error(`period is already anchored: ${period}`);
+  }
+
+  // A week that is still running cannot be anchored, because one anchor per
+  // period is enforced: every review made in the days remaining would fall into
+  // a week that can never be anchored again. That is worse than a missed week —
+  // a gap is visible in `gapsIn` and honest about having no time bound, while a
+  // half-covered week looks finished and is not.
+  //
+  // `now` is a parameter rather than a clock read inside the arithmetic. This
+  // project has already shipped one bug from time taken off the clock, and a
+  // guard about time that cannot be tested at a chosen instant is not a guard.
+  const bounds = periodBounds(period);
+  if (nowSeconds < bounds.end) {
+    throw new Error(
+      `period ${period} is still running until ${new Date(bounds.end * 1000).toISOString()}: ` +
+        `anchoring now would leave every later review in it uncoverable`,
+    );
   }
 
   // Deduplicated before anything counts them. Two byte-identical findings in one
@@ -34,12 +62,10 @@ export function planAnchor(
   // hence one uid twice. None appear in the current corpus, but a repeated leaf
   // would let `count` overstate what the anchor covers — the record would claim
   // more evidence than exists.
-  const inPeriod = envelopes
-    .filter(
-      (e) =>
-        periodOf(new Date(Number(e.attestation.message.time) * 1000).toISOString()) === period,
-    )
-    .map((e) => e.attestation.uid as `0x${string}`);
+  const covered = envelopes.filter(
+    (e) => periodOf(new Date(Number(e.attestation.message.time) * 1000).toISOString()) === period,
+  );
+  const inPeriod = covered.map((e) => e.attestation.uid as `0x${string}`);
 
   // Sorted so the root depends on the set, not on the order it was read in.
   //
@@ -59,5 +85,6 @@ export function planAnchor(
     uids,
     periodStart: start,
     periodEnd: end,
+    newestCovered: Math.max(...covered.map((e) => Number(e.attestation.message.time))),
   };
 }

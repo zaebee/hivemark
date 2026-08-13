@@ -24,6 +24,16 @@ const envelope = (uid: string, time: string): AttestationEnvelope =>
 const W33 = "2026-08-12T11:00:00Z";
 const W34 = "2026-08-19T11:00:00Z";
 
+/**
+ * The instant 2026-W33 closes.
+ *
+ * Every call below passes it. Before the guard existed these tests read the
+ * machine clock through the default parameter, so they passed today and would
+ * have behaved differently after 17 August — a suite that quietly changes
+ * meaning with the date is not a suite.
+ */
+const CLOSED = Date.UTC(2026, 7, 17) / 1000;
+
 describe("planAnchor", () => {
   it("covers exactly the attestations whose time falls in the period", () => {
     const envelopes = [
@@ -31,18 +41,18 @@ describe("planAnchor", () => {
       envelope(`0x${"bb".repeat(32)}`, W33),
       envelope(`0x${"cc".repeat(32)}`, W34),
     ];
-    const plan = planAnchor(envelopes, [], periodId("2026-W33"))!;
+    const plan = planAnchor(envelopes, [], periodId("2026-W33"), CLOSED)!;
     expect(plan.count).toBe(2);
     expect(plan.uids).toEqual([`0x${"aa".repeat(32)}`, `0x${"bb".repeat(32)}`]);
   });
 
   it("returns null for a period with no attestations, rather than an empty root", () => {
-    expect(planAnchor([envelope(`0x${"cc".repeat(32)}`, W34)], [], periodId("2026-W33"))).toBeNull();
+    expect(planAnchor([envelope(`0x${"cc".repeat(32)}`, W34)], [], periodId("2026-W33"), CLOSED)).toBeNull();
   });
 
   it("refuses a period that is already anchored", () => {
     const records = [{ period: "2026-W33" } as AnchorRecord];
-    expect(() => planAnchor([envelope(`0x${"aa".repeat(32)}`, W33)], records, periodId("2026-W33"))).toThrow(
+    expect(() => planAnchor([envelope(`0x${"aa".repeat(32)}`, W33)], records, periodId("2026-W33"), CLOSED)).toThrow(
       /already anchored/i,
     );
   });
@@ -50,7 +60,7 @@ describe("planAnchor", () => {
   it("orders uids deterministically, so the root does not depend on input order", () => {
     const a = envelope(`0x${"aa".repeat(32)}`, W33);
     const b = envelope(`0x${"bb".repeat(32)}`, W33);
-    expect(planAnchor([a, b], [], periodId("2026-W33"))!.root).toBe(planAnchor([b, a], [], periodId("2026-W33"))!.root);
+    expect(planAnchor([a, b], [], periodId("2026-W33"), CLOSED)!.root).toBe(planAnchor([b, a], [], periodId("2026-W33"), CLOSED)!.root);
   });
 
   it("counts a repeated uid once, so the anchor cannot overstate its coverage", () => {
@@ -61,13 +71,66 @@ describe("planAnchor", () => {
       [envelope(same, W33), envelope(same, W33), envelope(`0x${"bb".repeat(32)}`, W33)],
       [],
       periodId("2026-W33"),
+      CLOSED,
     )!;
     expect(plan.count).toBe(2);
     expect(plan.uids).toEqual([same, `0x${"bb".repeat(32)}`]);
   });
 
   it("reports the period's own bounds, not the range of its attestations", () => {
-    const plan = planAnchor([envelope(`0x${"aa".repeat(32)}`, W33)], [], periodId("2026-W33"))!;
+    const plan = planAnchor([envelope(`0x${"aa".repeat(32)}`, W33)], [], periodId("2026-W33"), CLOSED)!;
     expect(plan.periodEnd - plan.periodStart).toBe(7 * 24 * 60 * 60);
+  });
+
+  it("reports the newest attestation it covers, so a stale input file is visible", () => {
+    // The guard refuses a week that has not closed. It cannot tell whether the
+    // file it was handed is current — a Monday anchor over a Friday harvest
+    // loses the weekend just as silently, through the other door. Printing the
+    // coverage edge beside the calendar edge is what a human can act on.
+    const early = envelope(`0x${"aa".repeat(32)}`, "2026-08-10T09:00:00Z");
+    const late = envelope(`0x${"bb".repeat(32)}`, "2026-08-14T18:30:00Z");
+    const plan = planAnchor([early, late], [], periodId("2026-W33"), CLOSED)!;
+    expect(plan.newestCovered).toBe(Math.floor(Date.parse("2026-08-14T18:30:00Z") / 1000));
+    expect(plan.newestCovered).toBeLessThan(plan.periodEnd);
+  });
+
+  describe("a week still running cannot be anchored", () => {
+    // One anchor per period is enforced, so anchoring an open week is a one-way
+    // door: every review made in the days remaining falls into a week that can
+    // never be anchored again. Worse than a missed week, which at least shows up
+    // in `gapsIn` — a half-covered week looks finished.
+    //
+    // `now` is a parameter and not a clock read. Reading the clock inside is how
+    // this project shipped a bug before, and a guard about time that cannot be
+    // tested at a chosen instant is not a guard.
+    const mid = Date.UTC(2026, 7, 13) / 1000; // Thursday of 2026-W33
+    const after = Date.UTC(2026, 7, 17) / 1000; // the first instant of W34
+
+    it("refuses while the period is still open", () => {
+      expect(() =>
+        planAnchor([envelope(`0x${"aa".repeat(32)}`, W33)], [], periodId("2026-W33"), mid),
+      ).toThrow(/still running|not ended|open/i);
+    });
+
+    it("allows it the instant the period closes", () => {
+      const plan = planAnchor(
+        [envelope(`0x${"aa".repeat(32)}`, W33)],
+        [],
+        periodId("2026-W33"),
+        after,
+      );
+      expect(plan!.count).toBe(1);
+    });
+
+    it("still refuses a period that is already anchored, closed or not", () => {
+      expect(() =>
+        planAnchor(
+          [envelope(`0x${"aa".repeat(32)}`, W33)],
+          [{ period: periodId("2026-W33") } as never],
+          periodId("2026-W33"),
+          after,
+        ),
+      ).toThrow(/already anchored/);
+    });
   });
 });

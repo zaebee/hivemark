@@ -13,6 +13,10 @@ const plan: AnchorPlan = {
   uids: [`0x${"11".repeat(32)}`, `0x${"22".repeat(32)}`],
   periodStart: 1_754_956_800,
   periodEnd: 1_755_561_600,
+  // Reported to the human before broadcast, and deliberately not part of the
+  // request: the anchor asserts a claim about a calendar week, so narrowing its
+  // bounds to the newest thing inside it would change what is being claimed.
+  newestCovered: 1_755_000_000,
 };
 
 describe("buildAnchorRequest", () => {
