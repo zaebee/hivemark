@@ -13,6 +13,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { avatarSvg } from "../src/avatar.js";
 import { deriveTrackRecords } from "../src/derive.js";
 import { genomeOf, providerOf } from "../src/genome.js";
+import { vocabularyOf } from "../src/breed/vocabulary.js";
 import { harvest } from "../src/harvest.js";
 import { identityId } from "../src/identity.js";
 import { MORPHOLOGY, SOURCES, type CharacterName } from "../src/morphology.js";
@@ -83,8 +84,23 @@ if (tracks.length < 3) {
   );
 }
 
+/**
+ * Which revision is current is a question about time, not about popularity.
+ *
+ * This compared each genome against the most-*reviewed* identity's revision, so
+ * "current" meant "belonging to whoever has the most reviews". On a corpus where
+ * the older revision accumulates reviews the captions invert — verified: giving
+ * the older revision forty reviews labels it current and both newer ones older.
+ * A label derived from the track record, describing a fixed genome, in the one
+ * document built to be regenerated against fuller corpora.
+ *
+ * `vocabularyOf` already answers this by `reviewed_at`, and answering it twice
+ * is how the two answers start to differ.
+ */
+const newestGuardian = vocabularyOf(records).newestGuardian;
+
 const named = (t: TrackRecord): string =>
-  `${t.genome.context_mode} · ${t.genome.guardian_version === tracks[0]!.genome.guardian_version ? "current" : "older"} Guardian`;
+  `${t.genome.context_mode} · ${t.genome.guardian_version === newestGuardian ? "current" : "older"} Guardian`;
 
 // ------------------------------------------------------------ hypotheticals
 const HYPO: ReadonlyArray<{ name: string; genome: Genome }> = [

@@ -192,6 +192,18 @@ describe("traits reach the plan and nothing else does", () => {
     expect(bodyPlan({ ...genome, skeptic_model: null }).stinger).toBeNull();
   });
 
+  it("keeps the generation marker visible for any revision string", () => {
+    // A sha is hex by contract, but the field is typed as a string and the plate
+    // and breeding both build genomes by hand. parseInt accepts a leading sign,
+    // and JS keeps the sign through %, so "-2abc" produced zero bands — the
+    // generation marker silently gone from the abdomen, past a NaN guard written
+    // to catch exactly this kind of input.
+    for (const version of ["-2abc", "-1abc", "+5abc", "", "zz", "0", "ffff"]) {
+      const bands = bodyPlan({ ...genome, guardian_version: version }).bands;
+      expect(bands, `"${version}" should still band the abdomen`).toBeGreaterThanOrEqual(1);
+    }
+  });
+
   it("counts bands from the Guardian revision", () => {
     const a = bodyPlan(genome).bands;
     const b = bodyPlan({

@@ -109,10 +109,17 @@ export interface BodyPlan {
   readonly bands: number;
 }
 
-/** Generation marker: a Guardian revision maps to a band count. */
+/**
+ * Generation marker: a Guardian revision maps to a band count.
+ *
+ * The two characters are required to be hex before parsing, rather than trusted
+ * to be. `Number.parseInt` accepts a leading sign and JS keeps that sign through
+ * `%`, so "-2abc" reached `2 + (-2 % 3)` and drew zero bands — a marker silently
+ * absent, straight past a NaN guard written to prevent exactly that.
+ */
 function bandCount(guardianVersion: string): number {
-  const head = Number.parseInt(guardianVersion.slice(0, 2), 16);
-  return Number.isNaN(head) ? 1 : 2 + (head % 3);
+  if (!/^[0-9a-f]{2}/i.test(guardianVersion)) return 1;
+  return 2 + (Number.parseInt(guardianVersion.slice(0, 2), 16) % 3);
 }
 
 type EyeShape = "round" | "wide" | "narrow";
