@@ -36,6 +36,18 @@ Register each with `resolver = 0x0` and `revocable = true` — those two values 
 part of what the UID is derived from, so a different choice produces a different
 UID and the attestations will not resolve.
 
+Do not hand-assemble the calls. `bun scripts/register-schemas.ts` prints the
+exact `to`, `value` and `data` for all three and sends nothing. It decodes the
+calldata it just built and re-derives the UID from the decoded arguments, so what
+it prints is checked to register each schema under the UID the signed
+attestations already name — and it exits non-zero rather than printing a
+transaction that would not.
+
+The UIDs in the table above are pinned in `tests/schema-uids.test.ts` against the
+constants and against this file. If that test fails, a schema string was edited:
+that is a breaking change needing a fresh registration and a decision about every
+attestation signed under the old UID, not a test to update.
+
 Both UIDs are derived rather than assigned, so **every attestation already signed
 becomes resolvable on easscan the moment the claim schema exists**. Nothing needs
 re-signing.
