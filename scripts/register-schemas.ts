@@ -46,6 +46,28 @@ const REGISTER_ABI = [
   },
 ] as const;
 
+/**
+ * The UIDs the signed attestations actually name, as literals.
+ *
+ * These are the point of the script and they must not be imported. The first
+ * version compared the UID derived from the calldata against the module's
+ * exported constant — but that constant is itself computed from the same schema
+ * string at import time, so the comparison reduced to `keccak(x) === keccak(x)`
+ * and held for any schema whatsoever. Probed: renaming one field printed
+ * "✓ matches" for a transaction registering something no attestation names, and
+ * exited zero.
+ *
+ * A literal is external to the code being checked, which is the whole
+ * difference. Editing a schema now fails here, in the script a human runs
+ * immediately before spending, rather than only in a test suite that the same
+ * edit would invite them to update.
+ */
+const EXPECTED = {
+  claim: "0x9c6648261df139b4453dd540ed2e8d821a9e775beede14ba9aae9e7202daacfb",
+  anchor: "0x8ff2e1ad6186bbe4c1ac54ea7d969dcf04a8caa7d31e8ac45127bfa3cfba06bd",
+  birth: "0x6ca5f932f49e5ac467c1ca24c5af39800a12df874d3856b4afdd54800c07ed02",
+} as const;
+
 const SCHEMAS = [
   { name: "claim", schema: CLAIM_SCHEMA, uid: CLAIM_SCHEMA_UID },
   { name: "anchor", schema: ANCHOR_SCHEMA, uid: ANCHOR_SCHEMA_UID },
@@ -61,10 +83,8 @@ for (const { name, schema, uid } of SCHEMAS) {
     args: [schema, RESOLVER, REVOCABLE],
   });
 
-  // Decode what was just encoded and re-derive the UID from *that*, rather than
-  // trusting that the arguments went in unchanged. This is the whole point of
-  // the script: it proves the printed bytes register the schema under the UID
-  // the signed attestations already name, instead of asserting it in prose.
+  // Decode what was just encoded and re-derive the UID from *that*, so the
+  // number checked below comes from the bytes that would actually be sent.
   const [decodedSchema, decodedResolver, decodedRevocable] = decodeFunctionData({
     abi: REGISTER_ABI,
     data,
@@ -73,16 +93,30 @@ for (const { name, schema, uid } of SCHEMAS) {
     encodePacked(["string", "address", "bool"], [decodedSchema, decodedResolver, decodedRevocable]),
   );
 
-  const agrees = derived === uid;
-  if (!agrees) failures++;
+  // Two independent comparisons against the literal, which say different things.
+  // The first: these bytes register the schema the attestations name. The
+  // second: the module's own constant still agrees with that, so a drifted
+  // constant is reported rather than hidden by the calldata being right.
+  const expected = EXPECTED[name];
+  const sendsRight = derived === expected;
+  const codeAgrees = uid === expected;
+  if (!sendsRight || !codeAgrees) failures++;
 
   console.log(`── ${name} schema`);
   console.log(`to        ${SCHEMA_REGISTRY}`);
   console.log(`value     0 wei`);
-  console.log(`uid       ${uid}`);
-  console.log(`derived   ${derived}  ${agrees ? "✓ matches" : "✗ DOES NOT MATCH — do not send"}`);
+  console.log(`expected  ${expected}`);
+  console.log(`derived   ${derived}  ${sendsRight ? "✓ the calldata registers this uid" : "✗ WRONG UID"}`);
+  console.log(`in code   ${uid}  ${codeAgrees ? "✓ agrees" : "✗ the constant has drifted"}`);
   console.log(`schema    ${schema}`);
-  console.log(`data      ${data}`);
+  if (sendsRight && codeAgrees) {
+    console.log(`data      ${data}`);
+  } else {
+    // Withheld rather than printed with a warning three lines above it. A human
+    // scrolling, or piping this to a file where the exit code evaporates, must
+    // not be able to copy calldata that was refused.
+    console.log(`data      withheld — this transaction would not register ${expected}`);
+  }
   console.log();
 }
 

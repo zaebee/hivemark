@@ -55,7 +55,11 @@ describe("schema uids are a published contract", () => {
     // broadcast reads that table, not this file.
     const doc = readFileSync("docs/anchoring.md", "utf8");
     for (const [name, , expected] of PINNED) {
-      expect(doc, `${name} uid missing from the runbook`).toContain(expected);
+      // Its own row, not merely present somewhere on the page: a table with two
+      // UIDs swapped between rows would satisfy a containment check while
+      // telling a reader the wrong thing about which schema is which.
+      const row = new RegExp(`^\\|\\s*${name}\\s*\\|.*\`${expected}\``, "m");
+      expect(doc, `${name} uid is not in the ${name} row of the runbook table`).toMatch(row);
     }
   });
 });

@@ -82,6 +82,18 @@ describe("planAnchor", () => {
     expect(plan.periodEnd - plan.periodStart).toBe(7 * 24 * 60 * 60);
   });
 
+  it("reports the newest attestation it covers, so a stale input file is visible", () => {
+    // The guard refuses a week that has not closed. It cannot tell whether the
+    // file it was handed is current — a Monday anchor over a Friday harvest
+    // loses the weekend just as silently, through the other door. Printing the
+    // coverage edge beside the calendar edge is what a human can act on.
+    const early = envelope(`0x${"aa".repeat(32)}`, "2026-08-10T09:00:00Z");
+    const late = envelope(`0x${"bb".repeat(32)}`, "2026-08-14T18:30:00Z");
+    const plan = planAnchor([early, late], [], periodId("2026-W33"), CLOSED)!;
+    expect(plan.newestCovered).toBe(Math.floor(Date.parse("2026-08-14T18:30:00Z") / 1000));
+    expect(plan.newestCovered).toBeLessThan(plan.periodEnd);
+  });
+
   describe("a week still running cannot be anchored", () => {
     // One anchor per period is enforced, so anchoring an open week is a one-way
     // door: every review made in the days remaining falls into a week that can
