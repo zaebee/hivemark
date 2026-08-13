@@ -24,9 +24,27 @@ export function planAnchor(
   envelopes: readonly AttestationEnvelope[],
   records: readonly AnchorRecord[],
   period: PeriodId,
+  now: number = Math.floor(Date.now() / 1000),
 ): AnchorPlan | null {
   if (recordFor(records, period)) {
     throw new Error(`period is already anchored: ${period}`);
+  }
+
+  // A week that is still running cannot be anchored, because one anchor per
+  // period is enforced: every review made in the days remaining would fall into
+  // a week that can never be anchored again. That is worse than a missed week —
+  // a gap is visible in `gapsIn` and honest about having no time bound, while a
+  // half-covered week looks finished and is not.
+  //
+  // `now` is a parameter rather than a clock read inside the arithmetic. This
+  // project has already shipped one bug from time taken off the clock, and a
+  // guard about time that cannot be tested at a chosen instant is not a guard.
+  const bounds = periodBounds(period);
+  if (now < bounds.end) {
+    throw new Error(
+      `period ${period} is still running until ${new Date(bounds.end * 1000).toISOString()}: ` +
+        `anchoring now would leave every later review in it uncoverable`,
+    );
   }
 
   // Deduplicated before anything counts them. Two byte-identical findings in one

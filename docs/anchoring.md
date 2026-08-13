@@ -72,6 +72,23 @@ recorded may as well not have happened.
 `active`, `retired` (rotated out; its past anchors remain valid) or
 `compromised` (do not trust anchors from it after the stated date).
 
+## Never anchor a week that is still running
+
+The dry run refuses it, and this is why. One anchor per period is enforced, in
+the ledger and again in `planAnchor`. So anchoring on a Thursday publishes a root
+over that week and closes it: every review made on the Friday, Saturday and
+Sunday lands in a week that can never be anchored again.
+
+That is strictly worse than missing the week. A gap is visible — `gapsIn` lists
+it, the dry run prints it, and the attestations in it are honestly unbounded in
+time. A half-covered week looks finished from the outside, and nothing in the
+record distinguishes "these are all the attestations of that week" from "these
+are the ones that happened to exist by Thursday".
+
+Wait for the period to close, then anchor. The guard takes the current time as
+an argument rather than reading the clock, so it can be tested at a chosen
+instant — this project has already shipped one bug from time taken off the clock.
+
 ## A missed week
 
 Leave it missed. An anchor asserts that its contents existed by a date that has
