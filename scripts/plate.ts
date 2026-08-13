@@ -13,9 +13,12 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { avatarSvg } from "../src/avatar.js";
 import { deriveTrackRecords } from "../src/derive.js";
 import { genomeOf, providerOf } from "../src/genome.js";
+import { vocabularyOf } from "../src/breed/vocabulary.js";
 import { harvest } from "../src/harvest.js";
 import { identityId } from "../src/identity.js";
+import { MORPHOLOGY, SOURCES, type CharacterName } from "../src/morphology.js";
 import type { Genome, TrackRecord } from "../src/types.js";
+import { DRIVEN_BY, characterMm } from "../src/variation.js";
 
 const KNOWN_FIELDS = [
   "context_mode",
@@ -71,9 +74,33 @@ for (const w of warnings) console.warn(`warning: ${w}`);
 
 const tracks = deriveTrackRecords(records).sort((a, b) => b.reviews - a.reviews);
 if (tracks.length === 0) throw new Error(`no identities harvested from ${source}`);
+// Plate IV crosses the second and third identities, so a thinner corpus has no
+// parents to cross. Said plainly here rather than as an undefined dereference
+// three hundred lines below, where the message names neither cause nor cure.
+if (tracks.length < 3) {
+  throw new Error(
+    `plate needs 3 identities to show a crossing, ${source} has ${tracks.length}: ` +
+      `pass a fuller corpus, or drop the crossings section`,
+  );
+}
+
+/**
+ * Which revision is current is a question about time, not about popularity.
+ *
+ * This compared each genome against the most-*reviewed* identity's revision, so
+ * "current" meant "belonging to whoever has the most reviews". On a corpus where
+ * the older revision accumulates reviews the captions invert — verified: giving
+ * the older revision forty reviews labels it current and both newer ones older.
+ * A label derived from the track record, describing a fixed genome, in the one
+ * document built to be regenerated against fuller corpora.
+ *
+ * `vocabularyOf` already answers this by `reviewed_at`, and answering it twice
+ * is how the two answers start to differ.
+ */
+const newestGuardian = vocabularyOf(records).newestGuardian;
 
 const named = (t: TrackRecord): string =>
-  `${t.genome.context_mode} · ${t.genome.guardian_version === tracks[0]!.genome.guardian_version ? "current" : "older"} Guardian`;
+  `${t.genome.context_mode} · ${t.genome.guardian_version === newestGuardian ? "current" : "older"} Guardian`;
 
 // ------------------------------------------------------------ hypotheticals
 const HYPO: ReadonlyArray<{ name: string; genome: Genome }> = [
@@ -81,6 +108,52 @@ const HYPO: ReadonlyArray<{ name: string; genome: Genome }> = [
   { name: "mistral · no skeptic", genome: hypothetical({ finder_model: "mistral-medium-latest" }) },
   { name: "ollama · bare diff, no skeptic", genome: hypothetical({ finder_model: "llama3.1:70b", guardian_version: "1ecd9629f46cab10b907dae285d0f58b0eef5e21" }) },
 ];
+
+// --------------------------------------------------------------- morphology
+/**
+ * The genome that pushes one character furthest, found by searching rather than
+ * by writing the number down.
+ *
+ * Every candidate is a real genome the pipeline would accept, so the bees below
+ * are what `avatarSvg` produces and not a drawing assembled for the occasion.
+ * The finder names all start `gemini-` and all carry `flash`, which pins the
+ * palette and the eye shape: whatever differs between these bees is build.
+ */
+function extremeHead(want: "low" | "high"): Genome {
+  const candidates = Array.from({ length: 400 }, (_, i) =>
+    hypothetical({ finder_model: `gemini-${i}-flash`, context_mode: "graph" }),
+  );
+  // One pass for one winner. Sorting four hundred genomes to read element zero
+  // would also have mutated the array it was handed.
+  const beats = (a: number, b: number) => (want === "low" ? a < b : a > b);
+  let best = candidates[0]!;
+  for (const candidate of candidates) {
+    if (beats(characterMm("headHeight", candidate), characterMm("headHeight", best))) {
+      best = candidate;
+    }
+  }
+  return best;
+}
+
+const VARIATION: ReadonlyArray<{ name: string; genome: Genome; note: string }> = [
+  { name: "shortest head found", genome: extremeHead("low"), note: "low end of the published range" },
+  { name: "the primary measurement", genome: hypothetical({ finder_model: "gemini-2.5-flash", context_mode: "graph" }), note: "Pathania et al. 2022, worker" },
+  { name: "tallest head found", genome: extremeHead("high"), note: "high end of the published range" },
+];
+
+const CHARACTERS = (Object.keys(MORPHOLOGY) as CharacterName[])
+  .map((name) => {
+    const { mm, range, sources } = MORPHOLOGY[name];
+    const span = range === null
+      ? '<span class="none">does not vary</span>'
+      : `${range[0].toFixed(2)} – ${range[1].toFixed(2)}`;
+    const cites = sources
+      .map((k) => `<span class="chip" title="${esc(SOURCES[k])}">${esc(k)}</span>`)
+      .join("");
+    return `<tr><td class="mono">${name}</td><td class="mono num">${mm.toFixed(2)}</td>
+<td class="mono num">${span}</td><td class="mono">${DRIVEN_BY[name]}</td><td>${cites}</td></tr>`;
+  })
+  .join("\n");
 
 // ----------------------------------------------------------------- crossings
 const CROSSES = [
@@ -160,9 +233,9 @@ const crossBlocks = CROSSES.map((c) => {
 
 const KEY = [
   ["provider", "Body palette", "Who is looking. Gold for gemini, rust for mistral, slate for ollama. Read off the finder model, never trusted as a field of its own."],
-  ["context_mode", "Wings", "graph gets two pairs — it sees structure, not just the diff. diff-only gets one."],
-  ["skeptic_model", "Stinger", "A review with no skeptic has no teeth. Null model, no stinger."],
-  ["finder_model", "Eyes", "Which model does the finding. A shape, so it reads within any palette."],
+  ["context_mode", "Wings", "graph gets two pairs — it sees structure, not just the diff. diff-only gets one. Wing dimensions come from the same slot."],
+  ["skeptic_model", "Stinger", "A review with no skeptic has no teeth. Null model, no stinger — and no abdomen of its own."],
+  ["finder_model", "Eyes and head", "Which model does the finding. A shape for the eyes, and the head's proportions, hashed from the same slot."],
   ["guardian_version", "Abdomen bands", "Generation marker. A new Guardian revision is a new lineage."],
 ]
   .map(([field, part, why]) => `<div><span class="field">${field}</span><span class="part">${part}</span><span class="why">${why}</span></div>`)
@@ -223,6 +296,14 @@ border-radius:2px;color:var(--ink-soft)}
 .chip b{color:var(--ink);font-weight:600}
 .meta{font-size:.72rem;color:var(--ink-faint);margin:.5rem 0 .4rem}
 .remark{margin:0 0 2.25rem;color:var(--ink-soft);font-size:.95rem;max-width:46rem}
+.chars{width:100%;border-collapse:collapse;margin:1.5rem 0;font-size:.82rem;
+font-family:ui-monospace,"SF Mono",Menlo,monospace;display:block;overflow-x:auto;white-space:nowrap}
+.chars th{text-align:left;font-weight:600;color:var(--ink-faint);text-transform:uppercase;
+letter-spacing:.1em;font-size:.66rem;padding:.5rem .8rem;border-bottom:1px solid var(--rule)}
+.chars td{padding:.45rem .8rem;border-bottom:1px solid var(--rule-soft);vertical-align:middle}
+.chars .num{text-align:right;font-variant-numeric:tabular-nums}
+.chars .none{color:var(--ink-faint);font-style:italic;white-space:nowrap}
+.chars .chip{margin-right:.25rem;cursor:help}
 .note{border-left:3px solid var(--accent);background:var(--accent-soft);padding:.9rem 1.1rem;color:var(--ink)}
 .note p{max-width:46rem}
 footer{border-top:1px solid var(--rule);padding-top:1.5rem;color:var(--ink-soft);font-size:.92rem}
@@ -232,9 +313,10 @@ footer{border-top:1px solid var(--rule);padding-top:1.5rem;color:var(--ink-soft)
 <header>
 <p class="eyebrow">hivemark · badge visual language · generated from src/avatar.ts</p>
 <h1>Bees assembled from a reviewer's genome</h1>
-<p class="lede">Every trait below is read from a genome field — nothing is decorative and nothing comes
-from the hash. The question this plate exists to answer: can you tell two reviewers apart at a glance,
-and does a crossbred bee visibly inherit from both parents?</p>
+<p class="lede">Every trait below is read from a genome field, and so are the proportions: the base is
+measured <em>Apis mellifera</em>, cited, and each part's build is hashed from the one slot that
+governs it. Nothing comes from the track record. The question this plate exists to answer: can you
+tell two reviewers apart at a glance, and does a crossbred bee visibly inherit from both parents?</p>
 </header>
 
 <section>
@@ -274,7 +356,43 @@ Dashed frames mark every specimen that is not real.</p>
 
 <section>
 <div class="head">
-<p class="eyebrow">Plate III · crossings</p>
+<p class="eyebrow">Plate III · morphology</p>
+<h2>Proportions that are facts, and how far they move</h2>
+<p>The base is the measured worker: head 2.45 × 3.62 mm, thorax 3.72, abdomen 6.63, forewing
+9.27 × 2.98. That is why the head is an ellipse and not a circle, and why the wings are as long as
+they are — a worker's forewing is 9.27 mm against a 12.80 mm body. A character varies only where two
+published means disagree, and then only between them, so every bee here coincides with a bee somebody
+measured.</p>
+</div>
+<div class="plate">${VARIATION.map(
+  (v) => `<article class="specimen is-hypo">
+<div class="tag hypo"><span>${esc(v.name)}</span><span>${esc(v.note)}</span></div>
+<figure>${avatarSvg(v.genome, 170)}</figure>
+<div class="caption"><span class="name mono">head ${characterMm("headHeight", v.genome).toFixed(2)} × ${characterMm("headWidth", v.genome).toFixed(2)} mm</span>
+${genomeRows(v.genome)}</div>
+</article>`,
+).join("\n")}</div>
+<table class="chars">
+<thead><tr><th>character</th><th class="num">mm</th><th class="num">published range</th><th>slot</th><th>sources</th></tr></thead>
+<tbody>${CHARACTERS}</tbody>
+</table>
+<div class="note">
+<p><strong>Every character here varies, and one of them nearly did not.</strong> Thorax and abdomen
+length had a single published mean each for most of this work — Pathania et al. state theirs is the
+first for that population — and the second measurement sat behind a publisher that refuses automated
+requests. Numbers seen only in search summaries were refused as too weak to sit underneath the
+largest mass of the bee. The article was opened by hand instead, and its four apiaries supply the
+other end of both ranges. No rule was relaxed to get there.</p>
+<p>The head is still the row shown above because it is the only region driven by a slot with an open
+vocabulary. <span class="mono">context_mode</span> holds two values, so a wing has exactly two
+builds; <span class="mono">guardian_version</span> and <span class="mono">skeptic_model</span> hold
+as many as the corpus has seen.</p>
+</div>
+</section>
+
+<section>
+<div class="head">
+<p class="eyebrow">Plate IV · crossings</p>
 <h2>Inheritance you can see</h2>
 <p>A hash-derived avatar cannot show lineage: the child's hash is unrelated to its parents'. Parts can.
 Each trait slot is filled from one parent or the other by the same bitmask <span class="mono">breed_dna</span>

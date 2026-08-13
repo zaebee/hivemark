@@ -496,10 +496,24 @@ abdomen's length sets where the stinger begins.
 
 The reason it is more than tidying: **proportions are continuous and the current
 traits are not.** Today a genome either has a stinger or does not, one wing pair
-or two. With a parametric body, crossbreeding could interpolate rather than pick
-a slot per trait, so an offspring could be genuinely intermediate instead of a
-patchwork of whichever parent won each field. That makes it a prerequisite worth
-doing *before* breeding rather than after.
+or two.
+
+**~~With a parametric body, crossbreeding could interpolate rather than pick a
+slot per trait, so an offspring could be genuinely intermediate instead of a
+patchwork of whichever parent won each field.~~ Struck 2026-08-12, on
+implementing it.** It cannot be delivered, and not for want of trying: **a hash
+has no order.** Variation derived from hashing a model name can be inherited but
+never blended — a child whose finder came from one parent and whose skeptic came
+from the other gets a third value for any character, not a value between its
+parents'. A genuinely intermediate build would need a numeric axis along which
+one model lies between two others, and no such axis exists; inventing one would
+be taste wearing a number's clothes.
+
+What a parametric body actually buys is **heritability**: an offspring's head is
+its finder-parent's head exactly, its wings its context-parent's wings, so
+lineage becomes visible. That is worth having under its own name, and it is a
+different claim from the one this paragraph made. See
+`docs/superpowers/specs/2026-08-12-morphology-design.md`.
 
 The constraint from §Badge still binds: proportions may be read from the genome
 and never from the track record. A body responding to confirmations would make a
@@ -509,13 +523,19 @@ fixed identity look mutable.
 base should be the measured morphology of *Apis mellifera*, cited — that turns
 the constants from one person's taste into a fact about the world, which is the
 standard every other number in this project is held to. Individual variation
-then comes from bits of `identity_id`, within bounds tight enough that a bee
-stays a bee. Determinism survives, since identical genomes hash identically; what
-changes is that two distinct identities differ in build and not only in colour
-and wing count.
+then comes from ~~bits of `identity_id`~~ **the genome's slots hashed one at a
+time — corrected 2026-08-12 for the reason above.** `identity_id` is the digest
+of the whole genome, so changing one slot moves every byte of it and a child's
+build would bear no relation to its parents'. Hashing each field separately
+satisfies "from the genome" more literally — the proportions read the fields,
+not their fingerprint — and is what makes a body inheritable at all.
 
-Deliberately after breeding, not before: interpolation should be seen working on
-one fixed set of proportions before a second source of variation is added to it.
+Bounds stay tight enough that a bee stays a bee. Determinism survives, since
+identical genomes hash identically; what changes is that two distinct identities
+differ in build and not only in colour and wing count.
+
+Deliberately after breeding, not before: the fixed set of proportions should be
+seen working before a second source of variation is added to it.
 
 The tempting third source is refused. Numbers from a review — confirmed, refuted,
 impact — are track record, and a bee that filled out as findings were confirmed

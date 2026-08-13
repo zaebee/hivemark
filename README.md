@@ -51,6 +51,24 @@ track records back to new reviews. A proposal has an identity but no
 claims and no birth: it becomes an entity only by being run. See
 `docs/breeding.md`.
 
+### The bee
+
+Proportions are the measured morphology of *Apis mellifera* workers, in
+millimetres, with a citation per character — head 2.45 × 3.62, thorax 3.72,
+abdomen 6.63, forewing 9.27 × 2.98. A character varies between identities only
+where two published means disagree, and then only between them, so every bee
+drawn coincides with a bee somebody measured — the ends of each range are named
+populations, four Himachal apiaries or two subspecies, never an error bar. A
+character with one published value does not vary at all. See
+`docs/morphology-sources.md`, which lists the two citations that did not survive
+being checked and the one that had to be opened by hand.
+
+Individual build comes from hashing the genome's slots one at a time, so a part
+moves only when the field that governs it moves and an offspring inherits its
+parents' parts. It cannot be interpolated — a hash has no order — so a crossbred
+bee recombines rather than blends. Nothing here reads the track record: identity
+is fixed while the record grows.
+
 ### What a signature does and does not say
 
 The publisher signs, not the reviewer — reviewers hold no keys by construction.

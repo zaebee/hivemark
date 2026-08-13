@@ -72,14 +72,40 @@ describe("traits read from the genome", () => {
   });
 
   it("changes the palette with the provider", () => {
-    const gemini = avatarSvg(base);
-    const ollama = avatarSvg({
-      ...base,
-      provider: "ollama",
-      finder_model: "qwen2.5-coder:7b",
-      skeptic_model: null,
-    });
-    expect(gemini).not.toBe(ollama);
+    // Assert the colours, not merely that the two pictures differ, and assert
+    // all three channels of each.
+    //
+    // Two probes shaped this. The original compared a gemini bee against a qwen
+    // one that also differed in eye shape, head build and stinger, so it passed
+    // with every palette collapsed onto gemini's. Its replacement pinned only
+    // `body`, so thorax, bands and all four wings could wear another provider's
+    // colours — mistral's `dark` set to gemini's, and gemini's `wing` set to
+    // mistral's, each left the suite green.
+    const PALETTE = {
+      gemini: { body: "#E3AE3C", dark: "#7E5410", wing: "#BFD8E4" },
+      mistral: { body: "#DC6B3E", dark: "#6F2A11", wing: "#E8CDBF" },
+      ollama: { body: "#8098AC", dark: "#33454F", wing: "#CBDCE4" },
+    } as const;
+    const FINDER = {
+      gemini: "gemini-2.5-flash",
+      mistral: "mistral-medium-latest",
+      ollama: "qwen2.5-coder:7b",
+    } as const;
+
+    for (const provider of Object.keys(PALETTE) as (keyof typeof PALETTE)[]) {
+      const svg = avatarSvg({ ...base, provider, finder_model: FINDER[provider] });
+      for (const [channel, hex] of Object.entries(PALETTE[provider])) {
+        expect(svg, `${provider} should paint its ${channel} ${hex}`).toContain(hex);
+      }
+      // Nine distinct hexes, and no coordinate contains a "#", so a foreign
+      // colour anywhere in the document is a real one and not a substring.
+      for (const other of Object.keys(PALETTE) as (keyof typeof PALETTE)[]) {
+        if (other === provider) continue;
+        for (const [channel, hex] of Object.entries(PALETTE[other])) {
+          expect(svg, `${provider} must not paint ${other}'s ${channel} ${hex}`).not.toContain(hex);
+        }
+      }
+    }
   });
 
   it("marks a different Guardian revision as a different generation", () => {
@@ -97,6 +123,33 @@ describe("traits read from the genome", () => {
     // every visible trait render identically even when schema_version differs.
     const withOtherVersion = { ...base, schema_version: 99 };
     expect(drawing(avatarSvg(withOtherVersion))).toBe(drawing(avatarSvg(base)));
+  });
+});
+
+describe("the renderer draws the measured animal", () => {
+  const bodyEllipses = (svg: string) =>
+    [...svg.matchAll(/<ellipse cx="[\d.]+" cy="[\d.]+" rx="([\d.]+)" ry="([\d.]+)"[^>]*fill="#E3AE3C"/g)].map(
+      (m) => ({ rx: Number(m[1]), ry: Number(m[2]) }),
+    );
+
+  it("draws the head as the measured ellipse, not a circle", () => {
+    // A worker's head is wider than it is tall — 3.62 by 2.45 mm. The drawing's
+    // habit of a circle was a habit, not an observation.
+    const heads = bodyEllipses(avatarSvg(base)).filter((e) => e.rx > e.ry);
+    expect(heads.length).toBeGreaterThan(0);
+  });
+
+  it("gives two identities with different finders different heads", () => {
+    // Both finders are gemini and both carry "flash", so palette and eye shape
+    // are identical and the pictures can differ only in the head's geometry.
+    //
+    // An earlier version of this test compared against gemini-3.5-pro and
+    // proved nothing: that model changes the eye shape too, so the SVGs
+    // differed even with variation switched off entirely. The fixture made the
+    // case unreachable, which is the failure this suite exists to avoid.
+    expect(drawing(avatarSvg(base))).not.toBe(
+      drawing(avatarSvg({ ...base, finder_model: "gemini-3.5-flash" })),
+    );
   });
 });
 
