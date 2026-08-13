@@ -72,27 +72,38 @@ describe("traits read from the genome", () => {
   });
 
   it("changes the palette with the provider", () => {
-    // Assert the colours, not merely that the two pictures differ. The earlier
-    // version compared a gemini bee against a qwen one that also differed in eye
-    // shape, head build and stinger — so it passed with all three palettes
-    // collapsed onto gemini's, which a probe confirmed. Nothing pinned a hex.
-    const bodyOf = { gemini: "#E3AE3C", mistral: "#DC6B3E", ollama: "#8098AC" } as const;
-    const finderOf = {
+    // Assert the colours, not merely that the two pictures differ, and assert
+    // all three channels of each.
+    //
+    // Two probes shaped this. The original compared a gemini bee against a qwen
+    // one that also differed in eye shape, head build and stinger, so it passed
+    // with every palette collapsed onto gemini's. Its replacement pinned only
+    // `body`, so thorax, bands and all four wings could wear another provider's
+    // colours — mistral's `dark` set to gemini's, and gemini's `wing` set to
+    // mistral's, each left the suite green.
+    const PALETTE = {
+      gemini: { body: "#E3AE3C", dark: "#7E5410", wing: "#BFD8E4" },
+      mistral: { body: "#DC6B3E", dark: "#6F2A11", wing: "#E8CDBF" },
+      ollama: { body: "#8098AC", dark: "#33454F", wing: "#CBDCE4" },
+    } as const;
+    const FINDER = {
       gemini: "gemini-2.5-flash",
       mistral: "mistral-medium-latest",
       ollama: "qwen2.5-coder:7b",
     } as const;
 
-    for (const [provider, body] of Object.entries(bodyOf)) {
-      const svg = avatarSvg({
-        ...base,
-        provider: provider as keyof typeof bodyOf,
-        finder_model: finderOf[provider as keyof typeof finderOf],
-      });
-      expect(svg, `${provider} should paint ${body}`).toContain(body);
-      for (const [other, otherBody] of Object.entries(bodyOf)) {
+    for (const provider of Object.keys(PALETTE) as (keyof typeof PALETTE)[]) {
+      const svg = avatarSvg({ ...base, provider, finder_model: FINDER[provider] });
+      for (const [channel, hex] of Object.entries(PALETTE[provider])) {
+        expect(svg, `${provider} should paint its ${channel} ${hex}`).toContain(hex);
+      }
+      // Nine distinct hexes, and no coordinate contains a "#", so a foreign
+      // colour anywhere in the document is a real one and not a substring.
+      for (const other of Object.keys(PALETTE) as (keyof typeof PALETTE)[]) {
         if (other === provider) continue;
-        expect(svg, `${provider} must not paint ${other}'s ${otherBody}`).not.toContain(otherBody);
+        for (const [channel, hex] of Object.entries(PALETTE[other])) {
+          expect(svg, `${provider} must not paint ${other}'s ${channel} ${hex}`).not.toContain(hex);
+        }
       }
     }
   });
