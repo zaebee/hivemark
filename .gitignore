@@ -1,3 +1,8 @@
 node_modules/
 dist/
 *.tsbuildinfo
+
+# Secrets. Present before any key exists, so there is no window in which
+# one sits in the working tree unignored.
+.env
+.env.*
