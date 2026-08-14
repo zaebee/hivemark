@@ -12,11 +12,23 @@ import { buildBirthRequest } from "./birth/submit.js";
  * sign something is broken.
  */
 function main(): void {
-  const [reviewsPath = "tests/fixtures/martian-reviews.sample.jsonl", ledgerPath = "births.json"] =
-    process.argv.slice(2);
+  const [reviewsPath, ledgerPath = "births.json"] = process.argv.slice(2);
 
-  const { records, warnings } = harvest(readFileSync(reviewsPath, "utf8"));
+  // No default corpus, for the reason in `cli.ts` — and more sharply here. A
+  // birth's `firstSeen` is a minimum over whatever corpus it was handed, and the
+  // record is permanent. Announcing from a fixture would publish a date that
+  // describes staged data and can never be corrected.
+  if (reviewsPath === undefined) {
+    throw new Error(
+      "usage: bun src/cli-birth.ts <reviews.jsonl> [births.json]\n" +
+        "  the corpus is not optional — a birth date cannot be revised once announced",
+    );
+  }
+
+  const text = readFileSync(reviewsPath, "utf8");
+  const { records, warnings } = harvest(text);
   for (const warning of warnings) console.warn(`warning: ${warning}`);
+  console.log(`source ${reviewsPath} — ${records.length} records\n`);
 
   const births = loadBirths(readFileSync(ledgerPath, "utf8"));
   const plans = planBirths(records, births);

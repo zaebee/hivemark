@@ -1,4 +1,5 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { byCodeUnit } from "./canonical.js";
 import { gapsIn, loadLedger } from "./anchor/ledger.js";
 import { periodId, periodOf } from "./anchor/period.js";
@@ -18,6 +19,18 @@ function main(): void {
 
   const envelopes = JSON.parse(readFileSync(attestationsPath, "utf8")) as AttestationEnvelope[];
   const records = loadLedger(readFileSync(ledgerPath, "utf8"));
+
+  // Where these attestations came from, if `cli.ts` left a note beside them.
+  // The default path makes this the easy command to run without thinking, and
+  // an anchor over fixture-derived attestations would look exactly like a real
+  // one — the signatures are valid either way.
+  const provenancePath = join(dirname(attestationsPath), "provenance.json");
+  if (existsSync(provenancePath)) {
+    const p = JSON.parse(readFileSync(provenancePath, "utf8")) as { source: string; generated_at: string };
+    console.log(`input       ${attestationsPath} — from ${p.source}, generated ${p.generated_at}`);
+  } else {
+    console.log(`input       ${attestationsPath} — no provenance.json beside it; origin unknown`);
+  }
 
   // The command line is where an unchecked string would otherwise enter. A week
   // that does not exist is refused here rather than deep inside the arithmetic.

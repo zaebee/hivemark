@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { attestClaim, type AttestationEnvelope } from "./attest/attest.js";
@@ -50,15 +51,44 @@ export async function run(text: string, options: RunOptions = {}): Promise<RunOu
 }
 
 async function main(): Promise<void> {
-  const [source = "tests/fixtures/martian-reviews.sample.jsonl", outDir = "dist"] =
-    process.argv.slice(2);
-  const output = await run(readFileSync(source, "utf8"));
+  const [source, outDir = "dist"] = process.argv.slice(2);
+
+  // No default corpus. This used to fall back to a fixture, and the artifacts in
+  // `dist/` were quietly built from staged data for weeks — indistinguishable
+  // from the real thing, and signed, because the signature says nothing about
+  // where the reviews came from. Nothing about a bare invocation needs to
+  // succeed.
+  if (source === undefined) {
+    throw new Error(
+      "usage: bun src/cli.ts <reviews.jsonl> [outDir]\n" +
+        "  the corpus is not optional — see docs/anchoring.md before publishing",
+    );
+  }
+
+  const text = readFileSync(source, "utf8");
+  const output = await run(text);
 
   mkdirSync(outDir, { recursive: true });
   for (const [name, body] of output.files) writeFileSync(join(outDir, name), body, "utf8");
 
+  // Provenance travels with the artifact, because the terminal does not.
+  // `attestations.json` is the input to anchoring, and by then nobody remembers
+  // which file produced it; a digest is what lets a later reader tell whether
+  // two runs saw the same corpus.
+  const provenance = {
+    source,
+    sha256: createHash("sha256").update(text).digest("hex"),
+    bytes: Buffer.byteLength(text),
+    lines: text.split("\n").filter((l) => l.trim() !== "").length,
+    identities: output.tracks.length,
+    attestations: output.attestations.length,
+    generated_at: new Date().toISOString(),
+  };
+  writeFileSync(join(outDir, "provenance.json"), `${JSON.stringify(provenance, null, 2)}\n`, "utf8");
+
   for (const warning of output.warnings) console.warn(`warning: ${warning}`);
-  console.log(`${output.tracks.length} identities → ${output.files.size} files in ${outDir}/`);
+  console.log(`source ${source} — ${provenance.lines} records, sha256 ${provenance.sha256.slice(0, 12)}…`);
+  console.log(`${output.tracks.length} identities → ${output.files.size + 1} files in ${outDir}/`);
   console.log(
     output.attestations.length > 0
       ? `  ${output.attestations.length} attestations signed`
