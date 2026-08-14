@@ -1,13 +1,13 @@
 import { readFileSync } from "node:fs";
 import { harvest } from "./harvest.js";
 import { loadBirths } from "./birth/ledger.js";
-import { planBirths } from "./birth/plan.js";
+import { corpusSpan, planBirths } from "./birth/plan.js";
 import { buildBirthRequest } from "./birth/submit.js";
 
 /**
  * Print the birth announcements that are still owed. Sends nothing.
  *
- * Identities are rare — three in the current corpus — so this is expected to
+ * Identities are rare — eight in the current corpus — so this is expected to
  * print nothing most of the time, and that is the healthy state rather than a
  * sign something is broken.
  */
@@ -28,7 +28,19 @@ function main(): void {
   const text = readFileSync(reviewsPath, "utf8");
   const { records, warnings } = harvest(text);
   for (const warning of warnings) console.warn(`warning: ${warning}`);
-  console.log(`source ${reviewsPath} — ${records.length} records\n`);
+
+  // The window a birth date is being drawn from. `planAnchor` reports the same
+  // kind of edge for the same kind of reason, and a birth is the less revisable
+  // of the two, so it should not be the one reporting less.
+  const span = corpusSpan(records);
+  console.log(`source ${reviewsPath} — ${records.length} records`);
+  if (span) {
+    console.log(
+      `       spanning ${new Date(span.earliest * 1000).toISOString()} … ` +
+        `${new Date(span.latest * 1000).toISOString()}`,
+    );
+  }
+  console.log();
 
   const births = loadBirths(readFileSync(ledgerPath, "utf8"));
   const plans = planBirths(records, births);
@@ -46,7 +58,10 @@ function main(): void {
     console.log(
       `genome      ${plan.genome.provider} · ${plan.genome.context_mode} · ${plan.genome.guardian_version.slice(0, 7)}`,
     );
-    console.log(`first seen  ${new Date(plan.firstSeen * 1000).toISOString()}`);
+    console.log(
+      `first seen  ${new Date(plan.firstSeen * 1000).toISOString()}` +
+        (plan.atCorpusEdge ? "  ← the corpus starts here; an earlier review would be outside it" : ""),
+    );
     console.log(`to          ${request.to}`);
     console.log(`schema      ${request.schema}`);
     console.log(`data        ${request.data.slice(0, 66)}…\n`);

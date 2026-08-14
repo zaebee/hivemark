@@ -85,6 +85,12 @@ export function planAnchor(
     uids,
     periodStart: start,
     periodEnd: end,
-    newestCovered: Math.max(...covered.map((e) => Number(e.attestation.message.time))),
+    // Reduced rather than spread, for the reason spelled out in `corpusSpan`:
+    // one week held 932 attestations on the day this was written, and a
+    // period's contents grow with the corpus without bound.
+    newestCovered: covered.reduce(
+      (newest, e) => Math.max(newest, Number(e.attestation.message.time)),
+      Number.NEGATIVE_INFINITY,
+    ),
   };
 }

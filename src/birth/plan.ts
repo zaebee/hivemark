@@ -11,6 +11,49 @@ export interface BirthPlan {
   readonly entity: `0x${string}`;
   readonly genome: Genome;
   readonly firstSeen: number;
+  /**
+   * Whether this identity's earliest review is also the corpus's earliest.
+   *
+   * `firstSeen` is a minimum over whatever file was handed in, and a birth is
+   * permanent — an earlier review surfacing later makes the announced date wrong
+   * with no way to revise it. An identity first seen in the middle of the corpus
+   * has reviews on both sides of it, which is evidence the boundary is not
+   * cutting it off. One sitting exactly on the earliest edge has no such
+   * evidence, and is the one to check before broadcasting.
+   *
+   * A true value is not a defect. It is the expected state for the identity that
+   * genuinely came first, and this cannot distinguish that from a truncated
+   * corpus — which is the point: only a human knows whether more exists.
+   */
+  readonly atCorpusEdge: boolean;
+}
+
+export interface CorpusSpan {
+  readonly earliest: number;
+  readonly latest: number;
+  readonly records: number;
+}
+
+/**
+ * When the corpus starts and ends, so an operator can see what window a birth
+ * date was drawn from before making it permanent.
+ */
+export function corpusSpan(records: readonly ReviewRecord[]): CorpusSpan | null {
+  if (records.length === 0) return null;
+
+  // A loop rather than `Math.min(...records.map(…))`. Spreading an array into a
+  // call has an argument limit, and this corpus is designed to accumulate:
+  // measured here, Node 22 throws RangeError between 125,000 and 130,000
+  // elements, Bun between 500,000 and 1,000,000. Neither is close today, and
+  // neither moves further away on its own.
+  let earliest = Number.POSITIVE_INFINITY;
+  let latest = Number.NEGATIVE_INFINITY;
+  for (const record of records) {
+    const at = Math.floor(Date.parse(record.reviewed_at) / 1000);
+    if (at < earliest) earliest = at;
+    if (at > latest) latest = at;
+  }
+  return { earliest, latest, records: records.length };
 }
 
 /**
@@ -42,6 +85,11 @@ export function planBirths(
     }
   }
 
+  // The corpus edge is taken over every record, not only the deduplicated ones:
+  // the question is where the *file* starts, and a superseded run still shows
+  // that reviews existed at that moment.
+  const span = corpusSpan(records);
+
   return [...earliest.entries()]
     .filter(([id]) => !announced(births, id))
     .map(([id, { genome, firstSeen }]) => ({
@@ -49,6 +97,7 @@ export function planBirths(
       entity: ownerAddress(id),
       genome,
       firstSeen,
+      atCorpusEdge: span !== null && firstSeen === span.earliest,
     }))
     // Ordered by identity so two runs over the same corpus propose the same
     // sequence regardless of the order the reviews were read in.
