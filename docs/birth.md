@@ -46,7 +46,7 @@ moment it exists.
 **1. Inspect.**
 
 ```bash
-bun src/cli-birth.ts tests/fixtures/martian-reviews.sample.jsonl births.json
+bun src/cli-birth.ts corpus.json births.json
 ```
 
 Prints every identity with no birth record, its genome, the date it was first

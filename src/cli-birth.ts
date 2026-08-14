@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { readCorpus } from "./corpus.js";
 import { harvest } from "./harvest.js";
 import { loadBirths } from "./birth/ledger.js";
 import { corpusSpan, planBirths } from "./birth/plan.js";
@@ -20,12 +21,12 @@ function main(): void {
   // describes staged data and can never be corrected.
   if (reviewsPath === undefined) {
     throw new Error(
-      "usage: bun src/cli-birth.ts <reviews.jsonl> [births.json]\n" +
+      "usage: bun src/cli-birth.ts <corpus.json|reviews.jsonl> [births.json]\n" +
         "  the corpus is not optional — a birth date cannot be revised once announced",
     );
   }
 
-  const text = readFileSync(reviewsPath, "utf8");
+  const { text, corpus } = readCorpus(reviewsPath);
   const { records, warnings } = harvest(text);
   for (const warning of warnings) console.warn(`warning: ${warning}`);
 
@@ -34,6 +35,7 @@ function main(): void {
   // of the two, so it should not be the one reporting less.
   const span = corpusSpan(records);
   console.log(`source ${reviewsPath} — ${records.length} records`);
+  if (corpus) for (const f of corpus.files) console.log(`       ${f.path.padEnd(28)} ${String(f.lines).padStart(4)} records`);
   if (span) {
     console.log(
       `       spanning ${new Date(span.earliest * 1000).toISOString()} … ` +

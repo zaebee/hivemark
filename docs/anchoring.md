@@ -144,9 +144,19 @@ warning against overfunding a hot key stands.
 **1. Regenerate and inspect.**
 
 ```bash
-HIVEMARK_SIGNING_KEY=… bun src/cli.ts tests/fixtures/martian-reviews.sample.jsonl dist
+HIVEMARK_SIGNING_KEY=… bun src/cli.ts corpus.json dist
 bun src/cli-anchor.ts dist/attestations.json anchors.json
 ```
+
+`corpus.json` is the manifest naming which files make up the corpus, and which
+are deliberately not part of it. Pass it rather than a `.jsonl` path: assembling
+the set by hand is an input to a Merkle root, and a forgotten file narrows what
+the anchor covers with nothing on screen to say so. The first command prints each
+file with its own digest, and `dist/provenance.json` keeps them.
+
+If a new `.jsonl` appears in the benchmarks directory, the load **fails** until
+someone adds it to `include` or to `exclude` with a reason. That is the intended
+behaviour: the alternative is a review file that silently never counted.
 
 The second command prints the period, the root, the count and the exact
 transaction that would be sent — and sends nothing. Read it before continuing.

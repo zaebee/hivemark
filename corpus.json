@@ -1,0 +1,28 @@
+{
+  "$comment": [
+    "Which files make up the corpus. Read by src/corpus.ts.",
+    "",
+    "This exists because assembling the corpus by hand is an input to two",
+    "irreversible outputs: a birth's firstSeen is a minimum over whatever files",
+    "were concatenated, and an anchor's Merkle root covers exactly the",
+    "attestations derived from them. Omit a file and both are wrong in ways that",
+    "cannot be corrected after broadcast.",
+    "",
+    "Every .jsonl in `base` must appear in `include` or `exclude`. A new file",
+    "that appears in neither fails the load rather than being silently ignored —",
+    "silent omission is the direction that costs a permanent record."
+  ],
+  "base": "../ownima/codegraph-brain/benchmarks",
+  "include": [
+    "martian-reviews.jsonl",
+    "martian-repeat-reviews.jsonl",
+    "martian-p3-run1.jsonl",
+    "martian-p3-run2.jsonl",
+    "martian-p3-run3.jsonl"
+  ],
+  "exclude": {
+    "martian-judged.jsonl": "judge output, not reviews — rows carry arm/decisions/fn/fp/judge_fail and no findings",
+    "martian-p3-judged-run1.jsonl": "judge output, same shape as martian-judged.jsonl",
+    "martian-repeat-judged.jsonl": "judge output, same shape as martian-judged.jsonl"
+  }
+}
