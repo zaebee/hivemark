@@ -35,8 +35,18 @@ Three properties of that location are deliberate:
 - **It is not a backup.** That directory is not synced or snapshotted, so the
   key must also go into a password manager. It is the only copy otherwise.
 
-The file should be exactly 67 bytes — `0x`, 64 hex characters, and a newline.
-Checking its size confirms it was not truncated without reading it.
+The file written by the generator is exactly 67 bytes — `0x`, 64 hex characters,
+and a newline. Checking its size confirms it was not truncated without reading
+it. That is an eyeball check and not the real one: `send-schemas.ts` validates
+the contents against `/^0x[0-9a-fA-F]{64}$/` after trimming, which is what
+actually decides whether the file is usable. A file re-saved by an editor may
+differ in its line ending and still be fine.
+
+**These instructions assume a Unix-like environment**, and one part of them does
+not merely fail to apply elsewhere. `0600` and `0700` are advisory on Windows
+outside WSL — Node accepts the `mode` argument and the filesystem ignores it, so
+the key would be written with inherited permissions and no error. On Windows,
+restrict the directory through its own ACLs, or use WSL.
 
 **2. Fund it.** A few dollars of ETH on Base covers years — a year of weekly
 anchors costs about seven cents at the gas price measured on 2026-08-12
@@ -47,22 +57,36 @@ low.
 one-off transactions against the
 SchemaRegistry at `0x4200000000000000000000000000000000000020`:
 
-| schema | source | UID |
-|---|---|---|
-| claim | `CLAIM_SCHEMA` in `src/attest/schema.ts` | `0x9c6648261df139b4453dd540ed2e8d821a9e775beede14ba9aae9e7202daacfb` |
-| anchor | `ANCHOR_SCHEMA` in `src/anchor/schema.ts` | `0x8ff2e1ad6186bbe4c1ac54ea7d969dcf04a8caa7d31e8ac45127bfa3cfba06bd` |
-| birth | `BIRTH_SCHEMA` in `src/birth/schema.ts` | `0x6ca5f932f49e5ac467c1ca24c5af39800a12df874d3856b4afdd54800c07ed02` |
+| schema | source | UID | registered |
+|---|---|---|---|
+| claim | `CLAIM_SCHEMA` in `src/attest/schema.ts` | `0x9c6648261df139b4453dd540ed2e8d821a9e775beede14ba9aae9e7202daacfb` | [`0x1fbb86d3…`](https://basescan.org/tx/0x1fbb86d367bf390d177e2427e72871dbe7bc13d6d92b96c75d5a9f03c2c74793) 2026-08-14 |
+| anchor | `ANCHOR_SCHEMA` in `src/anchor/schema.ts` | `0x8ff2e1ad6186bbe4c1ac54ea7d969dcf04a8caa7d31e8ac45127bfa3cfba06bd` | [`0xb287b4ef…`](https://basescan.org/tx/0xb287b4ef5db2bb4277690d14e40f536e761f674eb972ca4dfb05ec619cd5d8cf) 2026-08-14 |
+| birth | `BIRTH_SCHEMA` in `src/birth/schema.ts` | `0x6ca5f932f49e5ac467c1ca24c5af39800a12df874d3856b4afdd54800c07ed02` | [`0x79dd678d…`](https://basescan.org/tx/0x79dd678da2666adbd5bbe792d1de5facdf26e2442f41aa66020a3c72304f676c) 2026-08-14 |
+
+All three are live on Base with `resolver = 0x0` and `revocable = true`, verified
+by reading the registry back from a second RPC. Re-running `send-schemas.ts` now
+prints "already registered — nothing to send" for all three.
 
 Register each with `resolver = 0x0` and `revocable = true` — those two values are
 part of what the UID is derived from, so a different choice produces a different
 UID and the attestations will not resolve.
 
-**Look each UID up on easscan first.** A UID is global and derived from the
-schema text alone, so if anyone anywhere has registered the identical string with
-the same resolver and revocable flag, it already exists — attestations resolve
-against it and no transaction is needed. Registering it again does not fail
-safely into a no-op: EAS rejects it and the gas is spent on a revert. The script
-cannot check this offline.
+**A UID is global**, and derived from the schema text alone. If anyone anywhere
+has registered the identical string with the same resolver and revocable flag, it
+already exists — attestations resolve against it and no transaction is needed.
+Registering it again does not fail safely into a no-op: EAS rejects it and the
+gas is spent on a revert.
+
+`bun scripts/send-schemas.ts` checks this against the chain and skips any schema
+that already exists, so the lookup no longer has to be done by hand. Without
+`--send` it reads nothing and spends nothing; the key file is opened only when
+`--send` is passed, so a dry run is safe for anyone to execute. If a schema's
+text has drifted from the UID the signed attestations name, it refuses **all**
+three rather than sending the two that still match.
+
+It is safe to re-run after a failure. Each registration is its own transaction
+and the already-registered check runs before every one, so a retry resumes
+rather than double-spends.
 
 Do not hand-assemble the calls. `bun scripts/register-schemas.ts` prints the
 exact `to`, `value` and `data` for all three and sends nothing. It re-derives
@@ -105,8 +129,12 @@ Measured with `eth_estimateGas` on 2026-08-14, gas price 0.006 gwei:
 | register birth | 261,819 |
 | **all three** | **667,671 ≈ 0.0000040 ETH** |
 
-Births and anchors cannot be estimated until the schemas exist — the estimate
-reverts, which is the point above. Expect the same order of magnitude each.
+Actual gas used: 232,881 / 164,465 / 255,429, close to the estimates above.
+
+Before registration, estimating a birth attestation reverted with
+`InvalidSchema()`. After it, the same request estimates at **780,656 gas** — the
+ordering constraint, measured from both ends. Eight births come to about
+6.2M gas, roughly 0.000037 ETH at this price.
 
 A couple of dollars of ETH is therefore generous by a wide margin, and the
 warning against overfunding a hot key stands.
