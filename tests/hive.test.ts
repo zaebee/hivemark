@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { familiesOf, renderHive } from "../src/publish/hive.js";
+import { familiesOf, nearTwinsIn, renderHive } from "../src/publish/hive.js";
 import type { Genome, TrackRecord } from "../src/types.js";
 
 const genome = (over: Partial<Genome>): Genome => ({
@@ -107,5 +107,44 @@ describe("renderHive", () => {
     const html = renderHive([track({ context_mode: "<img src=x onerror=1>" as never })]);
     expect(html).toContain("&lt;img src=x onerror=1&gt;");
     expect(html).not.toMatch(/<img/);
+  });
+});
+
+describe("near twins", () => {
+  it("finds members differing in nothing but guardian_version", () => {
+    const family = familiesOf([
+      track({ guardian_version: "aaaa" }),
+      track({ guardian_version: "bbbb" }),
+      track({ context_mode: "diff-only", guardian_version: "cccc" }),
+    ])[0]!;
+    const groups = nearTwinsIn(family);
+    expect(groups).toHaveLength(1);
+    expect(groups[0]).toHaveLength(2);
+  });
+
+  it("does not call a lone member a twin", () => {
+    const family = familiesOf([track({ guardian_version: "aaaa" })])[0]!;
+    expect(nearTwinsIn(family)).toHaveLength(0);
+  });
+
+  it("does not group across a differing skeptic", () => {
+    // A different skeptic is a different reviewer, not a version bump.
+    const family = familiesOf([
+      track({ guardian_version: "aaaa", skeptic_model: "gemini-3.5-flash" }),
+      track({ guardian_version: "bbbb", skeptic_model: null }),
+    ])[0]!;
+    expect(nearTwinsIn(family)).toHaveLength(0);
+  });
+
+  it("states it as a suspicion, not a finding", () => {
+    // Whether these are one reviewer is upstream's to confirm — it is what
+    // codegraph-brain#375 measures — so the page must not assert it.
+    const html = renderHive([track({ guardian_version: "aaaa" }), track({ guardian_version: "bbbb" })]);
+    expect(html).toMatch(/probably/i);
+    expect(html).not.toMatch(/\bare one reviewer\b/);
+  });
+
+  it("says nothing when a family has no twins", () => {
+    expect(renderHive([track({ guardian_version: "aaaa" })])).not.toMatch(/probably/i);
   });
 });

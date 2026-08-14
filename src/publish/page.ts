@@ -44,6 +44,7 @@ code{font-size:.85em;word-break:break-all}
 .hm-bee svg{width:100%;height:auto;aspect-ratio:1}
 .hm-bee figcaption{font-size:.72rem;color:var(--muted);line-height:1.35;
 display:flex;flex-direction:column;overflow-wrap:break-word}
+.hm-twins{margin:.5rem 0 0;font-size:.8rem;color:var(--muted);font-style:italic}
 </style></head>
 <body><main>
 <h1>hivemark</h1>

@@ -66,13 +66,42 @@ function bee(track: TrackRecord): string {
   );
 }
 
+/**
+ * Members of a family that differ in nothing but `guardian_version`.
+ *
+ * Reported as a suspicion and never as a finding. Whether two such identities are
+ * really one reviewer is upstream's to confirm — it is exactly what
+ * codegraph-brain#375 measures by fingerprinting the review path — so this page
+ * may say they probably are and may not say they are.
+ */
+export function nearTwinsIn(family: Family): TrackRecord[][] {
+  const groups = new Map<string, TrackRecord[]>();
+  for (const member of family.members) {
+    const g = member.genome;
+    const key = JSON.stringify([g.finder_model, g.skeptic_model, g.context_mode]);
+    const held = groups.get(key);
+    if (held) held.push(member);
+    else groups.set(key, [member]);
+  }
+  return [...groups.values()].filter((members) => members.length > 1);
+}
+
 export function renderHive(tracks: readonly TrackRecord[]): string {
   const families = familiesOf(tracks)
-    .map(
-      (family) =>
+    .map((family) => {
+      const twins = nearTwinsIn(family);
+      const note =
+        twins.length === 0
+          ? ""
+          : `<p class="hm-twins">${twins.map((g) => g.length).join(" and ")} of these differ only in ` +
+            `Guardian revision, so they are probably one reviewer counted more than once. ` +
+            `Confirming that is upstream work.</p>`;
+
+      return (
         `<section class="hm-family"><h3>${esc(family.provider)}</h3>` +
-        `<div class="hm-row">${family.members.map(bee).join("")}</div></section>`,
-    )
+        `<div class="hm-row">${family.members.map(bee).join("")}</div>${note}</section>`
+      );
+    })
     .join("");
 
   return `<div class="hm-hive">${families}</div>`;
