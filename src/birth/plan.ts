@@ -40,8 +40,20 @@ export interface CorpusSpan {
  */
 export function corpusSpan(records: readonly ReviewRecord[]): CorpusSpan | null {
   if (records.length === 0) return null;
-  const times = records.map((r) => Math.floor(Date.parse(r.reviewed_at) / 1000));
-  return { earliest: Math.min(...times), latest: Math.max(...times), records: records.length };
+
+  // A loop rather than `Math.min(...records.map(…))`. Spreading an array into a
+  // call has an argument limit, and this corpus is designed to accumulate:
+  // measured here, Node 22 throws RangeError between 125,000 and 130,000
+  // elements, Bun between 500,000 and 1,000,000. Neither is close today, and
+  // neither moves further away on its own.
+  let earliest = Number.POSITIVE_INFINITY;
+  let latest = Number.NEGATIVE_INFINITY;
+  for (const record of records) {
+    const at = Math.floor(Date.parse(record.reviewed_at) / 1000);
+    if (at < earliest) earliest = at;
+    if (at > latest) latest = at;
+  }
+  return { earliest, latest, records: records.length };
 }
 
 /**

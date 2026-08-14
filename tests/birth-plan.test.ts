@@ -99,3 +99,19 @@ describe("corpus edge, because a birth date cannot be revised", () => {
     expect(corpusSpan([])).toBeNull();
   });
 });
+
+describe("corpusSpan on a corpus larger than a spread call allows", () => {
+  // 200,000 is above Node's argument limit for `Math.min(...array)`, measured at
+  // between 125,000 and 130,000 on v22. This test fails with RangeError against
+  // the spread implementation, which is the only reason it earns its runtime.
+  const many = Array.from({ length: 200_000 }, (_, i) => ({
+    reviewed_at: new Date(Date.UTC(2026, 0, 1) + i * 1000).toISOString(),
+  })) as never;
+
+  it("computes a span without exceeding the call stack", () => {
+    const span = corpusSpan(many);
+    expect(span!.records).toBe(200_000);
+    expect(span!.earliest).toBe(Date.UTC(2026, 0, 1) / 1000);
+    expect(span!.latest).toBe(Date.UTC(2026, 0, 1) / 1000 + 199_999);
+  });
+});

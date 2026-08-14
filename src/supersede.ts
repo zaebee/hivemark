@@ -104,6 +104,11 @@ export function supersededIn(envelopes: readonly AttestationEnvelope[]): Superse
     if (times.size === 1) continue;
 
     repeated++;
+    // Spread is safe here and nowhere else in this codebase: `times` holds the
+    // distinct moments one identity reviewed one commit, which is the number of
+    // re-runs of a single review — single digits, structurally. The corpus-wide
+    // versions of this in `corpusSpan` and `planAnchor` are loops for that
+    // reason.
     const newest = Math.max(...times);
     for (const entry of entries) {
       if (entry.time !== newest) superseded.add(entry.uid);
