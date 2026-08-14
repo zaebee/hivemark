@@ -85,7 +85,7 @@ produces claims and a page and signs nothing. See `docs/attestation-signers.md`.
 bun install
 bun run test
 bun run typecheck
-bun src/cli.ts tests/fixtures/martian-reviews.sample.jsonl dist
+bun src/cli.ts corpus.json dist
 ```
 
 Bun executes the TypeScript sources directly, resolving the `.js` import

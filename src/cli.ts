@@ -1,10 +1,11 @@
 import { createHash } from "node:crypto";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { attestClaim, type AttestationEnvelope } from "./attest/attest.js";
 import { loadSigner, type Signer } from "./attest/signer.js";
 import { avatarSvg } from "./avatar.js";
 import { claimsOf } from "./claims.js";
+import { nonEmptyLines, readCorpus } from "./corpus.js";
 import { deriveTrackRecords } from "./derive.js";
 import { harvest } from "./harvest.js";
 import { renderPage } from "./publish/page.js";
@@ -60,12 +61,12 @@ async function main(): Promise<void> {
   // succeed.
   if (source === undefined) {
     throw new Error(
-      "usage: bun src/cli.ts <reviews.jsonl> [outDir]\n" +
+      "usage: bun src/cli.ts <corpus.json|reviews.jsonl> [outDir]\n" +
         "  the corpus is not optional — see docs/anchoring.md before publishing",
     );
   }
 
-  const text = readFileSync(source, "utf8");
+  const { text, corpus } = readCorpus(source);
   const output = await run(text);
 
   mkdirSync(outDir, { recursive: true });
@@ -79,7 +80,10 @@ async function main(): Promise<void> {
     source,
     sha256: createHash("sha256").update(text).digest("hex"),
     bytes: Buffer.byteLength(text),
-    lines: text.split("\n").filter((l) => l.trim() !== "").length,
+    lines: nonEmptyLines(text),
+    // Per-file digests when a manifest was used. The assembled digest proves two
+    // runs saw the same bytes; these say which file differed when they did not.
+    files: corpus?.files ?? null,
     identities: output.tracks.length,
     attestations: output.attestations.length,
     generated_at: new Date().toISOString(),
@@ -88,6 +92,11 @@ async function main(): Promise<void> {
 
   for (const warning of output.warnings) console.warn(`warning: ${warning}`);
   console.log(`source ${source} — ${provenance.lines} records, sha256 ${provenance.sha256.slice(0, 12)}…`);
+  if (corpus) {
+    for (const f of corpus.files) {
+      console.log(`  ${f.path.padEnd(28)} ${String(f.lines).padStart(4)} records  ${f.sha256.slice(0, 12)}…`);
+    }
+  }
   console.log(`${output.tracks.length} identities → ${output.files.size + 1} files in ${outDir}/`);
   console.log(
     output.attestations.length > 0
@@ -96,12 +105,12 @@ async function main(): Promise<void> {
   );
   for (const track of output.tracks) {
     const s = track.skeptic;
-    const corpus = track.corpus.map(([p, n]) => `${p}×${n}`).join(" ");
+    const projects = track.corpus.map(([p, n]) => `${p}×${n}`).join(" ");
     console.log(
       `  ${track.genome.context_mode.padEnd(9)} ${String(track.reviews).padStart(2)} reviews ` +
         `${String(track.claims).padStart(3)} claims — ` +
         `${s.confirmed}✓ ${s.refuted}✗ ${s.uncertain}? ${s.unresolved}– ` +
-        `impact ${s.mean_impact ?? "n/a"}  [${corpus}]`,
+        `impact ${s.mean_impact ?? "n/a"}  [${projects}]`,
     );
   }
 }
