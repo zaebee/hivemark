@@ -148,7 +148,15 @@ if (!send) {
 }
 
 // Past this point the key is read and money is spent.
-const key = readFileSync(KEY_PATH, "utf8").trim();
+let key: string;
+try {
+  key = readFileSync(KEY_PATH, "utf8").trim();
+} catch (error) {
+  // A missing key file is the ordinary state on a fresh checkout, not a crash.
+  console.error(`cannot read ${KEY_PATH}: ${(error as Error).message}`);
+  console.error("see docs/anchoring.md — the anchoring key is created once, by hand.");
+  process.exit(1);
+}
 if (!/^0x[0-9a-fA-F]{64}$/.test(key)) {
   console.error(`${KEY_PATH} does not contain a single 0x-prefixed 32-byte key`);
   process.exit(1);
@@ -157,7 +165,37 @@ const account = privateKeyToAccount(key as `0x${string}`);
 const wallet = createWalletClient({ account, chain: base, transport: http() });
 
 const balance = await publicClient.getBalance({ address: account.address });
-console.log(`sending from ${account.address}, balance ${formatEther(balance)} ETH\n`);
+console.log(`sending from ${account.address}, balance ${formatEther(balance)} ETH`);
+
+// Refuse when the balance cannot cover everything pending, rather than when it
+// is zero. Sends happen one at a time, so a wallet holding enough for two of
+// three fails partway and leaves a half-registered set behind — the outcome the
+// all-or-nothing UID check above exists to avoid, reached through funding
+// instead of through drift. One wei and zero fail identically, so zero is not
+// the interesting threshold.
+const gasPrice = await publicClient.getGasPrice();
+let needed = 0n;
+for (const { name, data } of pending) {
+  try {
+    needed += await publicClient.estimateGas({ account: account.address, to: SCHEMA_REGISTRY, data });
+  } catch (error) {
+    // An estimate that reverts means this transaction would revert, so stopping
+    // here costs nothing and saves the gas. `0x23369fa6` is `AlreadyExists()`,
+    // which the pre-flight check above should have caught — seeing it here means
+    // the registry changed under us between the two reads.
+    console.error(`\ncannot estimate the ${name} registration, so it would fail if sent:`);
+    console.error(`  ${(error as Error).message.split("\n")[0]}`);
+    console.error("nothing was sent.");
+    process.exit(1);
+  }
+}
+const cost = needed * gasPrice;
+console.log(`${pending.length} transaction(s) need about ${formatEther(cost)} ETH at ${gasPrice} wei/gas\n`);
+if (balance < cost) {
+  console.error(`insufficient balance: ${formatEther(balance)} ETH held, ${formatEther(cost)} ETH needed.`);
+  console.error("fund the address on Base — chain 8453 — and re-run. nothing was sent.");
+  process.exit(1);
+}
 
 for (const { name, data, uid } of pending) {
   const hash = await wallet.sendTransaction({ to: SCHEMA_REGISTRY, data, value: 0n });
@@ -180,7 +218,10 @@ for (const { name, data, uid } of pending) {
       log.address.toLowerCase() === SCHEMA_REGISTRY.toLowerCase() &&
       log.topics[1]?.toLowerCase() === uid.toLowerCase(),
   );
-  console.log(`      ${registered ? `✓ ${uid} is registered` : "✗ NO Registered EVENT FOR THIS UID — investigate before sending more"}`);
+  const verdict = registered
+    ? `✓ ${uid} is registered`
+    : "✗ NO Registered EVENT FOR THIS UID — investigate before sending more";
+  console.log(`      ${verdict}`);
   if (!registered) process.exit(1);
   console.log();
 }

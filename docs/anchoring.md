@@ -35,8 +35,18 @@ Three properties of that location are deliberate:
 - **It is not a backup.** That directory is not synced or snapshotted, so the
   key must also go into a password manager. It is the only copy otherwise.
 
-The file should be exactly 67 bytes — `0x`, 64 hex characters, and a newline.
-Checking its size confirms it was not truncated without reading it.
+The file written by the generator is exactly 67 bytes — `0x`, 64 hex characters,
+and a newline. Checking its size confirms it was not truncated without reading
+it. That is an eyeball check and not the real one: `send-schemas.ts` validates
+the contents against `/^0x[0-9a-fA-F]{64}$/` after trimming, which is what
+actually decides whether the file is usable. A file re-saved by an editor may
+differ in its line ending and still be fine.
+
+**These instructions assume a Unix-like environment**, and one part of them does
+not merely fail to apply elsewhere. `0600` and `0700` are advisory on Windows
+outside WSL — Node accepts the `mode` argument and the filesystem ignores it, so
+the key would be written with inherited permissions and no error. On Windows,
+restrict the directory through its own ACLs, or use WSL.
 
 **2. Fund it.** A few dollars of ETH on Base covers years — a year of weekly
 anchors costs about seven cents at the gas price measured on 2026-08-12
