@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { harvest } from "../src/harvest.js";
-import { planBirths } from "../src/birth/plan.js";
+import { corpusSpan, planBirths } from "../src/birth/plan.js";
 import { identityId } from "../src/identity.js";
 import { genomeOf } from "../src/genome.js";
 import type { BirthRecord } from "../src/birth/ledger.js";
@@ -55,5 +55,47 @@ describe("planBirths", () => {
       const other = backward.find((p) => p.identity_id === plan.identity_id)!;
       expect(other.firstSeen).toBe(plan.firstSeen);
     }
+  });
+});
+
+describe("corpus edge, because a birth date cannot be revised", () => {
+  const at = (iso: string): number => Math.floor(Date.parse(iso) / 1000);
+
+  it("flags the identity whose first review is the corpus's first", () => {
+    const plans = planBirths(records, []);
+    const earliest = Math.min(...plans.map((p) => p.firstSeen));
+    const flagged = plans.filter((p) => p.atCorpusEdge);
+
+    // Exactly the ones sitting on the boundary, and nothing else. An identity
+    // with reviews on both sides of it has evidence the file is not cutting it
+    // off; one on the edge has none.
+    expect(flagged.map((p) => p.firstSeen)).toEqual(flagged.map(() => earliest));
+    expect(flagged.length).toBeGreaterThan(0);
+  });
+
+  it("does not flag an identity first seen inside the corpus", () => {
+    const plans = planBirths(records, []);
+    const inside = plans.filter((p) => !p.atCorpusEdge);
+    const earliest = Math.min(...plans.map((p) => p.firstSeen));
+    // Without this the test passes vacuously when everything is flagged: the
+    // filter empties and the loop below never runs.
+    expect(inside.length).toBeGreaterThan(0);
+    for (const plan of inside) expect(plan.firstSeen).toBeGreaterThan(earliest);
+  });
+
+  it("reports the span the dates were drawn from", () => {
+    const span = corpusSpan(records);
+    expect(span).not.toBeNull();
+    expect(span!.records).toBe(records.length);
+    expect(span!.earliest).toBeLessThanOrEqual(span!.latest);
+    expect(span!.earliest).toBe(
+      Math.min(...records.map((r) => at(r.reviewed_at))),
+    );
+  });
+
+  it("has no span for an empty corpus, rather than an invented one", () => {
+    // Math.min() of nothing is Infinity, which would print as a date in 1970 or
+    // worse — a boundary that looks measured and is not.
+    expect(corpusSpan([])).toBeNull();
   });
 });

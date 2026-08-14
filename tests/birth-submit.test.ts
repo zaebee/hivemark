@@ -28,6 +28,9 @@ const plan: BirthPlan = {
   entity: ownerAddress(identityId(genome)),
   genome,
   firstSeen: 1_786_527_600,
+  // Irrelevant to building a request — it is an operator warning about corpus
+  // boundaries, not part of what gets attested — so a fixed value is honest here.
+  atCorpusEdge: false,
 };
 
 describe("buildBirthRequest", () => {
@@ -78,6 +81,7 @@ describe("buildBirthRequest", () => {
       entity: ownerAddress(identityId(lyingGenome)),
       genome: lyingGenome,
       firstSeen: plan.firstSeen,
+      atCorpusEdge: false,
     };
     expect(() => buildBirthRequest(inconsistent)).toThrow(/belongs to ollama/i);
   });
