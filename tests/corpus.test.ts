@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { loadCorpus } from "../src/corpus.js";
 
 const made: string[] = [];
@@ -47,6 +47,18 @@ describe("loadCorpus", () => {
     // the digest must not depend on how a filesystem happens to list names.
     expect(corpus.text).toBe(row(2) + row(1));
     expect(corpus.files.map((f) => f.path)).toEqual(["b.jsonl", "a.jsonl"]);
+  });
+
+  it("refuses a file named in both include and exclude", () => {
+    // The reading it would otherwise get is the dangerous one: include wins, so
+    // someone who believes they removed a file finds it still counted, with the
+    // exclude entry sitting there as evidence they did not.
+    const manifest = scenario({
+      files: { "a.jsonl": row(1) },
+      include: ["a.jsonl"],
+      exclude: { "a.jsonl": "changed my mind" },
+    });
+    expect(() => loadCorpus(manifest)).toThrow(/both included and excluded/);
   });
 
   it("refuses a file that is in neither include nor exclude", () => {
@@ -132,7 +144,15 @@ describe("loadCorpus", () => {
 });
 
 describe("the committed manifest", () => {
-  it("describes the real corpus, or says which file nobody has classified", () => {
+  // The corpus lives in a sibling checkout, which a clean clone will not have.
+  // Skipped explicitly rather than swallowed: a test that passes when it could
+  // not run reports the reassuring answer, which is the failure this whole file
+  // exists to prevent. A skip is visible in the report; a caught-and-returned
+  // error is not.
+  const base = resolve(dirname(resolve("corpus.json")), "../ownima/codegraph-brain/benchmarks");
+  const present = existsSync(base);
+
+  it.skipIf(!present)("describes the real corpus, or says which file nobody has classified", () => {
     // Fails when a new .jsonl lands in the benchmarks directory, which is the
     // moment someone has to decide whether it is part of the corpus.
     const corpus = loadCorpus("corpus.json");

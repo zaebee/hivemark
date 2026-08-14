@@ -33,7 +33,7 @@ export interface Corpus {
   readonly sha256: string;
 }
 
-const nonEmptyLines = (text: string): number => text.split("\n").filter((l) => l.trim() !== "").length;
+export const nonEmptyLines = (text: string): number => text.split("\n").filter((l) => l.trim() !== "").length;
 
 /**
  * Read review text from either a manifest or a single `.jsonl`.
@@ -75,6 +75,18 @@ export function loadCorpus(manifestPath: string): Corpus {
     throw new Error(
       `corpus base ${base} does not exist (resolved to ${root}) — ` +
         `the manifest assumes a sibling checkout; adjust "base" in ${manifestPath}`,
+    );
+  }
+
+  // A file named in both lists is a contradiction, and the reading it currently
+  // gets is the dangerous one: `include` wins, so someone who believes they
+  // removed a file from the corpus finds it still counted, with the `exclude`
+  // entry sitting there as evidence they did not.
+  const overlap = Object.keys(exclude).filter((n) => include.includes(n));
+  if (overlap.length > 0) {
+    throw new Error(
+      `${overlap.length} file(s) are both included and excluded in ${manifestPath}: ${overlap.join(", ")} — ` +
+        `decide which, since include currently wins silently.`,
     );
   }
 
