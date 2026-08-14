@@ -154,6 +154,14 @@ describe("judgeOf", () => {
     expect(judgeOf(genome("gemini-2.5-flash", null))).toBe("nobody");
   });
 
+  it("ignores casing, because the two mistakes are not symmetric", () => {
+    // Calling these different models publishes a self-graded rate as an
+    // independently confirmed one. The opposite error needs two real models
+    // whose names differ only in case, which does not happen.
+    expect(judgeOf(genome("mistral-medium-latest", "Mistral-Medium-Latest"))).toBe("self");
+    expect(judgeOf(genome("mistral-medium-latest", "MISTRAL-MEDIUM-LATEST"))).toBe("self");
+  });
+
   it("does not merely compare providers", () => {
     // Both are mistral, but a different model did the judging. Keying on
     // provider instead of model would call this self-graded and be wrong.

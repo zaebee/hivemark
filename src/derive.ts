@@ -103,10 +103,24 @@ function supersedes(record: ReviewRecord, held: ReviewRecord): boolean {
   return byCodeUnit(canonicalJson(record), canonicalJson(held)) > 0;
 }
 
-/** Who judged these claims, from the genome alone. */
+/**
+ * Who judged these claims, from the genome alone.
+ *
+ * Compared case-insensitively, because the two mistakes are not symmetric.
+ * Treating `Mistral-Medium-Latest` and `mistral-medium-latest` as different
+ * models publishes a self-graded rate as an independently confirmed one, with a
+ * green badge — the exact failure this function exists to prevent. The opposite
+ * error would require two genuinely different models whose names differ only in
+ * case, which is not a thing.
+ *
+ * The upstream schema is a bare `z.string()`, so nothing enforces casing on the
+ * way in.
+ */
 export function judgeOf(genome: Genome): Judge {
   if (genome.skeptic_model === null) return "nobody";
-  return genome.skeptic_model === genome.finder_model ? "self" : "independent";
+  return genome.skeptic_model.toLowerCase() === genome.finder_model.toLowerCase()
+    ? "self"
+    : "independent";
 }
 
 function skepticAxis(claims: Claim[], genome: Genome): SkepticAxis {
