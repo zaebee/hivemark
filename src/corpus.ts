@@ -58,7 +58,20 @@ export function readCorpus(path: string): { text: string; corpus: Corpus | null 
  * the direction that costs a permanent record, so it is the one made loud.
  */
 export function loadCorpus(manifestPath: string): Corpus {
-  const parsed = ManifestSchema.safeParse(JSON.parse(readFileSync(manifestPath, "utf8")));
+  // Named, because the raw SyntaxError is not. `JSON Parse error: Unexpected
+  // token '}'` reaches the operator through a CLI that prints `err.message` and
+  // nothing else, so without the path it says only that some JSON somewhere is
+  // wrong — at a moment when several JSON files are in play.
+  let source: unknown;
+  try {
+    source = JSON.parse(readFileSync(manifestPath, "utf8"));
+  } catch (error) {
+    throw new Error(
+      `${manifestPath} is not readable as JSON: ${error instanceof Error ? error.message : "unknown error"}`,
+    );
+  }
+
+  const parsed = ManifestSchema.safeParse(source);
   if (!parsed.success) {
     const first = parsed.error.issues[0];
     throw new Error(

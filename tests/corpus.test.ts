@@ -134,6 +134,18 @@ describe("loadCorpus", () => {
     expect(loadCorpus(manifest).text).toBe('{"n":1}\n{"n":2}\n');
   });
 
+  it("names the file when the manifest is not valid JSON", () => {
+    // The raw SyntaxError is `JSON Parse error: Unexpected token '}'`, which
+    // reaches an operator through a CLI that prints err.message and nothing
+    // else. Without the path it says only that some JSON somewhere is wrong, at
+    // a moment when corpus.json, anchors.json and births.json are all in play.
+    const root = mkdtempSync(join(tmpdir(), "hivemark-corpus-"));
+    made.push(root);
+    const manifest = join(root, "corpus.json");
+    writeFileSync(manifest, '{ "base": "./x", "include": [ }', "utf8");
+    expect(() => loadCorpus(manifest)).toThrow(/corpus\.json is not readable as JSON/);
+  });
+
   it("rejects a manifest that is not one", () => {
     const root = mkdtempSync(join(tmpdir(), "hivemark-corpus-"));
     made.push(root);
