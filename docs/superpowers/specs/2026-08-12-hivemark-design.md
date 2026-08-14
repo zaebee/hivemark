@@ -456,10 +456,16 @@ is covered by every signature — settled above.
    ollama and mistral runs that do not exist yet.~~
 
    **Superseded 2026-08-14.** The mistral runs arrived. The corpus is 115
-   reviews across 8 identities and two providers, and the comparison this gap
-   was waiting for exists: matched on `graph` mode and the three shared
-   projects, 14.8 claims per review against 3.4, holding on every project
-   separately.
+   records — 108 after deduplication, which is what a track record counts —
+   across 8 identities and two providers, and the comparison this gap was
+   waiting for exists: matched on `graph` mode and the three shared projects,
+   14.8 claims per review against 3.4, holding on every project separately.
+
+   Both counts are stated because the difference is not bookkeeping. The seven
+   superseded re-runs are still signed and will still be covered by an anchor,
+   so the same corpus yields 932 attestations and 800 counted claims. That is
+   recomputable by any reader from published attestations alone, and the dry run
+   prints it before broadcasting.
 
    The gap closes only half way, and the half it does not close was not
    anticipated here. mistral's skeptic is the same model as its finder, so its
