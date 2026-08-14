@@ -3,7 +3,7 @@ import { claimsOf } from "./claims.js";
 import { genomeOf } from "./genome.js";
 import { identityId, ownerAddress } from "./identity.js";
 import type { ReviewRecord } from "./schema.js";
-import type { Claim, SkepticAxis, TrackRecord } from "./types.js";
+import type { Claim, Genome, Judge, SkepticAxis, TrackRecord } from "./types.js";
 
 /**
  * Aggregate claims into one track record per identity.
@@ -29,7 +29,7 @@ export function deriveTrackRecords(records: ReviewRecord[]): TrackRecord[] {
     reviews: bucket.records.length,
     claims: bucket.claims.length,
     corpus: corpusOf(bucket.records),
-    skeptic: skepticAxis(bucket.claims),
+    skeptic: skepticAxis(bucket.claims, genomeOf(bucket.records[0]!)),
     human: { available: false as const },
   }));
 }
@@ -103,11 +103,32 @@ function supersedes(record: ReviewRecord, held: ReviewRecord): boolean {
   return byCodeUnit(canonicalJson(record), canonicalJson(held)) > 0;
 }
 
-function skepticAxis(claims: Claim[]): SkepticAxis {
+/**
+ * Who judged these claims, from the genome alone.
+ *
+ * Compared case-insensitively, because the two mistakes are not symmetric.
+ * Treating `Mistral-Medium-Latest` and `mistral-medium-latest` as different
+ * models publishes a self-graded rate as an independently confirmed one, with a
+ * green badge — the exact failure this function exists to prevent. The opposite
+ * error would require two genuinely different models whose names differ only in
+ * case, which is not a thing.
+ *
+ * The upstream schema is a bare `z.string()`, so nothing enforces casing on the
+ * way in.
+ */
+export function judgeOf(genome: Genome): Judge {
+  if (genome.skeptic_model === null) return "nobody";
+  return genome.skeptic_model.toLowerCase() === genome.finder_model.toLowerCase()
+    ? "self"
+    : "independent";
+}
+
+function skepticAxis(claims: Claim[], genome: Genome): SkepticAxis {
   const count = (v: Claim["verdict"]) => claims.filter((c) => c.verdict === v).length;
   const scored = claims.map((c) => c.impact_score).filter((s): s is number => s !== null);
 
   return {
+    judge: judgeOf(genome),
     confirmed: count("confirmed"),
     refuted: count("refuted"),
     uncertain: count("uncertain"),

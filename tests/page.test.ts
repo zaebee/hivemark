@@ -24,7 +24,7 @@ function make(over: Partial<TrackRecord> = {}): TrackRecord {
     reviews: 10,
     claims: 20,
     corpus: [["cal_dot_com", 10]],
-    skeptic: { confirmed: 15, refuted: 3, uncertain: 2, unresolved: 0, mean_impact: 4.1 },
+    skeptic: { judge: "independent", confirmed: 15, refuted: 3, uncertain: 2, unresolved: 0, mean_impact: 4.1 },
     human: { available: false },
     ...over,
   };
@@ -112,5 +112,39 @@ describe("renderPage", () => {
   it("refuses to render a reviewer whose model cannot be placed", () => {
     const unplaceable = make({ genome: { ...make().genome, finder_model: "gpt-4o" } });
     expect(() => renderPage([unplaceable])).toThrow(/unrecognised model/i);
+  });
+});
+
+describe("a self-graded identity on the page", () => {
+  const selfGraded = (): TrackRecord =>
+    make({
+      genome: {
+        schema_version: 1,
+        known_fields: ["context_mode", "finder_model", "guardian_version", "provider", "skeptic_model"],
+        provider: "mistral",
+        finder_model: "mistral-medium-latest",
+        skeptic_model: "mistral-medium-latest",
+        context_mode: "graph",
+        guardian_version: "4d1fe6a1234567",
+      },
+      skeptic: { judge: "self", confirmed: 15, refuted: 3, uncertain: 2, unresolved: 0, mean_impact: 4.1 },
+    });
+
+  it("warns beside the skeptic that it is the finder", () => {
+    expect(renderPage([selfGraded()])).toMatch(/grades its own work/);
+  });
+
+  it("relabels the rate, so the compared number carries the caveat", () => {
+    const html = renderPage([selfGraded()]);
+    expect(html).toMatch(/self-graded rate/);
+    expect(html).not.toMatch(/>confirmed rate</);
+  });
+
+  it("leaves an independently judged card unmarked", () => {
+    // Without this the two above pass against an implementation that warns on
+    // every card.
+    const html = renderPage([make()]);
+    expect(html).not.toMatch(/grades its own work/);
+    expect(html).toMatch(/confirmed rate/);
   });
 });

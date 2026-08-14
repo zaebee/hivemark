@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { harvest } from "../src/harvest.js";
-import { deriveTrackRecords } from "../src/derive.js";
-import type { TrackRecord } from "../src/types.js";
+import { deriveTrackRecords, judgeOf } from "../src/derive.js";
+import { providerOf } from "../src/genome.js";
+import type { Genome, TrackRecord } from "../src/types.js";
 
 const records = harvest(
   readFileSync("tests/fixtures/martian-reviews.sample.jsonl", "utf8"),
@@ -126,5 +127,61 @@ describe("deriveTrackRecords", () => {
       }))
       .sort((a, b) => (JSON.stringify(a) < JSON.stringify(b) ? -1 : 1));
     expect(summary).toMatchSnapshot();
+  });
+});
+
+describe("judgeOf", () => {
+  const genome = (finder: string, skeptic: string | null): Genome => ({
+    schema_version: 1,
+    known_fields: ["context_mode", "finder_model", "guardian_version", "provider", "skeptic_model"],
+    provider: providerOf(finder),
+    finder_model: finder,
+    skeptic_model: skeptic,
+    context_mode: "graph",
+    guardian_version: "d0d807ef",
+  });
+
+  it("calls it self-graded when the skeptic is the finder", () => {
+    expect(judgeOf(genome("mistral-medium-latest", "mistral-medium-latest"))).toBe("self");
+  });
+
+  it("calls it independent when a different model judges", () => {
+    expect(judgeOf(genome("gemini-2.5-flash", "gemini-3.5-flash"))).toBe("independent");
+  });
+
+  it("distinguishes no skeptic from a self-grading one", () => {
+    // Collapsing these would report an unjudged corpus as a self-judged one.
+    expect(judgeOf(genome("gemini-2.5-flash", null))).toBe("nobody");
+  });
+
+  it("ignores casing, because the two mistakes are not symmetric", () => {
+    // Calling these different models publishes a self-graded rate as an
+    // independently confirmed one. The opposite error needs two real models
+    // whose names differ only in case, which does not happen.
+    expect(judgeOf(genome("mistral-medium-latest", "Mistral-Medium-Latest"))).toBe("self");
+    expect(judgeOf(genome("mistral-medium-latest", "MISTRAL-MEDIUM-LATEST"))).toBe("self");
+  });
+
+  it("does not merely compare providers", () => {
+    // Both are mistral, but a different model did the judging. Keying on
+    // provider instead of model would call this self-graded and be wrong.
+    expect(judgeOf(genome("mistral-medium-latest", "mistral-nemo"))).toBe("independent");
+  });
+});
+
+describe("the judge reaches the track record", () => {
+  // The badge and page tests build fixtures with `judge` already set, so they
+  // never exercise the derivation. Without this, judgeOf could return
+  // "independent" for everything and the whole suite would stay green while
+  // every self-graded badge quietly turned back into a confirmed one.
+  it("marks an identity whose skeptic is its own finder", () => {
+    const selfGraded = records.map((r) => ({ ...r, skeptic_model: r.finder_model }));
+    const tracks = deriveTrackRecords(selfGraded);
+    expect(tracks.length).toBeGreaterThan(0);
+    for (const t of tracks) expect(t.skeptic.judge).toBe("self");
+  });
+
+  it("leaves the real corpus independent, which is what it is", () => {
+    for (const t of deriveTrackRecords(records)) expect(t.skeptic.judge).toBe("independent");
   });
 });
