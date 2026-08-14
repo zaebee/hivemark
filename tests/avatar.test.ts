@@ -81,10 +81,15 @@ describe("traits read from the genome", () => {
     // `body`, so thorax, bands and all four wings could wear another provider's
     // colours — mistral's `dark` set to gemini's, and gemini's `wing` set to
     // mistral's, each left the suite green.
+    // Derived now rather than hand-picked, so these are the values paletteFor
+    // produces — pinned as literals on purpose. Importing paletteFor here would
+    // make the assertion compare the function to itself and pass for any
+    // palette at all, which is the same defect this test already carries two
+    // probes against.
     const PALETTE = {
-      gemini: { body: "#E3AE3C", dark: "#7E5410", wing: "#BFD8E4" },
-      mistral: { body: "#DC6B3E", dark: "#6F2A11", wing: "#E8CDBF" },
-      ollama: { body: "#8098AC", dark: "#33454F", wing: "#CBDCE4" },
+      gemini: { body: "hsl(309 62% 74%)", dark: "hsl(309 66% 31%)", wing: "hsl(309 26% 86%)" },
+      mistral: { body: "hsl(225 62% 47%)", dark: "hsl(225 66% 20%)", wing: "hsl(225 26% 86%)" },
+      ollama: { body: "hsl(39 62% 74%)", dark: "hsl(39 66% 31%)", wing: "hsl(39 26% 86%)" },
     } as const;
     const FINDER = {
       gemini: "gemini-2.5-flash",
@@ -97,8 +102,9 @@ describe("traits read from the genome", () => {
       for (const [channel, hex] of Object.entries(PALETTE[provider])) {
         expect(svg, `${provider} should paint its ${channel} ${hex}`).toContain(hex);
       }
-      // Nine distinct hexes, and no coordinate contains a "#", so a foreign
-      // colour anywhere in the document is a real one and not a substring.
+      // Nine distinct colours, and none is a substring of another: every one
+      // starts at "hsl(" and the digits that follow differ, so a foreign colour
+      // found in the document is a real one rather than an accident of matching.
       for (const other of Object.keys(PALETTE) as (keyof typeof PALETTE)[]) {
         if (other === provider) continue;
         for (const [channel, hex] of Object.entries(PALETTE[other])) {
@@ -128,7 +134,7 @@ describe("traits read from the genome", () => {
 
 describe("the renderer draws the measured animal", () => {
   const bodyEllipses = (svg: string) =>
-    [...svg.matchAll(/<ellipse cx="[\d.]+" cy="[\d.]+" rx="([\d.]+)" ry="([\d.]+)"[^>]*fill="#E3AE3C"/g)].map(
+    [...svg.matchAll(/<ellipse cx="[\d.]+" cy="[\d.]+" rx="([\d.]+)" ry="([\d.]+)"[^>]*fill="hsl\(309 62% 74%\)"/g)].map(
       (m) => ({ rx: Number(m[1]), ry: Number(m[2]) }),
     );
 

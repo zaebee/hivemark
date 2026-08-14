@@ -1,7 +1,8 @@
 import { bodyPlan, DRAWING, type BodyPlan } from "./body.js";
 import { providerOf } from "./genome.js";
 import { identityId } from "./identity.js";
-import type { Genome, Provider } from "./types.js";
+import { paletteFor, type Palette } from "./palette.js";
+import type { Genome } from "./types.js";
 
 /**
  * A reviewer's badge: a bee assembled from its genome.
@@ -17,18 +18,6 @@ import type { Genome, Provider } from "./types.js";
  * keeps positions out of the renderer: nothing here may invent a coordinate,
  * because every one it needs is already on the plan.
  */
-
-interface Palette {
-  readonly body: string;
-  readonly dark: string;
-  readonly wing: string;
-}
-
-const PALETTES: Record<Provider, Palette> = {
-  gemini: { body: "#E3AE3C", dark: "#7E5410", wing: "#BFD8E4" },
-  mistral: { body: "#DC6B3E", dark: "#6F2A11", wing: "#E8CDBF" },
-  ollama: { body: "#8098AC", dark: "#33454F", wing: "#CBDCE4" },
-};
 
 /**
  * Outline colour.
@@ -132,7 +121,7 @@ function stinger(plan: BodyPlan): string {
  * actually doing the finding.
  */
 export function avatarSvg(genome: Genome, size = 120): string {
-  const palette = PALETTES[providerOf(genome.finder_model)];
+  const palette = paletteFor(providerOf(genome.finder_model));
   const plan = bodyPlan(genome);
 
   // Scoped to the identity, not to a trait: several bees are inlined into one
