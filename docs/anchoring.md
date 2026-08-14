@@ -57,12 +57,22 @@ Register each with `resolver = 0x0` and `revocable = true` — those two values 
 part of what the UID is derived from, so a different choice produces a different
 UID and the attestations will not resolve.
 
-**Look each UID up on easscan first.** A UID is global and derived from the
-schema text alone, so if anyone anywhere has registered the identical string with
-the same resolver and revocable flag, it already exists — attestations resolve
-against it and no transaction is needed. Registering it again does not fail
-safely into a no-op: EAS rejects it and the gas is spent on a revert. The script
-cannot check this offline.
+**A UID is global**, and derived from the schema text alone. If anyone anywhere
+has registered the identical string with the same resolver and revocable flag, it
+already exists — attestations resolve against it and no transaction is needed.
+Registering it again does not fail safely into a no-op: EAS rejects it and the
+gas is spent on a revert.
+
+`bun scripts/send-schemas.ts` checks this against the chain and skips any schema
+that already exists, so the lookup no longer has to be done by hand. Without
+`--send` it reads nothing and spends nothing; the key file is opened only when
+`--send` is passed, so a dry run is safe for anyone to execute. If a schema's
+text has drifted from the UID the signed attestations name, it refuses **all**
+three rather than sending the two that still match.
+
+It is safe to re-run after a failure. Each registration is its own transaction
+and the already-registered check runs before every one, so a retry resumes
+rather than double-spends.
 
 Do not hand-assemble the calls. `bun scripts/register-schemas.ts` prints the
 exact `to`, `value` and `data` for all three and sends nothing. It re-derives
