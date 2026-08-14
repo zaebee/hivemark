@@ -165,17 +165,23 @@ for (const { name, data, uid } of pending) {
   const receipt = await publicClient.waitForTransactionReceipt({ hash });
   console.log(`      status ${receipt.status}, gas used ${receipt.gasUsed}`);
 
-  // Confirm the chain agrees the intended UID now exists, rather than trusting
-  // a success status. A reverted-but-mined transaction and a transaction that
-  // registered something else both fail here.
-  const now = await publicClient.readContract({
-    address: SCHEMA_REGISTRY,
-    abi: GET_SCHEMA_ABI,
-    functionName: "getSchema",
-    args: [uid as `0x${string}`],
-  });
-  console.log(`      ${now.uid === uid ? `✓ ${uid} is registered` : "✗ THE UID DID NOT APPEAR — investigate before sending more"}`);
-  if (now.uid !== uid) process.exit(1);
+  // Confirm from the receipt's own logs, not from a follow-up read.
+  //
+  // The registry emits `Registered` with the uid as its first indexed topic, so
+  // the proof is already in hand and cannot race. An earlier version re-read
+  // `getSchema` immediately after the receipt and compared that: the public RPC
+  // balances across nodes, the read landed on one that had not applied the block
+  // yet, and a correct registration was reported as "THE UID DID NOT APPEAR" —
+  // a false negative that aborted the remaining two sends.
+  //
+  // A mined-but-reverted transaction emits no logs, so it still fails here.
+  const registered = receipt.logs.some(
+    (log) =>
+      log.address.toLowerCase() === SCHEMA_REGISTRY.toLowerCase() &&
+      log.topics[1]?.toLowerCase() === uid.toLowerCase(),
+  );
+  console.log(`      ${registered ? `✓ ${uid} is registered` : "✗ NO Registered EVENT FOR THIS UID — investigate before sending more"}`);
+  if (!registered) process.exit(1);
   console.log();
 }
 

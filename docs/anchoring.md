@@ -47,11 +47,11 @@ low.
 one-off transactions against the
 SchemaRegistry at `0x4200000000000000000000000000000000000020`:
 
-| schema | source | UID |
-|---|---|---|
-| claim | `CLAIM_SCHEMA` in `src/attest/schema.ts` | `0x9c6648261df139b4453dd540ed2e8d821a9e775beede14ba9aae9e7202daacfb` |
-| anchor | `ANCHOR_SCHEMA` in `src/anchor/schema.ts` | `0x8ff2e1ad6186bbe4c1ac54ea7d969dcf04a8caa7d31e8ac45127bfa3cfba06bd` |
-| birth | `BIRTH_SCHEMA` in `src/birth/schema.ts` | `0x6ca5f932f49e5ac467c1ca24c5af39800a12df874d3856b4afdd54800c07ed02` |
+| schema | source | UID | registered |
+|---|---|---|---|
+| claim | `CLAIM_SCHEMA` in `src/attest/schema.ts` | `0x9c6648261df139b4453dd540ed2e8d821a9e775beede14ba9aae9e7202daacfb` | [`0x1fbb86d3…`](https://basescan.org/tx/0x1fbb86d367bf390d177e2427e72871dbe7bc13d6d92b96c75d5a9f03c2c74793) 2026-08-14 |
+| anchor | `ANCHOR_SCHEMA` in `src/anchor/schema.ts` | `0x8ff2e1ad6186bbe4c1ac54ea7d969dcf04a8caa7d31e8ac45127bfa3cfba06bd` | not yet |
+| birth | `BIRTH_SCHEMA` in `src/birth/schema.ts` | `0x6ca5f932f49e5ac467c1ca24c5af39800a12df874d3856b4afdd54800c07ed02` | not yet |
 
 Register each with `resolver = 0x0` and `revocable = true` — those two values are
 part of what the UID is derived from, so a different choice produces a different
