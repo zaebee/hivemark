@@ -34,6 +34,12 @@ look at.
 Hive above for the overview, cards below for the detail. At twenty identities the
 second half grows linearly and the first half still fits on a screen.
 
+**The hive wraps rather than scrolls sideways.** Families are grid or flex
+containers that reflow, each bee holding a fixed aspect ratio so a narrow
+viewport gives shorter rows and not clipped bees. Twenty identities on a phone
+should be legible as several rows, which is the only layout requirement strong
+enough to state in advance — the rest is ordinary CSS and belongs in the plan.
+
 `scripts/plate.ts` is untouched. It studies the **trait system** — what the
 genome can express, including hypothetical genomes nobody has run — while the
 hive shows the **population**. Its "reviewers that actually exist" section
@@ -110,6 +116,20 @@ constraint is about the figure remaining recognisable.
 A palette is three colours (`body`, `dark`, `wing`), so the derived hue produces
 all three by a fixed relationship rather than three independent draws. That keeps
 a provider's bees internally coherent, which is what makes a family read as one.
+
+**No override table for well-known providers.** Proposed in review, and rejected:
+it reintroduces exactly the hand-maintained map this section removes, for a
+benefit that is cosmetic. Two providers landing close in hue are still separated
+by lightness, and if that ever fails the cost is a reader briefly mistaking one
+family for another — recoverable, unlike anything else in this codebase that is
+keyed by provider. A table maintained to improve aesthetics will be the table
+nobody updates.
+
+**Colours stay baked into the SVG, not lifted into CSS variables.** Also proposed
+in review. `avatarSvg` output is written to `dist/avatar-*.svg` as standalone
+files, so an SVG that inherits its palette from the page's stylesheet renders
+colourless everywhere except the page. The published artefact has to be
+self-contained.
 
 ## 6. The seam: a page that anyone can regenerate
 
