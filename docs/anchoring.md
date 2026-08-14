@@ -15,8 +15,28 @@ secret would be the largest attack surface here by a wide margin.
 ## One-time setup
 
 **1. Create an empty wallet.** Any tool that generates a standard EVM key works.
-Record only the address; the private key goes into your password manager and
-nowhere else. Add the address to the table below.
+Add the address to the table below.
+
+"Empty" means never used, not merely unfunded — check the address on more than
+one chain before recording it. The same address exists on every EVM chain, so
+one with history elsewhere links every anchor to that history permanently, and
+its key has been in wallets for an unknown time. The first address proposed for
+this table had seven transactions on Ethereum mainnet and was discarded for that
+reason, before it was ever used here.
+
+The key lives at `~/.hivemark/anchoring.key`, mode 0600 in a 0700 directory.
+Three properties of that location are deliberate:
+
+- **Outside the repository.** Bun auto-loads `.env` from the working directory,
+  which is how a key reached a transcript once already. Nothing here can pick
+  this file up by accident.
+- **Nothing in hivemark reads it.** Anchoring is broadcast by hand, so the file
+  is storage for a human rather than configuration for a program.
+- **It is not a backup.** That directory is not synced or snapshotted, so the
+  key must also go into a password manager. It is the only copy otherwise.
+
+The file should be exactly 67 bytes — `0x`, 64 hex characters, and a newline.
+Checking its size confirms it was not truncated without reading it.
 
 **2. Fund it.** A few dollars of ETH on Base covers years — a year of weekly
 anchors costs about seven cents at the gas price measured on 2026-08-12
@@ -118,7 +138,7 @@ recorded may as well not have happened.
 
 | address | active from | active until | status |
 |---|---|---|---|
-| `0xFe30FD1fAEba962015C25a4f7149fA9054133c36` | 2026-08-14 | | active |
+| `0xd34Ce280dB5E2a2584DD2EA4183bd8bC679bC05e` | 2026-08-14 | | active |
 
 `active`, `retired` (rotated out; its past anchors remain valid) or
 `compromised` (do not trust anchors from it after the stated date).
