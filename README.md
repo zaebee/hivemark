@@ -109,14 +109,47 @@ discourse and keycloak, overlapping only on grafana. A difference between the
 rows may be a difference between codebases rather than between reviewers. The
 generated page says so on its face, and the corpus is printed on every card.
 
+## Where it stands now
+
+108 deduplicated reviews, 800 claims, 8 identities across two providers.
+
+| identity | reviews | claims | resolved | rate | judged by |
+|---|---|---|---|---|---|
+| gemini · diff-only · `d0d807e` | 26 | 88 | 88 | 69% | another model |
+| gemini · diff-only · `f9c36f5` | 19 | 63 | 63 | 71% | another model |
+| mistral · graph · `aeebde9` | 19 | 289 | 289 | 85% | **itself** |
+| gemini · graph · `d0d807e` | 18 | 59 | 59 | 75% | another model |
+| mistral · graph · `112e437` | 11 | 166 | 166 | 80% | **itself** |
+| mistral · graph · `4d1fe6a` | 8 | 108 | 108 | 92% | **itself** |
+| gemini · graph · `f9c36f5` | 6 | 26 | 26 | 81% | another model |
+| gemini · graph · `1ecd962` | 1 | 1 | 1 | 0% | another model |
+
+**Eight rows, three configurations.** Five of these exist only because
+`guardian_sha` is part of the genome and a commit landed mid-run — including the
+last row, whose entire track record is one review. That is
+[an upstream problem](https://github.com/zaebee/codegraph-brain/issues/375), and
+until it is fixed the row count overstates how many distinct reviewers were run.
+
+**The `judged by` column is load-bearing.** A rate awarded by the finder to
+itself is not the same measurement as one awarded by a different model, and the
+92% is the former.
+
 ## Honest limits
 
 - Guardian writes no record for a review that fails, so every track record here
   is survivorship-biased and systematically optimistic.
 - The human axis (`findings_applied`) has no data in benchmark artifacts and is
   never inferred from the skeptic.
-- The corpus uses a single finder/skeptic pair, so cross-provider comparison is
-  not yet possible.
+- Cross-provider comparison is now partly possible and partly not. Matched on
+  `graph` mode and the three projects both providers reviewed, mistral produces
+  **14.8 claims per review against gemini's 3.4**, and the gap holds on every
+  shared project — so it is a difference between reviewers, not between
+  codebases. The confirmation rates are **not** comparable: mistral's skeptic is
+  the same model as its finder, so its 84.7% is self-assessment, while gemini's
+  75.6% was awarded by a different model. Cards and badges mark that; the
+  numbers must not be read side by side without it.
+- The two providers also ran under different Guardian revisions, which is an
+  unresolved confound even on the claims rate.
 
 ## Drift guard
 

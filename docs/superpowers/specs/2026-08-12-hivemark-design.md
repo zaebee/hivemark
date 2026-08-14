@@ -449,11 +449,33 @@ is covered by every signature — settled above.
    benchmark output; `findings_applied` lives in production metrics that are not
    committed to the repository. Until a production source is wired in, every
    track record rests on two axes, and the card must say so.
-2. **The corpus is narrow.** All 36 records use `gemini-2.5-flash` as finder and
-   `gemini-3.5-flash` as skeptic. The three distinct genomes differ only in
+2. ~~**The corpus is narrow.** All 36 records use `gemini-2.5-flash` as finder
+   and `gemini-3.5-flash` as skeptic. The three distinct genomes differ only in
    `had_graph` and `guardian_sha`. Cross-provider comparison — the thing that
    makes "digital entities with different characters" more than a phrase — needs
-   ollama and mistral runs that do not exist yet.
+   ollama and mistral runs that do not exist yet.~~
+
+   **Superseded 2026-08-14.** The mistral runs arrived. The corpus is 115
+   records — 108 after deduplication, which is what a track record counts —
+   across 8 identities and two providers, and the comparison this gap was
+   waiting for exists: matched on `graph` mode and the three shared projects,
+   14.8 claims per review against 3.4, holding on every project separately.
+
+   Both counts are stated because the difference is not bookkeeping. The seven
+   superseded re-runs are still signed and will still be covered by an anchor,
+   so the same corpus yields 932 attestations and 800 counted claims. That is
+   recomputable by any reader from published attestations alone, and the dry run
+   prints it before broadcasting.
+
+   The gap closes only half way, and the half it does not close was not
+   anticipated here. mistral's skeptic is the same model as its finder, so its
+   confirmation rate is self-assessment and cannot be set beside gemini's. This
+   spec assumed a wider corpus would make the rates comparable; it made the
+   claims rate comparable and left the rate this document treats as the headline
+   measurement no more comparable than before. See #13, and `judge` on
+   `SkepticAxis`.
+
+   Ollama still does not exist in the corpus.
 3. Gas figures in this document are orders of magnitude, not quotes.
 
 ## What the first run will show
