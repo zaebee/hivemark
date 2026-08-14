@@ -80,10 +80,28 @@ reviewing; the bee belongs to it and *wears* where it went for judgement. A
 cross-provider bee is not in two families.
 
 Within a family, bees are ordered by what distinguishes them — `context_mode`
-first, then `guardian_version`. Those are the slots `DRIVEN_BY` maps to the wings
-and the thorax, so the ordering makes the difference legible as shape: a row of
-bees differing only in thorax length is a row of near-twins, and the page can say
-so.
+first, then `guardian_version`. `context_mode` drives all four wing characters.
+`guardian_version` drives **two** things: thorax length through `DRIVEN_BY`, and
+the abdomen band count through `bandCount`.
+
+**Shape shows kinship. It does not identify.** Measured on the three mistral
+identities, which differ in nothing but `guardian_version`:
+
+| guardian | bands | thorax |
+|---|---|---|
+| `4d1fe6a8` | 4 | 41.8 |
+| `112e4373` | 4 | 40.2 |
+| `aeebde9c` | 2 | 41.3 |
+
+Two of the three are the same on both counts to within 4%. Nobody will reliably
+tell them apart by looking, and that is the honest outcome rather than a defect —
+they are near-identical because they nearly are the same reviewer, which is the
+whole of #20.
+
+The consequence is a requirement: **every bee in the hive carries its label.**
+The arrangement conveys family and kinship; the text conveys which one this is.
+A view that relied on shape alone would be unreadable exactly where it matters
+most.
 
 ## 5. Colour at scale
 
