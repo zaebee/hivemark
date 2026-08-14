@@ -23,7 +23,8 @@ anchors costs about seven cents at the gas price measured on 2026-08-12
 (0.0060 gwei, ETH at $1,883). Do not overfund a hot key; top it up when it runs
 low.
 
-**3. Register both schemas.** These are one-off transactions against the
+**3. Register all three schemas, before anything else onchain.** These are
+one-off transactions against the
 SchemaRegistry at `0x4200000000000000000000000000000000000020`:
 
 | schema | source | UID |
@@ -57,9 +58,38 @@ constants and against this file. If that test fails, a schema string was edited:
 that is a breaking change needing a fresh registration and a decision about every
 attestation signed under the old UID, not a test to update.
 
-Both UIDs are derived rather than assigned, so **every attestation already signed
-becomes resolvable on easscan the moment the claim schema exists**. Nothing needs
-re-signing.
+All three UIDs are derived rather than assigned, so **every attestation already
+signed becomes decodable the moment the claim schema exists**. Nothing needs
+re-signing. "Decodable" and not "listed": easscan can render an offchain
+attestation once the schema exists and someone presents it, but offchain
+attestations do not appear in a listing by themselves.
+
+**Registration must come before any onchain attestation, and this is not a
+preference.** EAS reverts `attest` when the schema UID does not exist, so a birth
+or anchor sent first does not fail into a harmless no-op — it spends gas on a
+revert. Measured against Base mainnet from the anchoring address before
+registration, `eth_call` on a real birth request returns `0xbf37b20e`, which is
+`InvalidSchema()`. Order is schemas, then births, then anchors.
+
+The claim that registering late "costs only visibility, never validity" holds for
+the offchain attestations already on disk, and only for those.
+
+### What it costs
+
+Measured with `eth_estimateGas` on 2026-08-14, gas price 0.006 gwei:
+
+| | gas |
+|---|---|
+| register claim | 238,914 |
+| register anchor | 166,938 |
+| register birth | 261,819 |
+| **all three** | **667,671 ≈ 0.0000040 ETH** |
+
+Births and anchors cannot be estimated until the schemas exist — the estimate
+reverts, which is the point above. Expect the same order of magnitude each.
+
+A couple of dollars of ETH is therefore generous by a wide margin, and the
+warning against overfunding a hot key stands.
 
 ## Every week
 
@@ -88,7 +118,7 @@ recorded may as well not have happened.
 
 | address | active from | active until | status |
 |---|---|---|---|
-| _none yet_ | | | |
+| `0xFe30FD1fAEba962015C25a4f7149fA9054133c36` | 2026-08-14 | | active |
 
 `active`, `retired` (rotated out; its past anchors remain valid) or
 `compromised` (do not trust anchors from it after the stated date).
