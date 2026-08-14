@@ -1,4 +1,6 @@
 import { avatarSvg } from "../avatar.js";
+import { esc } from "../escape.js";
+import { renderHive } from "./hive.js";
 import { shieldsEndpoint } from "./shields.js";
 import type { TrackRecord } from "../types.js";
 
@@ -35,11 +37,20 @@ dt{color:var(--muted)}dd{margin:0;font-variant-numeric:tabular-nums;min-width:0}
 code{font-size:.85em;word-break:break-all}
 .nodata{color:var(--muted);font-style:italic}
 .warn{color:#b4690e;font-weight:600}
+.hm-hive{margin:1.5rem 0 0}
+.hm-family h3{margin:1rem 0 .5rem;font-size:1rem;color:var(--muted);font-weight:600}
+.hm-row{display:flex;flex-wrap:wrap;gap:1rem}
+.hm-bee{margin:0;width:7rem;text-align:center}
+.hm-bee svg{width:100%;height:auto;aspect-ratio:1}
+.hm-bee figcaption{font-size:.72rem;color:var(--muted);line-height:1.35;
+display:flex;flex-direction:column;overflow-wrap:break-word}
+.hm-twins{margin:.5rem 0 0;font-size:.8rem;color:var(--muted);font-style:italic}
 </style></head>
 <body><main>
 <h1>hivemark</h1>
 <p class="sub">Track records for code-review agents, derived from Guardian's own resolved claims.</p>
 ${notes.join("\n")}
+${renderHive(tracks)}
 ${tracks.map(card).join("\n")}
 </main></body></html>`;
 }
@@ -148,10 +159,3 @@ function confoundedNote(d: Divergence): string {
   );
 }
 
-function esc(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
