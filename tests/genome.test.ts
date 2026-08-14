@@ -103,6 +103,13 @@ describe("whitespace cannot mint an identity", () => {
     );
   });
 
+  it("refuses a blank-but-present skeptic rather than reading it as absent", () => {
+    // `" "` is truthy, so it reaches the check instead of collapsing to null.
+    // It means "no skeptic ran" written with a stray space, and the space is
+    // the configuration error this exists to surface.
+    expect(() => genomeOf(padded({ skeptic_model: " " }))).toThrow(/skeptic_model/);
+  });
+
   it("still accepts a clean record, and an absent skeptic", () => {
     // Without this the tests above pass against a genomeOf that throws always.
     expect(genomeOf(padded({})).finder_model).toBe("gemini-2.5-flash");

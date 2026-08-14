@@ -97,10 +97,16 @@ export function genomeOf(record: ReviewRecord): Genome {
     // schema admits either. Collapsed here so one configuration cannot become
     // two identities — and so a published birth record, where both encode to
     // the same empty field, cannot read as self-contradictory.
-    skeptic_model:
-      record.skeptic_model === "" || record.skeptic_model === undefined || record.skeptic_model === null
-        ? null
-        : exactly(record.skeptic_model, "skeptic_model"),
+    // `!` covers exactly the reachable falsy values. The schema is
+    // `z.string().nullable()` and not optional, so a record missing the field
+    // fails to parse and `undefined` cannot arrive here — an explicit check for
+    // it would imply a state that cannot occur.
+    //
+    // A blank-but-present `" "` is truthy and therefore reaches `exactly`,
+    // which refuses it. That is deliberate: it means "no skeptic ran" written
+    // with a stray space, and the space is the configuration error this
+    // function exists to surface.
+    skeptic_model: !record.skeptic_model ? null : exactly(record.skeptic_model, "skeptic_model"),
     context_mode: record.had_graph ? "graph" : "diff-only",
     guardian_version: exactly(record.guardian_sha, "guardian_sha"),
   };
