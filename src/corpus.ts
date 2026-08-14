@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { z } from "zod";
+import { byCodeUnit } from "./canonical.js";
 
 /**
  * Which files make up the corpus, read from a manifest rather than retyped.
@@ -47,6 +48,28 @@ export function readCorpus(path: string): { text: string; corpus: Corpus | null 
   if (!path.endsWith(".json")) return { text: readFileSync(path, "utf8"), corpus: null };
   const corpus = loadCorpus(path);
   return { text: corpus.text, corpus };
+}
+
+/**
+ * Every `.jsonl` at or below a directory, as paths relative to it.
+ *
+ * Recursive, and that is the point. `readdirSync` reads one level, so a ratchet
+ * built on it claims to account for every file while seeing only the top of the
+ * tree — a review file placed one directory down would be omitted from the
+ * corpus in silence, which is the failure this whole module exists to prevent,
+ * with a blind spot immediately below where it was looking.
+ *
+ * The direction matters: a non-review file swept in is rejected loudly, because
+ * `harvest` refuses any row without a `url` and reports it as a warning. Only a
+ * genuine review file being missed is silent, and that is the one recursion
+ * fixes.
+ */
+function jsonlUnder(dir: string, prefix = ""): string[] {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const rel = prefix === "" ? entry.name : `${prefix}/${entry.name}`;
+    if (entry.isDirectory()) return jsonlUnder(join(dir, entry.name), rel);
+    return entry.name.endsWith(".jsonl") ? [rel] : [];
+  });
 }
 
 /**
@@ -103,7 +126,13 @@ export function loadCorpus(manifestPath: string): Corpus {
     );
   }
 
-  const onDisk = readdirSync(root).filter((n) => n.endsWith(".jsonl")).sort();
+  // Explicitly by code unit, never `localeCompare`, which Sonar suggested here.
+  // This ordering only decides how files are listed in an error message, but the
+  // rule is the same one `anchor/plan.ts` states where it decides a Merkle root:
+  // locale-aware collation varies with the ICU data a runtime happens to carry,
+  // so two machines would report the same fault differently. A comparator that
+  // is right everywhere costs nothing over one that is right locally.
+  const onDisk = jsonlUnder(root).sort(byCodeUnit);
   const accounted = new Set([...include, ...Object.keys(exclude)]);
   const unaccounted = onDisk.filter((n) => !accounted.has(n));
   if (unaccounted.length > 0) {

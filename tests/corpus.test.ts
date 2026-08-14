@@ -61,6 +61,42 @@ describe("loadCorpus", () => {
     expect(() => loadCorpus(manifest)).toThrow(/both included and excluded/);
   });
 
+  it("sees a file in a subdirectory, because a ratchet that reads one level is not one", () => {
+    // readdirSync is not recursive, so the first version of this claimed to
+    // account for every file while seeing only the top of the tree. A review
+    // file placed one directory down would have been omitted from the corpus in
+    // silence — the failure this module exists to prevent, with a blind spot
+    // immediately below where it was looking.
+    const root = mkdtempSync(join(tmpdir(), "hivemark-corpus-"));
+    made.push(root);
+    const data = join(root, "benchmarks");
+    mkdirSync(join(data, "nested"), { recursive: true });
+    writeFileSync(join(data, "a.jsonl"), row(1), "utf8");
+    writeFileSync(join(data, "nested", "buried.jsonl"), row(2), "utf8");
+    const manifest = join(root, "corpus.json");
+    writeFileSync(
+      manifest,
+      JSON.stringify({ base: "./benchmarks", include: ["a.jsonl"], exclude: {} }),
+      "utf8",
+    );
+    expect(() => loadCorpus(manifest)).toThrow(/nested\/buried\.jsonl/);
+  });
+
+  it("includes a file from a subdirectory when the manifest names it", () => {
+    const root = mkdtempSync(join(tmpdir(), "hivemark-corpus-"));
+    made.push(root);
+    const data = join(root, "benchmarks");
+    mkdirSync(join(data, "nested"), { recursive: true });
+    writeFileSync(join(data, "nested", "buried.jsonl"), row(7), "utf8");
+    const manifest = join(root, "corpus.json");
+    writeFileSync(
+      manifest,
+      JSON.stringify({ base: "./benchmarks", include: ["nested/buried.jsonl"], exclude: {} }),
+      "utf8",
+    );
+    expect(loadCorpus(manifest).text).toBe(row(7));
+  });
+
   it("refuses a file that is in neither include nor exclude", () => {
     // The whole point. A new review file appearing and being silently ignored
     // would narrow every birth date and every anchor built from here, with
