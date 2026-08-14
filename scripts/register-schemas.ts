@@ -5,10 +5,14 @@
  * then broadcasts, and the printing is separated from the spending so the two
  * can be checked apart.
  *
- * Registration is one-off and is what makes attestations resolve on easscan.
- * Because a UID is derived rather than assigned, **every attestation already
- * signed becomes resolvable the moment its schema exists** — nothing is
- * re-signed, and registering late costs only visibility, never validity.
+ * Registration is one-off. Because a UID is derived rather than assigned, every
+ * attestation already signed becomes decodable the moment its schema exists, and
+ * nothing is re-signed.
+ *
+ * That "registering late costs only visibility" is true of the offchain
+ * attestations on disk and false of anything onchain: EAS reverts `attest` on an
+ * unregistered schema — `0xbf37b20e`, `InvalidSchema()`, observed against Base
+ * mainnet. Run this before the first birth or anchor, not after.
  *
  *   bun scripts/register-schemas.ts
  */
