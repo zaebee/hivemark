@@ -24,6 +24,7 @@ exports[`deriveTrackRecords > matches a stable snapshot of the real corpus 1`] =
     "reviews": 21,
     "skeptic": {
       "confirmed": 53,
+      "judge": "independent",
       "mean_impact": 3.9,
       "refuted": 7,
       "uncertain": 8,
@@ -45,6 +46,7 @@ exports[`deriveTrackRecords > matches a stable snapshot of the real corpus 1`] =
     "reviews": 1,
     "skeptic": {
       "confirmed": 0,
+      "judge": "independent",
       "mean_impact": 2,
       "refuted": 0,
       "uncertain": 1,
@@ -70,6 +72,7 @@ exports[`deriveTrackRecords > matches a stable snapshot of the real corpus 1`] =
     "reviews": 13,
     "skeptic": {
       "confirmed": 32,
+      "judge": "independent",
       "mean_impact": 4.74,
       "refuted": 2,
       "uncertain": 9,

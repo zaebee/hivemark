@@ -24,7 +24,7 @@ function track(over: Partial<TrackRecord["skeptic"]>): TrackRecord {
     reviews: 10,
     claims: 20,
     corpus: [["cal_dot_com", 10]],
-    skeptic: { confirmed: 15, refuted: 3, uncertain: 2, unresolved: 0, mean_impact: 4.1, ...over },
+    skeptic: { judge: "independent", confirmed: 15, refuted: 3, uncertain: 2, unresolved: 0, mean_impact: 4.1, ...over },
     human: { available: false },
   };
 }
@@ -56,5 +56,42 @@ describe("shieldsEndpoint", () => {
 
   it("names the reviewer by provider and context mode", () => {
     expect(shieldsEndpoint(track({})).label).toBe("gemini · graph");
+  });
+});
+
+describe("a self-graded identity", () => {
+  it("says self-graded rather than confirmed", () => {
+    const badge = shieldsEndpoint(track({ judge: "self" }));
+    expect(badge.message).toMatch(/self-graded/);
+    expect(badge.message).not.toMatch(/confirmed/);
+  });
+
+  it("is denied the colour scale, however high the rate", () => {
+    // 95% would be brightgreen for an independently judged identity. Colour is
+    // what a reader takes in at a glance, so green over a number the finder
+    // awarded itself asserts a quality this measurement cannot support.
+    const high = { confirmed: 19, refuted: 1, uncertain: 0, unresolved: 0 };
+    expect(shieldsEndpoint(track({ judge: "self", ...high })).message).toMatch(/95% self-graded/);
+    expect(shieldsEndpoint(track({ judge: "self", ...high })).color).toBe("lightgrey");
+    expect(shieldsEndpoint(track({ judge: "self" })).color).toBe("lightgrey");
+  });
+
+  it("still colours an independently judged identity by its rate", () => {
+    // Without this the test above passes against an implementation returning
+    // lightgrey for everything.
+    const high = { confirmed: 19, refuted: 1, uncertain: 0, unresolved: 0 };
+    const badge = shieldsEndpoint(track({ judge: "independent", ...high }));
+    expect(badge.color).toBe("brightgreen");
+    expect(badge.message).toMatch(/95% confirmed/);
+  });
+
+  it("does not call an unjudged corpus self-graded", () => {
+    // `nobody` means no skeptic ran. Collapsing it into `self` would report an
+    // unjudged corpus as a self-judged one.
+    const none = shieldsEndpoint(
+      track({ judge: "nobody", confirmed: 0, refuted: 0, uncertain: 0, unresolved: 20 }),
+    );
+    expect(none.message).toBe("no data");
+    expect(none.message).not.toMatch(/self-graded/);
   });
 });

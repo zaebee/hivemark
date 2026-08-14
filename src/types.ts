@@ -41,7 +41,29 @@ export interface Claim {
   readonly impact_score: number | null;
 }
 
+/**
+ * Who resolved this identity's claims.
+ *
+ * `self` means the skeptic and the finder are the same model, so the
+ * confirmation rate is self-assessment. That rate is published beside rates
+ * produced by an independent skeptic, and nothing else on the page distinguishes
+ * them — the same defect `TrackRecord.corpus` was added to prevent, arriving
+ * through a different door. A reader who correctly checks that the project sets
+ * match will conclude the rates are comparable, and for a self-graded pair they
+ * are not.
+ *
+ * `nobody` is a third state and not a variant of `self`: no skeptic ran at all.
+ * Collapsing the two would report an unjudged corpus as a self-judged one.
+ *
+ * Derived from the genome, never stored as input — an expression of
+ * `skeptic_model` and `finder_model`, the way `provider` expresses
+ * `finder_model`. A field that could disagree with the genome would be a field
+ * that could lie about it.
+ */
+export type Judge = "self" | "independent" | "nobody";
+
 export interface SkepticAxis {
+  readonly judge: Judge;
   readonly confirmed: number;
   readonly refuted: number;
   readonly uncertain: number;

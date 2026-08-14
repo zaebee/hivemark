@@ -24,6 +24,23 @@ export function shieldsEndpoint(track: TrackRecord): ShieldsEndpoint {
   }
 
   const rate = Math.round((confirmed / resolved) * 100);
+
+  // A self-graded rate is marked in the text *and* denied the colour scale.
+  //
+  // This badge is the part of the record that travels furthest with the least
+  // context — it ends up in a README beside other badges, read at a glance. The
+  // colour is what gets read at a glance, and green over a number the finder
+  // awarded itself asserts a quality this measurement cannot support. Wording
+  // alone would be mitigation the colour shouts over.
+  if (track.skeptic.judge === "self") {
+    return {
+      schemaVersion: 1,
+      label,
+      message: `${rate}% self-graded (${resolved} resolved)`,
+      color: "lightgrey",
+    };
+  }
+
   return {
     schemaVersion: 1,
     label,

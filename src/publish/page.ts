@@ -34,6 +34,7 @@ dl{display:grid;grid-template-columns:auto minmax(0,1fr);gap:.2rem 1rem;margin:0
 dt{color:var(--muted)}dd{margin:0;font-variant-numeric:tabular-nums;min-width:0}
 code{font-size:.85em;word-break:break-all}
 .nodata{color:var(--muted);font-style:italic}
+.warn{color:#b4690e;font-weight:600}
 </style></head>
 <body><main>
 <h1>hivemark</h1>
@@ -41,6 +42,20 @@ code{font-size:.85em;word-break:break-all}
 ${notes.join("\n")}
 ${tracks.map(card).join("\n")}
 </main></body></html>`;
+}
+
+/**
+ * The warning that belongs beside a skeptic who is the finder.
+ *
+ * Placed on the skeptic row and repeated in the rate's own label, because those
+ * are the two places a reader stops. The rate is the number that gets compared
+ * across cards, and a comparison against an independently judged rate is not one
+ * these two numbers support.
+ */
+function judgeNote(judge: TrackRecord["skeptic"]["judge"]): string {
+  return judge === "self"
+    ? ' <strong class="warn">— same model as the finder; it grades its own work</strong>'
+    : "";
 }
 
 function card(track: TrackRecord): string {
@@ -54,14 +69,14 @@ ${avatarSvg(track.genome, 96)}
 <dt>identity</dt><dd><code>${esc(track.identity_id)}</code></dd>
 <dt>owner</dt><dd><code>${esc(track.owner_address)}</code></dd>
 <dt>finder</dt><dd>${esc(track.genome.finder_model)}</dd>
-<dt>skeptic</dt><dd>${esc(track.genome.skeptic_model ?? "none")}</dd>
+<dt>skeptic</dt><dd>${esc(track.genome.skeptic_model ?? "none")}${judgeNote(s.judge)}</dd>
 <dt>context</dt><dd>${esc(track.genome.context_mode)}</dd>
 <dt>guardian</dt><dd><code>${esc(track.genome.guardian_version ?? "unknown")}</code></dd>
 <dt>corpus</dt><dd>${corpus}</dd>
 <dt>reviews</dt><dd>${track.reviews}</dd>
 <dt>claims</dt><dd>${track.claims}</dd>
 <dt>skeptic axis</dt><dd>${s.confirmed} confirmed · ${s.refuted} refuted · ${s.uncertain} uncertain · ${s.unresolved} unresolved</dd>
-<dt>confirmed rate</dt><dd>${resolved === 0 ? '<span class="nodata">no data</span>' : `${Math.round((s.confirmed / resolved) * 100)}% of ${resolved} resolved`}</dd>
+<dt>${s.judge === "self" ? "self-graded rate" : "confirmed rate"}</dt><dd>${resolved === 0 ? '<span class="nodata">no data</span>' : `${Math.round((s.confirmed / resolved) * 100)}% of ${resolved} resolved`}</dd>
 <dt>mean impact</dt><dd>${s.mean_impact ?? '<span class="nodata">no data</span>'}</dd>
 <dt>human axis</dt><dd><span class="nodata">no data</span> — benchmark artifacts carry no findings_applied</dd>
 <dt>badge</dt><dd>${esc(shieldsEndpoint(track).message)}</dd>
