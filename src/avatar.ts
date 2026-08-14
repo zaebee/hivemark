@@ -1,4 +1,5 @@
 import { bodyPlan, DRAWING, type BodyPlan } from "./body.js";
+import { esc } from "./escape.js";
 import { providerOf } from "./genome.js";
 import { identityId } from "./identity.js";
 import { paletteFor, UNJUDGED, type Palette } from "./palette.js";
@@ -150,7 +151,7 @@ export function avatarSvg(genome: Genome, size = 120): string {
 
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" ` +
-    `viewBox="0 0 ${n(plan.width)} ${n(plan.height)}" role="img" aria-label="${label}">` +
+    `viewBox="0 0 ${n(plan.width)} ${n(plan.height)}" role="img" aria-label="${esc(label)}">` +
     `<defs><clipPath id="${clipId}">` +
     `<ellipse cx="${n(plan.axis)}" cy="${n(plan.abdomen.cy)}" rx="${n(plan.abdomen.rx)}" ry="${n(plan.abdomen.ry)}"/>` +
     `</clipPath></defs>` +
