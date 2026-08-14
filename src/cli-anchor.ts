@@ -5,14 +5,9 @@ import { gapsIn, loadLedger } from "./anchor/ledger.js";
 import { periodId, periodOf } from "./anchor/period.js";
 import { planAnchor } from "./anchor/plan.js";
 import { buildAnchorRequest } from "./anchor/submit.js";
+import { supersededIn } from "./supersede.js";
 import type { AttestationEnvelope } from "./attest/attest.js";
 
-/**
- * Print what an anchor for a period would contain. Sends nothing.
- *
- * The point of a dry run here is that the next step costs money and cannot be
- * undone: whatever this prints is exactly what a human then broadcasts.
- */
 /**
  * Where a set of attestations came from, in one line, never throwing.
  *
@@ -41,6 +36,12 @@ function provenanceOf(attestationsPath: string): string {
   }
 }
 
+/**
+ * Print what an anchor for a period would contain. Sends nothing.
+ *
+ * The point of a dry run here is that the next step costs money and cannot be
+ * undone: whatever this prints is exactly what a human then broadcasts.
+ */
 function main(): void {
   const [attestationsPath = "dist/attestations.json", ledgerPath = "anchors.json", period] =
     process.argv.slice(2);
@@ -67,6 +68,26 @@ function main(): void {
   const request = buildAnchorRequest(plan);
   console.log(`period      ${plan.period}  [${plan.periodStart}, ${plan.periodEnd})`);
   console.log(`covers      ${plan.count} attestations`);
+
+  // How many of those came from a run a later one superseded.
+  //
+  // The published cards count deduplicated claims and this root covers every
+  // attestation, so the two numbers differ and nothing on the page explains it.
+  // Printing the difference here is cheaper than making the record narrower:
+  // every attestation is true, a superseded run did happen, and signing only the
+  // newest would freeze one scoring policy into a permanent record.
+  //
+  // Computed from the attestations themselves — the claim schema carries
+  // identity, repo, pr and commit — so any reader can recompute it without the
+  // corpus. That is what makes publishing both defensible.
+  const inPeriod = new Set(plan.uids);
+  const summary = supersededIn(envelopes.filter((e) => inPeriod.has(e.attestation.uid as `0x${string}`)));
+  if (summary.superseded.size > 0) {
+    console.log(
+      `  of which  ${summary.superseded.size} from ${summary.repeated} re-reviewed commits — ` +
+        `the track records count the newest run only`,
+    );
+  }
   // The coverage edge beside the calendar edge. The guard refuses a week that has
   // not closed; nothing can tell whether the input file is current, so a Monday
   // anchor built on a Friday harvest would lose the weekend silently. Seeing how
