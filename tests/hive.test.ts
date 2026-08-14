@@ -53,6 +53,19 @@ describe("familiesOf", () => {
     ]);
   });
 
+  it("orders members that agree on both sorted fields", () => {
+    // One provider covers many finder models, so two members of a family can
+    // share context_mode and guardian_version and still be different reviewers.
+    // Without a final fallback the comparator returns 0 for them and the input
+    // order decides — which the test below claims cannot happen.
+    const pair = [
+      track({ finder_model: "gemini-3.5-pro" }),
+      track({ finder_model: "gemini-2.5-flash" }),
+    ];
+    const ids = (t: TrackRecord[]) => familiesOf(t)[0]!.members.map((m) => m.identity_id);
+    expect(ids(pair)).toEqual(ids([...pair].reverse()));
+  });
+
   it("is deterministic regardless of input order", () => {
     const a = [track({ guardian_version: "aaaa" }), track({ guardian_version: "bbbb" })];
     const names = (t: TrackRecord[]) =>
@@ -89,7 +102,7 @@ describe("renderHive", () => {
       track({ guardian_version: "cccc" }),
       track({ guardian_version: "dddd" }),
     ]);
-    expect((html.match(/<svg/g) ?? []).length).toBe(3);
+    expect(html.match(/<svg/g) ?? []).toHaveLength(3);
   });
 
   it("escapes what it prints, because a genome field is not trusted markup", () => {

@@ -6,9 +6,20 @@
  * make that a cycle. This module depends on nothing, so nobody can create one
  * through it.
  *
- * `"` is escaped as well as the three HTML characters: `avatarSvg` builds an
- * `aria-label` attribute by interpolation, where an unescaped quote ends the
- * attribute and everything after it becomes markup.
+ * Both quote characters are escaped alongside the three HTML ones. `avatarSvg`
+ * builds an `aria-label` by interpolation, where an unescaped quote ends the
+ * attribute and everything after it becomes markup — that is not theoretical,
+ * it was a live hole in this file's first version. `'` is covered too: every
+ * attribute here is double-quoted today, and the cost of covering the other
+ * quote is a character nobody sees rendered.
+ *
+ * `replaceAll` with plain strings rather than global regexes: same result, one
+ * fewer thing to read as a pattern.
  */
 export const esc = (value: string): string =>
-  value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");

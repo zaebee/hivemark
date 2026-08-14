@@ -45,7 +45,14 @@ export function familiesOf(tracks: readonly TrackRecord[]): Family[] {
       provider,
       members: [...members].sort((a, b) => {
         const mode = byCodeUnit(a.genome.context_mode, b.genome.context_mode);
-        return mode !== 0 ? mode : byCodeUnit(a.genome.guardian_version, b.genome.guardian_version);
+        if (mode !== 0) return mode;
+        const version = byCodeUnit(a.genome.guardian_version, b.genome.guardian_version);
+        // Falls back to identity so the comparator is total. Two members of one
+        // family can agree on both sorted fields and still differ — the family
+        // is keyed by provider, and one provider covers many finder models. A
+        // comparator returning 0 there leaves their order decided by the input,
+        // which is the property the determinism test claims to rule out.
+        return version !== 0 ? version : byCodeUnit(a.identity_id, b.identity_id);
       }),
     }));
 }
