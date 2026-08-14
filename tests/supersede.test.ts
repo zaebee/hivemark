@@ -122,6 +122,30 @@ describe("supersededIn", () => {
     expect(s.superseded.size).toBe(0);
   });
 
+  it("counts an attestation that is not a claim instead of dropping it quietly", () => {
+    // Anything here belongs to a different schema or is corrupt. Skipping it
+    // silently would make `superseded` understate the difference it exists to
+    // explain, and a caller could not tell an accurate small number from a large
+    // one computed over a fraction of the input.
+    const junk = {
+      attestation: { uid: "0xjunk", message: { data: "0xdeadbeef", time: "1500" } },
+    } as unknown as AttestationEnvelope;
+    const s = supersededIn([
+      envelope({ uid: "0xold", time: 1000 }),
+      junk,
+      envelope({ uid: "0xnew", time: 2000 }),
+    ]);
+    expect(s.undecodable).toBe(1);
+    // The decodable ones are still resolved correctly around it.
+    expect([...s.superseded]).toEqual(["0xold"]);
+    expect(s.groups).toBe(1);
+  });
+
+  it("reports zero undecodable when everything is a claim", () => {
+    const s = supersededIn([envelope({ uid: "0xa", time: 1000 })]);
+    expect(s.undecodable).toBe(0);
+  });
+
   it("marks nothing when two runs share a timestamp, rather than guessing", () => {
     // The corpus breaks this tie on canonical JSON, but that input is never
     // published. A reader working from attestations alone reaches a floor here,

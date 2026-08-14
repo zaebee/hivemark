@@ -40,6 +40,17 @@ export interface SupersededSummary {
   readonly repeated: number;
   /** Attestations belonging to a run that a later one superseded. */
   readonly superseded: ReadonlySet<string>;
+  /**
+   * Attestations whose data would not decode as a claim.
+   *
+   * Counted and reported rather than skipped. Dropping them quietly would make
+   * `superseded` understate the very difference it exists to explain, and the
+   * caller would have no way to tell an accurate small number from a large one
+   * with most of its input discarded. A non-zero value here means the file
+   * holds something that is not a claim attestation, which is worth a human's
+   * attention before a root is published over it.
+   */
+  readonly undecodable: number;
 }
 
 /**
@@ -54,10 +65,24 @@ function groupKey(identityId: string, repo: string, pr: number, commitSha: strin
 
 export function supersededIn(envelopes: readonly AttestationEnvelope[]): SupersededSummary {
   const groups = new Map<string, { uid: string; time: number }[]>();
+  let undecodable = 0;
 
   for (const envelope of envelopes) {
     const message = envelope.attestation.message as { data: `0x${string}`; time: string };
-    const [identityId, repo, pr, commitSha] = decodeAbiParameters(CLAIM_TYPES, message.data);
+    let identityId: unknown;
+    let repo: unknown;
+    let pr: unknown;
+    let commitSha: unknown;
+    try {
+      [identityId, repo, pr, commitSha] = decodeAbiParameters(CLAIM_TYPES, message.data);
+    } catch {
+      // Not fatal, and not silent either. Anything here is not a claim
+      // attestation — a different schema, or corruption — and the caller decides
+      // what that means. Throwing would stop a dry run whose other numbers are
+      // still worth seeing; continuing without a count would hide it.
+      undecodable++;
+      continue;
+    }
     const key = groupKey(identityId as string, repo as string, Number(pr), commitSha as string);
     const entry = { uid: envelope.attestation.uid as string, time: Number(message.time) };
     const held = groups.get(key);
@@ -85,5 +110,5 @@ export function supersededIn(envelopes: readonly AttestationEnvelope[]): Superse
     }
   }
 
-  return { groups: groups.size, repeated, superseded };
+  return { groups: groups.size, repeated, superseded, undecodable };
 }

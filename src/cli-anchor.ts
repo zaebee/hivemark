@@ -88,6 +88,15 @@ function main(): void {
         `the track records count the newest run only`,
     );
   }
+  if (summary.undecodable > 0) {
+    // Reported, never swallowed. Something in this file is not a claim
+    // attestation, so the superseded count above is computed over less than the
+    // full set — and a root is about to be published over all of it.
+    console.warn(
+      `warning     ${summary.undecodable} attestation(s) did not decode as claims; ` +
+        `the count above covers the rest`,
+    );
+  }
   // The coverage edge beside the calendar edge. The guard refuses a week that has
   // not closed; nothing can tell whether the input file is current, so a Monday
   // anchor built on a Friday harvest would lose the weekend silently. Seeing how
