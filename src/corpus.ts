@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { z } from "zod";
+import { byCodeUnit } from "./canonical.js";
 
 /**
  * Which files make up the corpus, read from a manifest rather than retyped.
@@ -125,7 +126,13 @@ export function loadCorpus(manifestPath: string): Corpus {
     );
   }
 
-  const onDisk = jsonlUnder(root).sort();
+  // Explicitly by code unit, never `localeCompare`, which Sonar suggested here.
+  // This ordering only decides how files are listed in an error message, but the
+  // rule is the same one `anchor/plan.ts` states where it decides a Merkle root:
+  // locale-aware collation varies with the ICU data a runtime happens to carry,
+  // so two machines would report the same fault differently. A comparator that
+  // is right everywhere costs nothing over one that is right locally.
+  const onDisk = jsonlUnder(root).sort(byCodeUnit);
   const accounted = new Set([...include, ...Object.keys(exclude)]);
   const unaccounted = onDisk.filter((n) => !accounted.has(n));
   if (unaccounted.length > 0) {
