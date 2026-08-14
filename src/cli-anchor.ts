@@ -13,6 +13,34 @@ import type { AttestationEnvelope } from "./attest/attest.js";
  * The point of a dry run here is that the next step costs money and cannot be
  * undone: whatever this prints is exactly what a human then broadcasts.
  */
+/**
+ * Where a set of attestations came from, in one line, never throwing.
+ *
+ * This is diagnostic. A missing or damaged note about the corpus must not stop
+ * an anchor over attestations that are themselves valid — their signatures do
+ * not depend on it.
+ *
+ * Every failure reads "origin unknown" rather than being silently omitted. The
+ * line exists so an operator does not anchor fixture-derived attestations by
+ * accident, and a line that disappears when something is wrong would be worse
+ * than no line at all.
+ */
+function provenanceOf(attestationsPath: string): string {
+  const path = join(dirname(attestationsPath), "provenance.json");
+  if (!existsSync(path)) return "no provenance.json beside it; origin unknown";
+  try {
+    const p: unknown = JSON.parse(readFileSync(path, "utf8"));
+    if (typeof p !== "object" || p === null) return "provenance.json is not an object; origin unknown";
+    const { source, generated_at: generatedAt } = p as Record<string, unknown>;
+    if (typeof source !== "string" || typeof generatedAt !== "string") {
+      return "provenance.json is missing source or generated_at; origin unknown";
+    }
+    return `from ${source}, generated ${generatedAt}`;
+  } catch {
+    return "provenance.json is unreadable; origin unknown";
+  }
+}
+
 function main(): void {
   const [attestationsPath = "dist/attestations.json", ledgerPath = "anchors.json", period] =
     process.argv.slice(2);
@@ -24,13 +52,7 @@ function main(): void {
   // The default path makes this the easy command to run without thinking, and
   // an anchor over fixture-derived attestations would look exactly like a real
   // one — the signatures are valid either way.
-  const provenancePath = join(dirname(attestationsPath), "provenance.json");
-  if (existsSync(provenancePath)) {
-    const p = JSON.parse(readFileSync(provenancePath, "utf8")) as { source: string; generated_at: string };
-    console.log(`input       ${attestationsPath} — from ${p.source}, generated ${p.generated_at}`);
-  } else {
-    console.log(`input       ${attestationsPath} — no provenance.json beside it; origin unknown`);
-  }
+  console.log(`input       ${attestationsPath} — ${provenanceOf(attestationsPath)}`);
 
   // The command line is where an unchecked string would otherwise enter. A week
   // that does not exist is refused here rather than deep inside the arithmetic.
