@@ -1,7 +1,7 @@
 import { bodyPlan, DRAWING, type BodyPlan } from "./body.js";
 import { providerOf } from "./genome.js";
 import { identityId } from "./identity.js";
-import { paletteFor, type Palette } from "./palette.js";
+import { paletteFor, UNJUDGED, type Palette } from "./palette.js";
 import type { Genome } from "./types.js";
 
 /**
@@ -121,7 +121,16 @@ function stinger(plan: BodyPlan): string {
  * actually doing the finding.
  */
 export function avatarSvg(genome: Genome, size = 120): string {
-  const palette = paletteFor(providerOf(genome.finder_model));
+  const finder = paletteFor(providerOf(genome.finder_model));
+
+  // Head, thorax and wings from the finder; abdomen from whoever judged it.
+  // `DRIVEN_BY` already gives the head to `finder_model` and the abdomen to
+  // `skeptic_model`, so the body distinguished the two roles and only the colour
+  // did not. The three visual states are one rule, not three branches: a skeptic
+  // of the same provider yields the same palette, so a self-graded bee comes out
+  // one colour without anything testing for it.
+  const skeptic =
+    genome.skeptic_model === null ? UNJUDGED : paletteFor(providerOf(genome.skeptic_model));
   const plan = bodyPlan(genome);
 
   // Scoped to the identity, not to a trait: several bees are inlined into one
@@ -129,10 +138,15 @@ export function avatarSvg(genome: Genome, size = 120): string {
   // Deterministic, so identical genomes still render identical SVG.
   const clipId = `hm-abdomen-${identityId(genome).slice(2, 14)}`;
 
+  // The label carries what the colour carries, so the two tones are not the only
+  // place the fact lives.
+  let judged: string;
+  if (genome.skeptic_model === null) judged = "judged by nobody";
+  else if (genome.skeptic_model === genome.finder_model) judged = "grading its own work";
+  else judged = `judged by ${providerOf(genome.skeptic_model)}`;
+
   const label =
-    `${providerOf(genome.finder_model)} reviewer, ` +
-    `${genome.context_mode} context, ` +
-    `${plan.stinger === null ? "without" : "with"} a skeptic`;
+    `${providerOf(genome.finder_model)} reviewer, ` + `${genome.context_mode} context, ` + judged;
 
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" ` +
@@ -140,14 +154,14 @@ export function avatarSvg(genome: Genome, size = 120): string {
     `<defs><clipPath id="${clipId}">` +
     `<ellipse cx="${n(plan.axis)}" cy="${n(plan.abdomen.cy)}" rx="${n(plan.abdomen.rx)}" ry="${n(plan.abdomen.ry)}"/>` +
     `</clipPath></defs>` +
-    wings(plan, palette) +
+    wings(plan, finder) +
     stinger(plan) +
-    ellipse(plan.axis, plan.abdomen.cy, plan.abdomen.rx, plan.abdomen.ry, palette.body, plan) +
-    `<g clip-path="url(#${clipId})">${bands(plan, palette)}</g>` +
+    ellipse(plan.axis, plan.abdomen.cy, plan.abdomen.rx, plan.abdomen.ry, skeptic.body, plan) +
+    `<g clip-path="url(#${clipId})">${bands(plan, skeptic)}</g>` +
     ellipse(plan.axis, plan.abdomen.cy, plan.abdomen.rx, plan.abdomen.ry, "none", plan) +
-    ellipse(plan.axis, plan.thorax.cy, plan.thorax.rx, plan.thorax.ry, palette.dark, plan) +
+    ellipse(plan.axis, plan.thorax.cy, plan.thorax.rx, plan.thorax.ry, finder.dark, plan) +
     antennae(plan) +
-    ellipse(plan.axis, plan.head.cy, plan.head.rx, plan.head.ry, palette.body, plan) +
+    ellipse(plan.axis, plan.head.cy, plan.head.rx, plan.head.ry, finder.body, plan) +
     eyes(plan) +
     `</svg>`
   );

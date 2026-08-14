@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { avatarSvg } from "../src/avatar.js";
+import { providerOf } from "../src/genome.js";
+import { paletteFor, UNJUDGED } from "../src/palette.js";
 import type { Genome } from "../src/types.js";
 
 const base: Genome = {
@@ -91,14 +93,28 @@ describe("traits read from the genome", () => {
       mistral: { body: "hsl(225 62% 47%)", dark: "hsl(225 66% 20%)", wing: "hsl(225 26% 86%)" },
       ollama: { body: "hsl(39 62% 74%)", dark: "hsl(39 66% 31%)", wing: "hsl(39 26% 86%)" },
     } as const;
+    // Finder and skeptic from the same provider, so the whole bee is one
+    // palette and a foreign colour anywhere is a real fault. A bee judged by
+    // another provider is two-toned by design — that is the next describe block,
+    // and mixing the two here would make this assertion untestable.
     const FINDER = {
       gemini: "gemini-2.5-flash",
       mistral: "mistral-medium-latest",
       ollama: "qwen2.5-coder:7b",
     } as const;
+    const SKEPTIC = {
+      gemini: "gemini-3.5-flash",
+      mistral: "mistral-medium-latest",
+      ollama: "qwen3:8b",
+    } as const;
 
     for (const provider of Object.keys(PALETTE) as (keyof typeof PALETTE)[]) {
-      const svg = avatarSvg({ ...base, provider, finder_model: FINDER[provider] });
+      const svg = avatarSvg({
+        ...base,
+        provider,
+        finder_model: FINDER[provider],
+        skeptic_model: SKEPTIC[provider],
+      });
       for (const [channel, hex] of Object.entries(PALETTE[provider])) {
         expect(svg, `${provider} should paint its ${channel} ${hex}`).toContain(hex);
       }
@@ -184,5 +200,55 @@ describe("provider is derived, not trusted", () => {
 
   it("refuses a model it cannot place", () => {
     expect(() => avatarSvg({ ...base, finder_model: "gpt-4o" })).toThrow(/unrecognised model/i);
+  });
+});
+
+describe("the bee wears its judge", () => {
+  const withSkeptic = (finder: string, skeptic: string | null): Genome => ({
+    ...base,
+    provider: providerOf(finder),
+    finder_model: finder,
+    skeptic_model: skeptic,
+  });
+
+  it("is two-toned when another provider judged it", () => {
+    const svg = avatarSvg(withSkeptic("gemini-2.5-flash", "mistral-medium-latest"));
+    const head = paletteFor("gemini").body;
+    const abdomen = paletteFor("mistral").body;
+    expect(svg).toContain(head);
+    expect(svg).toContain(abdomen);
+    expect(head).not.toBe(abdomen);
+  });
+
+  it("is one colour when it graded its own work", () => {
+    // Not a separate code path: same provider, same palette, and the visual
+    // state falls out of the rule rather than out of a branch.
+    const svg = avatarSvg(withSkeptic("mistral-medium-latest", "mistral-medium-latest"));
+    expect(svg).toContain(paletteFor("mistral").body);
+    expect(svg).not.toContain(paletteFor("gemini").body);
+  });
+
+  it("has a colourless abdomen when nobody judged it", () => {
+    const svg = avatarSvg(withSkeptic("gemini-2.5-flash", null));
+    expect(svg).toContain(UNJUDGED.body);
+    expect(svg).toContain(paletteFor("gemini").body);
+  });
+
+  it("keeps the wings with the finder, because the bee belongs to it", () => {
+    const svg = avatarSvg(withSkeptic("gemini-2.5-flash", "mistral-medium-latest"));
+    expect(svg).toContain(paletteFor("gemini").wing);
+    expect(svg).not.toContain(paletteFor("mistral").wing);
+  });
+
+  it("bands the abdomen in the skeptic's dark, not the finder's", () => {
+    const svg = avatarSvg(withSkeptic("gemini-2.5-flash", "mistral-medium-latest"));
+    expect(svg).toContain(`fill="${paletteFor("mistral").dark}"`);
+  });
+
+  it("says in the label what the colour says", () => {
+    // A screen reader gets the same fact the two tones carry.
+    expect(avatarSvg(withSkeptic("gemini-2.5-flash", "mistral-medium-latest"))).toContain("judged by mistral");
+    expect(avatarSvg(withSkeptic("mistral-medium-latest", "mistral-medium-latest"))).toContain("grading its own work");
+    expect(avatarSvg(withSkeptic("gemini-2.5-flash", null))).toContain("judged by nobody");
   });
 });
