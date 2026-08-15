@@ -36,7 +36,8 @@ SchemaRegistry at `0x4200000000000000000000000000000000000020` with
 | | |
 |---|---|
 | schema | `BIRTH_SCHEMA` in `src/birth/schema.ts` |
-| UID | `0x6ca5f932f49e5ac467c1ca24c5af39800a12df874d3856b4afdd54800c07ed02` |
+| UID | `0xde2b5303867b8d593b14ccccf4e168d1e8afbce0a66881facf1f9047799e01e5` |
+| superseded UID | `0x6ca5f932f49e5ac467c1ca24c5af39800a12df874d3856b4afdd54800c07ed02` — version 1, registered and unrevoked, named a single provider and a guardianVersion |
 
 The UID is derived, so attestations prepared before registration resolve the
 moment it exists.

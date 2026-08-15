@@ -42,7 +42,7 @@ const KEY_PATH = join(homedir(), ".hivemark", "anchoring.key");
 const EXPECTED = {
   claim: "0x9c6648261df139b4453dd540ed2e8d821a9e775beede14ba9aae9e7202daacfb",
   anchor: "0x8ff2e1ad6186bbe4c1ac54ea7d969dcf04a8caa7d31e8ac45127bfa3cfba06bd",
-  birth: "0x6ca5f932f49e5ac467c1ca24c5af39800a12df874d3856b4afdd54800c07ed02",
+  birth: "0xde2b5303867b8d593b14ccccf4e168d1e8afbce0a66881facf1f9047799e01e5",
 } as const;
 
 const REGISTER_ABI = [

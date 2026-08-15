@@ -22,18 +22,6 @@ function runCli(ledger: string): { status: number; stdout: string; stderr: strin
  * the entry point's behaviour is part of what is under test.
  */
 describe("cli-birth", () => {
-  it("refuses to plan a birth until birth schema 2 is registered", () => {
-    // Phase 1 moved identity onto the review fingerprint, and birth schema 1 has
-    // one provider field where genome 2 has two — so a record encoded against it
-    // could not be rebuilt into the genome it names. encodeBirth refuses rather
-    // than publishing something permanent and unreadable, and the CLI surfaces
-    // that as a clean failure rather than a stack trace.
-    const { status, stderr } = runCli("[]");
-    expect(status).toBe(1);
-    expect(stderr).toMatch(/cannot represent genome schema 2/);
-    expect(stderr).not.toMatch(/at .*\.ts:/);
-  });
-
   // Skipped until phase 2 registers birth schema 2, not deleted.
   //
   // encodeBirth refuses genome 2 because birth schema 1 has one provider field
