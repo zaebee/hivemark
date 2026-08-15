@@ -62,10 +62,18 @@ SchemaRegistry at `0x4200000000000000000000000000000000000020`:
 | claim | `CLAIM_SCHEMA` in `src/attest/schema.ts` | `0x9c6648261df139b4453dd540ed2e8d821a9e775beede14ba9aae9e7202daacfb` | [`0x1fbb86d3…`](https://basescan.org/tx/0x1fbb86d367bf390d177e2427e72871dbe7bc13d6d92b96c75d5a9f03c2c74793) 2026-08-14 |
 | anchor | `ANCHOR_SCHEMA` in `src/anchor/schema.ts` | `0x8ff2e1ad6186bbe4c1ac54ea7d969dcf04a8caa7d31e8ac45127bfa3cfba06bd` | [`0xb287b4ef…`](https://basescan.org/tx/0xb287b4ef5db2bb4277690d14e40f536e761f674eb972ca4dfb05ec619cd5d8cf) 2026-08-14 |
 | birth (v1, superseded) | registered and unrevoked; nothing points at it | `0x6ca5f932f49e5ac467c1ca24c5af39800a12df874d3856b4afdd54800c07ed02` | [`0x79dd678d…`](https://basescan.org/tx/0x79dd678da2666adbd5bbe792d1de5facdf26e2442f41aa66020a3c72304f676c) 2026-08-14 |
-| birth | `BIRTH_SCHEMA` in `src/birth/schema.ts` | `0xde2b5303867b8d593b14ccccf4e168d1e8afbce0a66881facf1f9047799e01e5` | not yet |
+| birth | `BIRTH_SCHEMA` in `src/birth/schema.ts` | `0xde2b5303867b8d593b14ccccf4e168d1e8afbce0a66881facf1f9047799e01e5` | [`0xf9094e88…`](https://basescan.org/tx/0xf9094e8850a9a50b9b68374ef421f779543506a9c4ba404a58945a71950d3952) 2026-08-15 |
 
-All three are live on Base with `resolver = 0x0` and `revocable = true`, verified
-by reading the registry back from a second RPC. Re-running `send-schemas.ts` now
+All four are live on Base with `resolver = 0x0` and `revocable = true`, verified
+by reading the registry back from a second RPC — including that the birth
+schema's text on chain is byte-identical to `BIRTH_SCHEMA` in the code.
+
+Birth v1 was superseded on 2026-08-15 when identity moved onto the review
+fingerprint: it named a single `provider` and a `guardianVersion`, and the
+genome now carries a provider for each of the finder and the skeptic and no
+guardian sha at all. It is **not revoked**, and nothing was ever signed against
+it — replacing it cost one transaction precisely because no birth had been
+announced. Re-running `send-schemas.ts` now
 prints "already registered — nothing to send" for all three.
 
 Register each with `resolver = 0x0` and `revocable = true` — those two values are
