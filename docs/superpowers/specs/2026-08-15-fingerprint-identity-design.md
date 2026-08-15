@@ -35,7 +35,8 @@ cost.
 
 ```
 schema_version        1 → 2
-known_fields          guardian_version → review_fingerprint, + skeptic_provider
+known_fields          guardian_version → review_fingerprint,
+                      provider → finder_provider, + skeptic_provider
 provider              → finder_provider    (read, not derived)
                       + skeptic_provider   (read, not derived)
 finder_model          unchanged
