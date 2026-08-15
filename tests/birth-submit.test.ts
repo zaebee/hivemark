@@ -9,13 +9,7 @@ import type { BirthPlan } from "../src/birth/plan.js";
 
 const genome: Genome = {
   schema_version: 1,
-  known_fields: [
-    "context_mode",
-    "finder_model",
-    "review_fingerprint",
-    "provider",
-    "skeptic_model",
-  ],
+  known_fields: ["context_mode", "finder_model", "finder_provider", "review_fingerprint", "skeptic_model", "skeptic_provider"],
   finder_provider: "gemini",
 
   skeptic_provider: "gemini",

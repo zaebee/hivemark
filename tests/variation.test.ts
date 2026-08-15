@@ -5,7 +5,7 @@ import type { Genome } from "../src/types.js";
 
 const base: Genome = {
   schema_version: 1,
-  known_fields: ["context_mode", "finder_model", "review_fingerprint", "provider", "skeptic_model"],
+  known_fields: ["context_mode", "finder_model", "finder_provider", "review_fingerprint", "skeptic_model", "skeptic_provider"],
   finder_provider: "gemini",
 
   skeptic_provider: "gemini",
@@ -144,7 +144,7 @@ describe("variation is a function of one slot", () => {
     const noisy = {
       ...base,
       schema_version: 99,
-      known_fields: ["provider"],
+      known_fields: ["context_mode", "finder_model", "finder_provider", "review_fingerprint", "skeptic_model", "skeptic_provider"],
       finder_provider: "ollama" as const,
     };
     for (const name of names) {

@@ -8,13 +8,7 @@ function make(over: Partial<TrackRecord> = {}): TrackRecord {
     owner_address: "0x0000000000000000000000000000000000000001",
     genome: {
       schema_version: 1,
-      known_fields: [
-        "context_mode",
-        "finder_model",
-        "review_fingerprint",
-        "provider",
-        "skeptic_model",
-      ],
+      known_fields: ["context_mode", "finder_model", "finder_provider", "review_fingerprint", "skeptic_model", "skeptic_provider"],
       finder_provider: "gemini",
 
       skeptic_provider: "gemini",
@@ -122,7 +116,7 @@ describe("a self-graded identity on the page", () => {
     make({
       genome: {
         schema_version: 1,
-        known_fields: ["context_mode", "finder_model", "review_fingerprint", "provider", "skeptic_model"],
+        known_fields: ["context_mode", "finder_model", "finder_provider", "review_fingerprint", "skeptic_model", "skeptic_provider"],
         finder_provider: "mistral",
 
         skeptic_provider: "mistral",

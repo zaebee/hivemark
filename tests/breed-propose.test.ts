@@ -4,16 +4,20 @@ import { identityId } from "../src/identity.js";
 import type { Vocabulary } from "../src/breed/vocabulary.js";
 import type { Genome } from "../src/types.js";
 
+// Mirrors KNOWN_FIELDS in src/genome.ts. It is part of the hashed genome, so a
+// mock listing schema 1's fields while declaring schema 2 contradicts itself and
+// computes an identity the pipeline would never produce.
 const KNOWN = [
   "context_mode",
   "finder_model",
+  "finder_provider",
   "review_fingerprint",
-  "provider",
   "skeptic_model",
+  "skeptic_provider",
 ] as const;
 
 const genome = (over: Partial<Genome>): Genome => ({
-  schema_version: 1,
+  schema_version: 2,
   known_fields: KNOWN,
   finder_provider: "gemini",
 
