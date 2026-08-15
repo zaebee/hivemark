@@ -232,6 +232,11 @@ recomputed by hand; what moves is derived counts, and each is named below.
 - Consumes: `ReviewRecord` from Task 1, fixtures from Task 2.
 - Produces: `Genome` with `finder_provider: string`, `skeptic_provider: string | null`, `review_fingerprint: string`, and **without** `provider` or `guardian_version`. `GENOME_SCHEMA_VERSION` is `2`.
 
+`string` rather than the `Provider` union is deliberate and costs nothing:
+`paletteFor` already takes `string`, and nothing else in `src/` demands the
+union except `providerOf`'s own return type — verified. The union is what
+refuses an unrecognised model today, and a stated provider needs no such guess.
+
 - [ ] **Step 1: Write the failing test**
 
 Append to `tests/genome.test.ts`:
@@ -392,10 +397,16 @@ Run: `bun run typecheck && bun run test`
 
 Expect type errors wherever `genome.provider` or `genome.guardian_version` is read. Each one is a real decision, not a mechanical rename:
 
-- `avatar.ts`, `hive.ts` — read `finder_provider` / `skeptic_provider` directly instead of calling `providerOf`.
+- `avatar.ts` and `hive.ts` — **no change**. Neither reads `genome.provider`;
+  both call `providerOf(genome.finder_model)`, and `finder_model` is still there,
+  so they compile untouched. Switching them to the stated providers is phase 2.
 - `birth/submit.ts` — the consistency check comparing `providerOf(finder_model)` against `genome.provider` **is deleted**, not rewritten. It compares two producer-stated fields, which catches a producer contradicting itself and not a producer that is confidently wrong. That job moved upstream, where the closure fails loudly on a provider it cannot map.
 - `breed/propose.ts` — its vocabulary is built from genome slots; `guardian_version` becomes `review_fingerprint`.
-- `publish/page.ts` — the card prints `guardian` and `provider`; print the fingerprint and both providers.
+- `publish/page.ts` — **two sites, not one**. Line 85 prints the `guardian` row
+  on each card; line 150's `describe()` builds the divergence note from
+  `genome.provider` and `genome.guardian_version`. Both must print the
+  fingerprint and the stated providers, and `describe()` is easy to miss because
+  it is a helper rather than part of the card template.
 - `body.ts` / `variation.ts` — `DRIVEN_BY` maps `guardian_version` to the thorax and the band count. Rename the slot to `review_fingerprint`. **The mapping is unchanged**: the same slot drives the same characters, so bees keep the shape their configuration gives them.
 
 - [ ] **Step 6: Fix each call site, then run again**
