@@ -17,6 +17,7 @@
 - **No birth may be broadcast until the new schema is registered on Base.** The guard in `encodeBirth` comes off only when the UID it names exists.
 - **`review_fingerprint_source` does not enter the genome or the birth record.** It says how a digest was obtained, not what a reviewer is. (spec §2)
 - **Announcing a birth is irreversible.** One per identity, `firstSeen` is a minimum over the corpus handed in, and it cannot be revised. (#14)
+- **Every probe must run where the plan is read.** `sed -i` differs between GNU and BSD, so a probe written with it silently does not run on macOS — and a probe that does not run is a probe that was not performed, which is the failure this project keeps finding. `perl -pi -e` behaves identically on both.
 
 ---
 
@@ -166,7 +167,7 @@ Expected: PASS, including the two birth CLI tests once Task 3 unskips them — t
 
 ```bash
 cp src/birth/schema.ts /tmp/bs.bak
-sed -i 's/string finderProvider/string finder_provider/' src/birth/schema.ts
+perl -pi -e 's/string finderProvider/string finder_provider/' src/birth/schema.ts
 bun run test tests/schema-uids.test.ts   # must FAIL on both uid and text
 bun scripts/send-schemas.ts              # must refuse all three, exit 1
 cp /tmp/bs.bak src/birth/schema.ts
@@ -296,7 +297,7 @@ Fix each site by reading the stated field:
 - [ ] **Step 5: Unskip the two birth CLI tests**
 
 ```bash
-sed -i 's/it\.skip(/it(/' tests/birth-cli.test.ts
+perl -pi -e 's/it\.skip\(/it(/g' tests/birth-cli.test.ts
 ```
 
 Delete the "Skipped until phase 2" comments above them — the reason is gone. Their assertions describe three identities now, not eight; update the counts to what the code produces after confirming three is right.
@@ -374,10 +375,12 @@ for target in ['1a2884400bd7', 'eebfdf98419c']:
     for p in glob.glob('../ownima/codegraph-brain/benchmarks/**/*.jsonl', recursive=True):
         for line in open(p, encoding='utf-8'):
             if not line.strip(): continue
-            try: r = json.loads(line)
-            except Exception: continue
-            if r.get('review_fingerprint') == target:
-                rows.append((r['reviewed_at'], p.split('benchmarks/')[-1]))
+            try:
+                r = json.loads(line)
+                if isinstance(r, dict) and r.get('review_fingerprint') == target and r.get('reviewed_at'):
+                    rows.append((r['reviewed_at'], p.split('benchmarks/')[-1]))
+            except Exception:
+                continue
     rows.sort()
     print(f'{target}: {len(rows)} rows, earliest {rows[0] if rows else None}')"
 ```
