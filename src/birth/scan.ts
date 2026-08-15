@@ -10,8 +10,8 @@
 /** The fields this needs from a `getLogs` result, and no more. */
 export interface AttestedLog {
   readonly args: {
-    readonly recipient?: `0x${string}` | undefined;
-    readonly uid?: `0x${string}` | undefined;
+    readonly recipient?: `0x${string}`;
+    readonly uid?: `0x${string}`;
   };
   readonly blockNumber?: bigint | null;
   readonly transactionHash?: `0x${string}` | null;

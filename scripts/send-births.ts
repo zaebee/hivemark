@@ -139,10 +139,12 @@ console.log(`          block ${registration.blockNumber}, head ${head}`);
 async function birthsOnChain(): Promise<Map<string, `0x${string}`[]>> {
   const byEntity = new Map<string, `0x${string}`[]>();
   for (let from = registration.blockNumber; from <= head; from += LOG_SCAN_CHUNK + 1n) {
-    // Not `Math.min`: block numbers are bigint, and Math.min throws
-    // `Conversion from 'BigInt' to 'number' is not allowed` on one.
-    const chunkEnd = from + LOG_SCAN_CHUNK;
-    const to = chunkEnd > head ? head : chunkEnd;
+    // Written as an assignment rather than `Math.min` or a ternary: block
+    // numbers are bigint, and Math.min throws `Conversion from 'BigInt' to
+    // 'number' is not allowed` on one — measured, and the reason the obvious
+    // simplification is not available here.
+    let to = from + LOG_SCAN_CHUNK;
+    if (to > head) to = head;
     const logs = await publicClient.getLogs({
       address: EAS_CONTRACT,
       event: ATTESTED_EVENT,
