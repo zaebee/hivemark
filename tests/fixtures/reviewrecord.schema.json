@@ -135,6 +135,15 @@
   },
   "description": "One Guardian review of one benchmark PR, stored so it can be re-judged.\n\nDeliberately self-sufficient. Phase 1 could re-score 118 reviews with a\nsecond judge, and later correct a scoring bug across all of them, only\nbecause `results.jsonl` happened to keep every finding's full text \u2014 the\nfinder never had to run again. That was luck; here it is a requirement, so\nthe record carries the SHAs it was produced from, the model that produced\nit, and the untruncated findings.\n\nWhat it does NOT carry is any score. Judging is a separate pass over these\nrows, which is what keeps \"re-judge with a different model\" from meaning\n\"re-run the benchmark\".",
   "properties": {
+    "arm": {
+      "default": "graph",
+      "enum": [
+        "graph",
+        "ablated"
+      ],
+      "title": "Arm",
+      "type": "string"
+    },
     "base_sha": {
       "title": "Base Sha",
       "type": "string"
@@ -161,6 +170,10 @@
     },
     "finder_model": {
       "title": "Finder Model",
+      "type": "string"
+    },
+    "finder_provider": {
+      "title": "Finder Provider",
       "type": "string"
     },
     "findings": {
@@ -198,6 +211,18 @@
       "title": "Prompt Tokens",
       "type": "integer"
     },
+    "review_fingerprint": {
+      "title": "Review Fingerprint",
+      "type": "string"
+    },
+    "review_fingerprint_source": {
+      "enum": [
+        "measured",
+        "reconstructed"
+      ],
+      "title": "Review Fingerprint Source",
+      "type": "string"
+    },
     "reviewed_at": {
       "title": "Reviewed At",
       "type": "string"
@@ -223,6 +248,30 @@
       "title": "Skeptic Prompt Tokens",
       "type": "integer"
     },
+    "skeptic_provider": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Skeptic Provider"
+    },
+    "temperature": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Temperature"
+    },
     "url": {
       "title": "Url",
       "type": "string"
@@ -243,6 +292,9 @@
     "duration_s",
     "parse_failed",
     "guardian_sha",
+    "review_fingerprint",
+    "review_fingerprint_source",
+    "finder_provider",
     "reviewed_at"
   ],
   "title": "ReviewRecord",

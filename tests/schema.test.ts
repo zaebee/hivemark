@@ -147,3 +147,56 @@ describe("RawFindingSchema agrees with Guardian's published pydantic contract", 
     expect(RawFindingSchema.safeParse(first.findings[0]).success).toBe(true);
   });
 });
+
+describe("the fields identity is keyed on", () => {
+  const row = (over: Record<string, unknown> = {}): unknown => ({
+    url: "https://github.com/acme/widgets/pull/1",
+    project: "acme",
+    pr_slice: "graph",
+    base_sha: "aaa",
+    head_sha: "bbb",
+    had_graph: true,
+    finder_model: "gemini-2.5-flash",
+    skeptic_model: "gemini-3.5-flash",
+    findings: [],
+    guardian_sha: "d0d807ef",
+    reviewed_at: "2026-08-12T11:27:57+00:00",
+    parse_failed: false,
+    review_fingerprint: "1a2884400bd7",
+    finder_provider: "gemini",
+    skeptic_provider: "gemini",
+    ...over,
+  });
+
+  it("accepts a record carrying all three", () => {
+    expect(ReviewRecordSchema.safeParse(row()).success).toBe(true);
+  });
+
+  it("refuses a record without a fingerprint", () => {
+    // Optional-with-a-fallback was rejected in the spec: a corpus where some
+    // rows key on a fingerprint and some on guardian_sha makes one reviewer
+    // two entities depending on which run it came from.
+    const { review_fingerprint: _drop, ...without } = row() as Record<string, unknown>;
+    expect(ReviewRecordSchema.safeParse(without).success).toBe(false);
+  });
+
+  it("refuses a record without a stated finder provider", () => {
+    const { finder_provider: _drop, ...without } = row() as Record<string, unknown>;
+    expect(ReviewRecordSchema.safeParse(without).success).toBe(false);
+  });
+
+  it("accepts a null skeptic provider, because a skeptic can be absent", () => {
+    expect(
+      ReviewRecordSchema.safeParse(row({ skeptic_model: null, skeptic_provider: null })).success,
+    ).toBe(true);
+  });
+
+  it("accepts a skeptic provider that is absent, because the contract permits it", () => {
+    // Written the other way round first, by analogy with skeptic_model, and the
+    // drift guard caught it: codegraph-brain 0.13.0 requires review_fingerprint
+    // and finder_provider and leaves this one optional. Requiring it would
+    // reject a record the producer is entitled to emit.
+    const { skeptic_provider: _drop, ...without } = row() as Record<string, unknown>;
+    expect(ReviewRecordSchema.safeParse(without).success).toBe(true);
+  });
+});

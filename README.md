@@ -154,10 +154,10 @@ itself is not the same measurement as one awarded by a different model, and the
 ## Drift guard
 
 Both halves of the artifact are published contracts as of `codegraph-brain`
-0.11.0, and both JSON Schemas are vendored and checked in the test suite.
+0.13.0, and both JSON Schemas are vendored and checked in the test suite.
 
 ```bash
-pip install codegraph-brain==0.11.0
+pip install codegraph-brain==0.13.0
 python -c "import json;from cgis.guardian.findings import Finding;\
   print(json.dumps(Finding.model_json_schema(),indent=2,sort_keys=True))" \
   > tests/fixtures/finding.schema.json

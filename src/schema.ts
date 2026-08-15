@@ -54,6 +54,36 @@ export const ReviewRecordSchema = z.object({
   // Required but nullable: null means the skeptic pass did not run, which is a
   // real configuration and the reason a badge can lack a stinger.
   skeptic_model: z.string().nullable(),
+  /**
+   * The digest of the code that actually decides a review — prompts, context
+   * assembly, the selected provider — as opposed to `guardian_sha`, which moves
+   * on any commit at all, including a README edit.
+   *
+   * Required, with no fallback to `guardian_sha`. A corpus where some rows key
+   * on one and some on the other makes a single reviewer appear as two entities
+   * depending on which run it came from, which is worse than either scheme
+   * alone.
+   */
+  review_fingerprint: z.string(),
+  /**
+   * Stated by the producer rather than inferred from a model-name prefix.
+   *
+   * `providerOf` guesses from the name and refuses what it does not recognise,
+   * which stops the pipeline on codellama, mixtral, gemma3, phi4, starcoder2,
+   * granite-code and command-r. The producer knows, and a guess breaks on the
+   * first model whose name does not carry its vendor.
+   */
+  finder_provider: z.string(),
+  /**
+   * Nullable *and* optional, unlike `skeptic_model` directly above it.
+   *
+   * The published contract leaves this one optional — verified against
+   * codegraph-brain 0.13.0, where `review_fingerprint` and `finder_provider` are
+   * required and this is not. Requiring it here would reject a record the
+   * producer is entitled to emit, so the drift guard refuses it and is right to.
+   * `genomeOf` collapses absent and null to the same thing: no skeptic ran.
+   */
+  skeptic_provider: z.string().nullable().optional(),
   had_graph: z.boolean(),
   pr_slice: z.string(),
   parse_failed: z.boolean(),
