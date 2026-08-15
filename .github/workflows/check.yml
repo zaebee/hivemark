@@ -1,0 +1,77 @@
+name: check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# No secrets are used by this workflow, deliberately. `docs/anchoring.md` says
+# no key belongs in CI, and this project has already lost one to a transcript.
+# The step below makes that executable rather than a rule someone remembers.
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out hivemark
+        uses: actions/checkout@v4
+        with:
+          path: hivemark
+
+      # The corpus lives in a sibling checkout, and `corpus.json` resolves its
+      # base relative to the manifest — so CI reproduces the layout rather than
+      # the code learning about CI. codegraph-brain is public; no token.
+      #
+      # Deliberately unpinned. A new .jsonl appearing there fails the manifest
+      # ratchet here, which is the cross-repo alarm that was missing when a
+      # backfill covered 89 of 115 rows and nobody noticed. The cost is that an
+      # upstream commit can redden an unrelated PR; the fix is one line in
+      # corpus.json, and that is a decision rather than a breakage.
+      - name: Check out the corpus
+        uses: actions/checkout@v4
+        with:
+          repository: zaebee/codegraph-brain
+          path: ownima/codegraph-brain
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Refuse to run with a signing key present
+        run: |
+          if [ -n "${HIVEMARK_SIGNING_KEY:-}" ]; then
+            echo "HIVEMARK_SIGNING_KEY is set in CI. It must never be."
+            echo "Attestations are signed by hand; see docs/anchoring.md."
+            exit 1
+          fi
+          echo "no signing key in the environment, as required"
+
+      - name: Install
+        working-directory: hivemark
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck
+        working-directory: hivemark
+        run: bun run typecheck
+
+      - name: Test
+        working-directory: hivemark
+        run: bun run test
+
+      # Proves the pipeline runs end to end without a key, which is the
+      # configuration CI must always be in.
+      #
+      # The key never reaches CI because `.env` is gitignored and a checkout is
+      # fresh — not because the environment is scrubbed. That distinction cost
+      # something once: Bun auto-loads `.env` from the working directory, so
+      # `env -i` does not remove the key locally and a local rehearsal that
+      # relies on it proves nothing. Rehearsed instead in a tree with no `.env`,
+      # where the page is written and attestations.json is not.
+      - name: Build the page with no key
+        working-directory: hivemark
+        run: |
+          bun src/cli.ts corpus.json dist
+          test -f dist/index.html
+          test ! -f dist/attestations.json && echo "nothing was signed, as required"
