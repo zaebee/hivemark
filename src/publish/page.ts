@@ -4,13 +4,34 @@ import { renderHive } from "./hive.js";
 import { shieldsEndpoint } from "./shields.js";
 import type { TrackRecord } from "../types.js";
 
+/**
+ * Shown when the build produced no signed attestations.
+ *
+ * The default is to show it, and that direction is deliberate: a page that
+ * silently omits the caveat when nothing was signed is the failure that
+ * matters, while showing it on a signed build is merely wrong in the harmless
+ * direction. CI builds are always unsigned — the signing key is not in CI and
+ * `check.yml` fails if it ever appears — so the published page is the unsigned
+ * case, permanently.
+ */
+const UNSIGNED =
+  "This page was built without a signing key, so the numbers below carry no " +
+  "attestations and nothing here is independently checkable. Signed runs are " +
+  "made by hand; see docs/anchoring.md.";
+
 const SURVIVORSHIP =
   "Guardian writes no record for a review that fails, so this data is " +
   "survivorship-biased by construction: every track record here is " +
   "systematically optimistic.";
 
-export function renderPage(tracks: TrackRecord[]): string {
+export interface PageOptions {
+  /** Whether this build signed anything. Absent means it did not. */
+  readonly signed?: boolean;
+}
+
+export function renderPage(tracks: TrackRecord[], options: PageOptions = {}): string {
   const notes = [`<p class="note">${esc(SURVIVORSHIP)}</p>`];
+  if (!options.signed) notes.unshift(`<p class="note">${esc(UNSIGNED)}</p>`);
   const divergence = leastOverlapping(tracks);
   if (divergence) notes.push(`<p class="note">${esc(confoundedNote(divergence))}</p>`);
 

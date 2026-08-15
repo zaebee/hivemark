@@ -48,6 +48,20 @@ describe("attestation over the real corpus", () => {
     expect(output.files.has("attestations.json")).toBe(false);
   });
 
+  it("says on the page itself that an unsigned build signed nothing", async () => {
+    // The published page is always this case: the signing key is not in CI and
+    // check.yml fails if it appears. A page that omits the caveat looks exactly
+    // like a signed one, and the numbers on it are equally legible either way.
+    const output = await run(TEXT, { signer: null });
+    expect(output.files.get("index.html")).toContain("built without a signing key");
+  });
+
+  it("makes no such claim when the build did sign", async () => {
+    const signer = loadSigner({ HIVEMARK_SIGNING_KEY: KEY });
+    const output = await run(TEXT, { signer });
+    expect(output.files.get("index.html")).not.toContain("built without a signing key");
+  });
+
   it("attests every claim when a key is present", async () => {
     const signer = loadSigner({ HIVEMARK_SIGNING_KEY: KEY });
     const output = await run(TEXT, { signer });
