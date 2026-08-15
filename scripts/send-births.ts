@@ -18,20 +18,17 @@
  * be handling key material.
  */
 
-import {
-  createPublicClient,
-  createWalletClient,
-  encodeFunctionData,
-  formatEther,
-  http,
-  parseAbiItem,
-  parseEventLogs,
-} from "viem";
-import { privateKeyToAccount } from "viem/accounts";
+import { createPublicClient, encodeFunctionData, http, parseAbiItem, parseEventLogs } from "viem";
 import { base } from "viem/chains";
 import { readFileSync } from "node:fs";
-import { homedir } from "node:os";
-import { join } from "node:path";
+import {
+  GET_SCHEMA_ABI,
+  SCHEMA_REGISTRY,
+  ZERO_UID,
+  refuseUnlessAffordable,
+  signer,
+  stopUnlessSending,
+} from "./wallet.js";
 import { EAS_CONTRACT } from "../src/attest/domain.js";
 import { readCorpus } from "../src/corpus.js";
 import { harvest } from "../src/harvest.js";
@@ -39,9 +36,6 @@ import { loadBirths } from "../src/birth/ledger.js";
 import { corpusSpan, planBirths, type BirthPlan } from "../src/birth/plan.js";
 import { buildBirthRequest } from "../src/birth/submit.js";
 import { BIRTH_SCHEMA_UID } from "../src/birth/schema.js";
-
-const SCHEMA_REGISTRY = "0x4200000000000000000000000000000000000020" as const;
-const ZERO_UID = `0x${"00".repeat(32)}` as const;
 
 /**
  * The transaction that registered `BIRTH_SCHEMA_UID`, recorded in
@@ -55,9 +49,6 @@ const ZERO_UID = `0x${"00".repeat(32)}` as const;
  */
 const SCHEMA_REGISTRATION_TX =
   "0xf9094e8850a9a50b9b68374ef421f779543506a9c4ba404a58945a71950d3952" as const;
-
-/** Where the anchoring key lives. Never inside the repository — see docs/anchoring.md. */
-const KEY_PATH = join(homedir(), ".hivemark", "anchoring.key");
 
 /**
  * Confirmed against real Base logs before being relied on: a scan of the EAS
@@ -98,27 +89,6 @@ const ATTEST_ABI = [
       },
     ],
     outputs: [{ name: "", type: "bytes32" }],
-  },
-] as const;
-
-const GET_SCHEMA_ABI = [
-  {
-    name: "getSchema",
-    type: "function",
-    stateMutability: "view",
-    inputs: [{ name: "uid", type: "bytes32" }],
-    outputs: [
-      {
-        name: "",
-        type: "tuple",
-        components: [
-          { name: "uid", type: "bytes32" },
-          { name: "resolver", type: "address" },
-          { name: "revocable", type: "bool" },
-          { name: "schema", type: "string" },
-        ],
-      },
-    ],
   },
 ] as const;
 
@@ -250,59 +220,28 @@ for (const plan of plans) {
   pending.push({ plan, data, to: request.to });
 }
 
-if (!send) {
-  console.log(`${pending.length} birth(s) ready. nothing was sent.`);
-  if (atEdge > 0) {
-    console.log(
-      `${atEdge} sit${atEdge === 1 ? "s" : ""} on the corpus edge — confirm no earlier review ` +
-        "exists anywhere before broadcasting, because the date is permanent.",
-    );
-  }
-  console.log("re-run with --send to broadcast. that spends money and cannot be undone.");
-  process.exit(0);
-}
+stopUnlessSending(
+  send,
+  `${pending.length} birth(s) ready. nothing was sent.`,
+  atEdge === 0
+    ? []
+    : [
+        `${atEdge} sit${atEdge === 1 ? "s" : ""} on the corpus edge — confirm no earlier review ` +
+          "exists anywhere before broadcasting, because the date is permanent.",
+      ],
+);
 
 // Past this point the key is read and money is spent.
-let key: string;
-try {
-  key = readFileSync(KEY_PATH, "utf8").trim();
-} catch (error) {
-  console.error(`cannot read ${KEY_PATH}: ${(error as Error).message}`);
-  console.error("see docs/anchoring.md — the anchoring key is created once, by hand.");
-  process.exit(1);
-}
-if (!/^0x[0-9a-fA-F]{64}$/.test(key)) {
-  console.error(`${KEY_PATH} does not contain a single 0x-prefixed 32-byte key`);
-  process.exit(1);
-}
-const account = privateKeyToAccount(key as `0x${string}`);
-const wallet = createWalletClient({ account, chain: base, transport: http() });
-
-const balance = await publicClient.getBalance({ address: account.address });
-const gasPrice = await publicClient.getGasPrice();
-let needed = 0n;
-for (const { data, to } of pending) {
-  try {
-    needed += await publicClient.estimateGas({ account: account.address, to, data });
-  } catch (error) {
-    console.error("\ncannot estimate one of the births, so it would fail if sent:");
-    console.error(`  ${(error as Error).message.split("\n")[0]}`);
-    console.error("nothing was sent.");
-    process.exit(1);
-  }
-}
-const cost = needed * gasPrice;
-console.log(`sending from ${account.address}, balance ${formatEther(balance)} ETH`);
-console.log(`${pending.length} transaction(s) need about ${formatEther(cost)} ETH\n`);
-
-// Refuse unless the balance covers all of them. Births go one at a time, so a
-// wallet holding enough for two of three announces two identities and leaves the
-// third unborn — a half-populated hive that looks deliberate.
-if (balance < cost) {
-  console.error(`insufficient balance: ${formatEther(balance)} ETH held, ${formatEther(cost)} ETH needed.`);
-  console.error("fund the address on Base — chain 8453 — and re-run. nothing was sent.");
-  process.exit(1);
-}
+const { account, wallet } = signer();
+await refuseUnlessAffordable(
+  publicClient,
+  account,
+  pending.map(({ plan, data, to }) => ({
+    label: `the birth of ${plan.identity_id}`,
+    to,
+    data,
+  })),
+);
 
 for (const { plan, data, to } of pending) {
   const hash = await wallet.sendTransaction({ to, data, value: 0n });

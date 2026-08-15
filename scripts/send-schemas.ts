@@ -14,23 +14,15 @@
  * process — including by an agent that should not be handling it.
  */
 
-import { createPublicClient, createWalletClient, http, encodeFunctionData, encodePacked, formatEther, keccak256 } from "viem";
-import { privateKeyToAccount } from "viem/accounts";
+import { createPublicClient, http, encodeFunctionData, encodePacked, keccak256 } from "viem";
 import { base } from "viem/chains";
-import { readFileSync } from "node:fs";
-import { homedir } from "node:os";
-import { join } from "node:path";
+import { GET_SCHEMA_ABI, SCHEMA_REGISTRY, ZERO_UID, refuseUnlessAffordable, signer, stopUnlessSending } from "./wallet.js";
 import { ANCHOR_SCHEMA } from "../src/anchor/schema.js";
 import { CLAIM_SCHEMA } from "../src/attest/schema.js";
 import { BIRTH_SCHEMA } from "../src/birth/schema.js";
 
-const SCHEMA_REGISTRY = "0x4200000000000000000000000000000000000020" as const;
 const RESOLVER = "0x0000000000000000000000000000000000000000" as const;
 const REVOCABLE = true;
-const ZERO_UID = `0x${"00".repeat(32)}` as const;
-
-/** Where the anchoring key lives. Never inside the repository — see docs/anchoring.md. */
-const KEY_PATH = join(homedir(), ".hivemark", "anchoring.key");
 
 /**
  * The UIDs the signed attestations name, as literals.
@@ -56,27 +48,6 @@ const REGISTER_ABI = [
       { name: "revocable", type: "bool" },
     ],
     outputs: [{ name: "", type: "bytes32" }],
-  },
-] as const;
-
-const GET_SCHEMA_ABI = [
-  {
-    name: "getSchema",
-    type: "function",
-    stateMutability: "view",
-    inputs: [{ name: "uid", type: "bytes32" }],
-    outputs: [
-      {
-        name: "",
-        type: "tuple",
-        components: [
-          { name: "uid", type: "bytes32" },
-          { name: "resolver", type: "address" },
-          { name: "revocable", type: "bool" },
-          { name: "schema", type: "string" },
-        ],
-      },
-    ],
   },
 ] as const;
 
@@ -141,61 +112,18 @@ if (pending.length === 0) {
   process.exit(0);
 }
 
-if (!send) {
-  console.log(`${pending.length} transaction(s) ready. nothing was sent.`);
-  console.log("re-run with --send to broadcast. that spends money and cannot be undone.");
-  process.exit(0);
-}
+stopUnlessSending(send, `${pending.length} transaction(s) ready. nothing was sent.`);
 
 // Past this point the key is read and money is spent.
-let key: string;
-try {
-  key = readFileSync(KEY_PATH, "utf8").trim();
-} catch (error) {
-  // A missing key file is the ordinary state on a fresh checkout, not a crash.
-  console.error(`cannot read ${KEY_PATH}: ${(error as Error).message}`);
-  console.error("see docs/anchoring.md — the anchoring key is created once, by hand.");
-  process.exit(1);
-}
-if (!/^0x[0-9a-fA-F]{64}$/.test(key)) {
-  console.error(`${KEY_PATH} does not contain a single 0x-prefixed 32-byte key`);
-  process.exit(1);
-}
-const account = privateKeyToAccount(key as `0x${string}`);
-const wallet = createWalletClient({ account, chain: base, transport: http() });
-
-const balance = await publicClient.getBalance({ address: account.address });
-console.log(`sending from ${account.address}, balance ${formatEther(balance)} ETH`);
-
-// Refuse when the balance cannot cover everything pending, rather than when it
-// is zero. Sends happen one at a time, so a wallet holding enough for two of
-// three fails partway and leaves a half-registered set behind — the outcome the
-// all-or-nothing UID check above exists to avoid, reached through funding
-// instead of through drift. One wei and zero fail identically, so zero is not
-// the interesting threshold.
-const gasPrice = await publicClient.getGasPrice();
-let needed = 0n;
-for (const { name, data } of pending) {
-  try {
-    needed += await publicClient.estimateGas({ account: account.address, to: SCHEMA_REGISTRY, data });
-  } catch (error) {
-    // An estimate that reverts means this transaction would revert, so stopping
-    // here costs nothing and saves the gas. `0x23369fa6` is `AlreadyExists()`,
-    // which the pre-flight check above should have caught — seeing it here means
-    // the registry changed under us between the two reads.
-    console.error(`\ncannot estimate the ${name} registration, so it would fail if sent:`);
-    console.error(`  ${(error as Error).message.split("\n")[0]}`);
-    console.error("nothing was sent.");
-    process.exit(1);
-  }
-}
-const cost = needed * gasPrice;
-console.log(`${pending.length} transaction(s) need about ${formatEther(cost)} ETH at ${gasPrice} wei/gas\n`);
-if (balance < cost) {
-  console.error(`insufficient balance: ${formatEther(balance)} ETH held, ${formatEther(cost)} ETH needed.`);
-  console.error("fund the address on Base — chain 8453 — and re-run. nothing was sent.");
-  process.exit(1);
-}
+const { account, wallet } = signer();
+await refuseUnlessAffordable(
+  publicClient,
+  account,
+  // `0x23369fa6` is `AlreadyExists()`, which the pre-flight check above should
+  // have caught — seeing it from an estimate means the registry changed under us
+  // between the two reads.
+  pending.map(({ name, data }) => ({ label: `the ${name} registration`, to: SCHEMA_REGISTRY, data })),
+);
 
 for (const { name, data, uid } of pending) {
   const hash = await wallet.sendTransaction({ to: SCHEMA_REGISTRY, data, value: 0n });
