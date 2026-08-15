@@ -1,0 +1,103 @@
+name: pages
+
+# Actions are pinned to commit SHAs rather than tags, for the reason spelled out
+# in check.yml: a tag can be moved to point at different code, a SHA cannot. The
+# trailing comment names the version so a human can read what is pinned.
+
+on:
+  push:
+    branches: [main]
+  # So a corpus change upstream can be published without an empty commit here.
+  workflow_dispatch:
+
+# `pages: write` and `id-token: write` are what the deploy needs and the whole
+# of what this job may do. `contents: read` stays read — nothing here writes to
+# the repository.
+#
+# What is deliberately absent is any secret. The page is built with no signing
+# key, so it carries no attestations; see the note it prints about itself.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deployment at a time, and a newer commit wins. `cancel-in-progress: false`
+# would queue a stale build behind a fresh one and publish it second.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out hivemark
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          path: hivemark
+
+      # The same sibling layout check.yml uses: `corpus.json` resolves its base
+      # relative to the manifest, so CI reproduces the layout rather than the
+      # code learning about CI. Deliberately unpinned, so a new .jsonl upstream
+      # trips the manifest ratchet here too.
+      - name: Check out the corpus
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: zaebee/codegraph-brain
+          path: ownima/codegraph-brain
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: latest
+
+      # Repeated from check.yml rather than shared. This job has `pages: write`,
+      # so it publishes; if a signing key ever did reach CI, this is the workflow
+      # where the damage would be public. A guard that only exists in the other
+      # file would not run here.
+      - name: Refuse to run with a signing key present
+        run: |
+          if [ -n "${HIVEMARK_SIGNING_KEY:-}" ]; then
+            echo "HIVEMARK_SIGNING_KEY is set in CI. It must never be."
+            echo "Attestations are signed by hand; see docs/anchoring.md."
+            exit 1
+          fi
+          echo "no signing key in the environment, as required"
+
+      - name: Install
+        working-directory: hivemark
+        run: bun install --frozen-lockfile --ignore-scripts
+
+      - name: Build the page
+        working-directory: hivemark
+        run: bun src/cli.ts corpus.json dist
+
+      # Publishing a signed artifact from CI would mean a key reached it. The
+      # guard above should have caught that already; this catches the case where
+      # it did not, at the last moment before the bytes leave the runner.
+      - name: Refuse to publish anything signed
+        working-directory: hivemark
+        run: |
+          if [ -f dist/attestations.json ]; then
+            echo "dist/attestations.json exists, so this build signed something."
+            echo "Refusing to publish it."
+            exit 1
+          fi
+          test -f dist/index.html
+          grep -q "built without a signing key" dist/index.html
+          echo "page built, unsigned, and says so"
+
+      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: hivemark/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0

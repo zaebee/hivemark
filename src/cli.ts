@@ -9,6 +9,7 @@ import { nonEmptyLines, readCorpus } from "./corpus.js";
 import { deriveTrackRecords } from "./derive.js";
 import { harvest } from "./harvest.js";
 import { renderPage } from "./publish/page.js";
+import { removeStale } from "./publish/stale.js";
 import { shieldsEndpoint } from "./publish/shields.js";
 import type { TrackRecord } from "./types.js";
 
@@ -30,7 +31,6 @@ export async function run(text: string, options: RunOptions = {}): Promise<RunOu
   const tracks = deriveTrackRecords(records);
   const files = new Map<string, string>();
 
-  files.set("index.html", renderPage(tracks));
   for (const track of tracks) {
     const short = track.identity_id.slice(2, 14);
     files.set(`badge-${short}.json`, `${JSON.stringify(shieldsEndpoint(track), null, 2)}\n`);
@@ -47,6 +47,10 @@ export async function run(text: string, options: RunOptions = {}): Promise<RunOu
     }
     files.set("attestations.json", `${JSON.stringify(attestations, null, 2)}\n`);
   }
+
+  // Written last, because whether anything was signed is only known by now and
+  // the page says so out loud.
+  files.set("index.html", renderPage(tracks, { signed: attestations.length > 0 }));
 
   return { tracks, files, warnings, attestations };
 }
@@ -72,6 +76,11 @@ async function main(): Promise<void> {
   mkdirSync(outDir, { recursive: true });
   for (const [name, body] of output.files) writeFileSync(join(outDir, name), body, "utf8");
 
+  // Sidecars for identities that no longer exist would otherwise stay forever.
+  // `provenance.json` is written below rather than through `output.files`, so it
+  // has to be named here or every run would delete the previous one's.
+  const stale = removeStale(outDir, new Set([...output.files.keys(), "provenance.json"]));
+
   // Provenance travels with the artifact, because the terminal does not.
   // `attestations.json` is the input to anchoring, and by then nobody remembers
   // which file produced it; a digest is what lets a later reader tell whether
@@ -91,6 +100,7 @@ async function main(): Promise<void> {
   writeFileSync(join(outDir, "provenance.json"), `${JSON.stringify(provenance, null, 2)}\n`, "utf8");
 
   for (const warning of output.warnings) console.warn(`warning: ${warning}`);
+  for (const name of stale) console.log(`removed stale ${name}`);
   console.log(`source ${source} — ${provenance.lines} records, sha256 ${provenance.sha256.slice(0, 12)}…`);
   if (corpus) {
     for (const f of corpus.files) {

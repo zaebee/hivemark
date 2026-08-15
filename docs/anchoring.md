@@ -245,6 +245,48 @@ surviving identities.
 preserved outside `dist/`, which the pipeline overwrites. Concatenate the two
 arrays and pass the result to `planAnchor`; the dry run will report 1864.
 
+### The root this week must produce
+
+```
+period   2026-W33          2026-08-10T00:00Z … 2026-08-17T00:00Z
+leaves   1864
+root     0xddccdfaf5164921bd5ba217fb7b6daffdc98b7b5ff3e12624bf8927ade961df9
+```
+
+Computed on 2026-08-15 by planning the anchor at the first instant the guard
+permits — `planAnchor` takes `now` as a parameter, so the week's contents can be
+previewed without waiting for it to end or weakening the guard.
+
+Pinned here for the same reason the schema UIDs are: **a different root on the
+day means something changed**, and the difference must be understood before
+anything is broadcast, not after. The root is stable under reordering (it is
+taken over a sorted set), one member from each generation proves into it in 11
+steps, a uid outside the set is refused at proof time, and a real member against
+a one-nibble-altered root fails — all four checked, including the two negative
+controls, because a proof checker that only ever sees valid input proves
+nothing.
+
+### Generation 1 is reproducible, and this was verified
+
+Attestation UIDs are deterministic: EAS's Version2 format defaults to a random
+salt, and `attest.ts` passes `claim_hash` instead precisely so that a claim
+which has not changed keeps its UID. So the preserved file is a convenience, not
+a single point of failure — but that was worth demonstrating rather than
+reasoning about, given a permanent root is derived from it.
+
+Regenerated from the last commit before the genome changed, in a throwaway
+worktree, with the same signing key:
+
+```bash
+git worktree add --detach /tmp/g1-tree 6cb08e5   # docs: ... phase 1 (#42)
+cp .env /tmp/g1-tree/.env                        # the signing key, briefly
+cd /tmp/g1-tree && bun install && bun src/cli.ts <corpus.json> /tmp/g1-out
+```
+
+All 932 UIDs matched the preserved file exactly. **Delete that copied `.env` and
+remove the worktree afterwards** — it puts the signing key outside its usual
+home, which is the situation this runbook otherwise exists to prevent.
+
 Expect the superseded count to be large — 560 of the 1864, across 32
 re-reviewed commits. That is not a defect: the two generations attribute the
 same findings to different identities, and collapsing eight identities into
