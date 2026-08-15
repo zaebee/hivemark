@@ -22,30 +22,14 @@ function runCli(ledger: string): { status: number; stdout: string; stderr: strin
  * the entry point's behaviour is part of what is under test.
  */
 describe("cli-birth", () => {
-  // Skipped until phase 2 registers birth schema 2, not deleted.
-  //
-  // encodeBirth refuses genome 2 because birth schema 1 has one provider field
-  // where the genome has two, so a record encoded against it could not be
-  // rebuilt into the genome it names. These two tests describe what the CLI
-  // does once that is fixed, and the fix is one line — removing `.skip` — so
-  // keeping them is cheaper and more honest than deleting a description nobody
-  // would remember to restore. The refusal itself is asserted above.
-  it.skip("lists every identity when the ledger is empty", () => {
+  it("lists every identity when the ledger is empty", () => {
     const { status, stdout } = runCli("[]");
     expect(status).toBe(0);
-    expect(stdout).toContain("3 identities to announce");
+    expect(stdout).toContain("2 identities to announce");
     expect(stdout).toContain("nothing was sent");
   });
 
-  // Skipped until phase 2 registers birth schema 2, not deleted.
-  //
-  // encodeBirth refuses genome 2 because birth schema 1 has one provider field
-  // where the genome has two, so a record encoded against it could not be
-  // rebuilt into the genome it names. These two tests describe what the CLI
-  // does once that is fixed, and the fix is one line — removing `.skip` — so
-  // keeping them is cheaper and more honest than deleting a description nobody
-  // would remember to restore. The refusal itself is asserted above.
-  it.skip("prints a genome and a first-seen date drawn from the reviews", () => {
+  it("prints a genome and a first-seen date drawn from the reviews", () => {
     const { stdout } = runCli("[]");
     expect(stdout).toMatch(/genome\s+gemini · (graph|diff-only)/);
     // The corpus was reviewed on 2026-08-12; a wall-clock date would not match.

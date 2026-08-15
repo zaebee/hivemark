@@ -9,10 +9,10 @@
  *   bun scripts/plate.ts <out.html> [reviews.jsonl]
  */
 
-import { readFileSync, writeFileSync } from "node:fs";
+import { writeFileSync } from "node:fs";
+import { readCorpus } from "../src/corpus.js";
 import { avatarSvg } from "../src/avatar.js";
 import { deriveTrackRecords } from "../src/derive.js";
-import { genomeOf, providerOf } from "../src/genome.js";
 import { vocabularyOf } from "../src/breed/vocabulary.js";
 import { harvest } from "../src/harvest.js";
 import { identityId } from "../src/identity.js";
@@ -23,20 +23,34 @@ import { DRIVEN_BY, characterMm } from "../src/variation.js";
 const KNOWN_FIELDS = [
   "context_mode",
   "finder_model",
-  "guardian_version",
-  "provider",
+  "finder_provider",
+  "review_fingerprint",
   "skeptic_model",
+  "skeptic_provider",
 ] as const;
+
+/**
+ * The vendor a model name belongs to.
+ *
+ * A prefix table like this one used to live in `src/genome.ts` and decide
+ * identity; it was deleted because guessing a vendor from a name refuses models
+ * whose name does not carry one, and the producer states it instead. Here it
+ * decides nothing — these genomes never ran, so no record states anything about
+ * them, and a wrong guess costs a colour on a study page.
+ */
+const familyOf = (model: string): string =>
+  model.startsWith("gemini") ? "gemini" : model.startsWith("mistral") ? "mistral" : "ollama";
 
 /** A genome that has never been run, built only to exercise the trait space. */
 function hypothetical(over: Partial<Genome> & Pick<Genome, "finder_model">): Genome {
   return {
-    schema_version: 1,
+    schema_version: 2,
     known_fields: KNOWN_FIELDS,
-    provider: providerOf(over.finder_model),
+    finder_provider: familyOf(over.finder_model),
+    skeptic_provider: null,
     skeptic_model: null,
     context_mode: "diff-only",
-    guardian_version: "d0d807ef01c556b882dc85b9fc0d2851d92aa1e5",
+    review_fingerprint: "1a2884400bd7",
     ...over,
   } as Genome;
 }
@@ -51,15 +65,20 @@ function hypothetical(over: Partial<Genome> & Pick<Genome, "finder_model">): Gen
  * Not in `src/` on purpose: breeding is milestone 2, and this is the study that
  * decides its shape. `avatarSvg` is the part under test here, and that is real.
  */
-const TRAITS = ["finder_model", "skeptic_model", "context_mode", "guardian_version"] as const;
+const TRAITS = ["finder_model", "skeptic_model", "context_mode", "review_fingerprint"] as const;
 
 function breed(a: Genome, b: Genome, mask: number): Genome {
-  const child: Record<string, unknown> = { schema_version: 1, known_fields: KNOWN_FIELDS };
+  const child: Record<string, unknown> = { schema_version: 2, known_fields: KNOWN_FIELDS };
   TRAITS.forEach((trait, i) => {
     child[trait] = (mask >> i) & 1 ? a[trait] : b[trait];
   });
-  child.provider = providerOf(child.finder_model as string);
-  return child as Genome;
+  // A crossed configuration has never run, so nothing states its providers.
+  // Derived from the models it inherited rather than carried across, or a child
+  // could claim one vendor while holding another's finder.
+  child.finder_provider = familyOf(child.finder_model as string);
+  child.skeptic_provider =
+    child.skeptic_model === null ? null : familyOf(child.skeptic_model as string);
+  return child as unknown as Genome;
 }
 
 const esc = (v: string): string =>
@@ -68,8 +87,12 @@ const esc = (v: string): string =>
 const short = (v: string | null): string => (v ? v.slice(0, 8) : "—");
 
 // ---------------------------------------------------------------- real data
-const source = process.argv[3] ?? "tests/fixtures/martian-reviews.sample.jsonl";
-const { records, warnings } = harvest(readFileSync(source, "utf8"));
+// Takes a manifest or a single .jsonl, the same as the pipeline — the plate
+// studies what the trait system can express, so it needs the real corpus rather
+// than a sample. The sample now yields two identities and Plate IV crosses
+// three, which is how this surfaced.
+const source = process.argv[3] ?? "corpus.json";
+const { records, warnings } = harvest(readCorpus(source).text);
 for (const w of warnings) console.warn(`warning: ${w}`);
 
 const tracks = deriveTrackRecords(records).sort((a, b) => b.reviews - a.reviews);
@@ -97,16 +120,16 @@ if (tracks.length < 3) {
  * `vocabularyOf` already answers this by `reviewed_at`, and answering it twice
  * is how the two answers start to differ.
  */
-const newestGuardian = vocabularyOf(records).newestGuardian;
+const newestFingerprint = vocabularyOf(records).newestFingerprint;
 
 const named = (t: TrackRecord): string =>
-  `${t.genome.context_mode} · ${t.genome.guardian_version === newestGuardian ? "current" : "older"} Guardian`;
+  `${t.genome.context_mode} · ${t.genome.review_fingerprint === newestFingerprint ? "current" : "older"} review path`;
 
 // ------------------------------------------------------------ hypotheticals
 const HYPO: ReadonlyArray<{ name: string; genome: Genome }> = [
   { name: "ollama · local, graph", genome: hypothetical({ finder_model: "qwen2.5-coder:7b", skeptic_model: "qwen2.5-coder:7b", context_mode: "graph" }) },
   { name: "mistral · no skeptic", genome: hypothetical({ finder_model: "mistral-medium-latest" }) },
-  { name: "ollama · bare diff, no skeptic", genome: hypothetical({ finder_model: "llama3.1:70b", guardian_version: "1ecd9629f46cab10b907dae285d0f58b0eef5e21" }) },
+  { name: "ollama · bare diff, no skeptic", genome: hypothetical({ finder_model: "llama3.1:70b", review_fingerprint: "eebfdf98419c" }) },
 ];
 
 // --------------------------------------------------------------- morphology
@@ -180,11 +203,12 @@ const CROSSES = [
 // --------------------------------------------------------------- rendering
 function genomeRows(g: Genome, extra = ""): string {
   return `<dl>
-<dt>provider</dt><dd>${esc(g.provider)}</dd>
+<dt>finder provider</dt><dd>${esc(g.finder_provider)}</dd>
+<dt>skeptic provider</dt><dd>${g.skeptic_provider ? esc(g.skeptic_provider) : '<span class="none">none</span>'}</dd>
 <dt>finder</dt><dd>${esc(g.finder_model)}</dd>
 <dt>skeptic</dt><dd>${g.skeptic_model ? esc(g.skeptic_model) : '<span class="none">none</span>'}</dd>
 <dt>context</dt><dd>${esc(g.context_mode)}</dd>
-<dt>guardian</dt><dd>${esc(short(g.guardian_version))}</dd>
+<dt>review path</dt><dd>${esc(short(g.review_fingerprint))}</dd>
 ${extra}</dl>`;
 }
 
@@ -217,7 +241,7 @@ const crossBlocks = CROSSES.map((c) => {
       const value = child[t] === null ? "none" : String(child[t]).slice(0, 16);
       return `<span class="chip">${t} <b>← ${from}</b> ${esc(value)}</span>`;
     }).join("") +
-    `<span class="chip">provider <b>← ${esc(child.provider)}</b> follows finder</span>`;
+    `<span class="chip">finder provider <b>← ${esc(child.finder_provider)}</b> follows finder</span>`;
 
   return `<div class="cross">
 <figure>${avatarSvg(c.a.genome, 130)}<figcaption>A · ${esc(c.a.name)}</figcaption></figure>

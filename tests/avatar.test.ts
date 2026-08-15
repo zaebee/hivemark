@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { avatarSvg } from "../src/avatar.js";
-import { providerOf } from "../src/genome.js";
 import { paletteFor, UNJUDGED } from "../src/palette.js";
 import type { Genome } from "../src/types.js";
+
+/** The vendor a model name belongs to, for building fixtures only. */
+const familyOf = (model: string): string =>
+  model.startsWith("gemini") ? "gemini" : model.startsWith("mistral") ? "mistral" : "ollama";
+
 
 const base: Genome = {
   schema_version: 1,
@@ -172,17 +176,31 @@ describe("the renderer draws the measured animal", () => {
   });
 });
 
-describe("finder_provider is derived, not trusted", () => {
-  it("reads the palette from finder_model when finder_provider disagrees", () => {
-    // finder_provider is an expression of finder_model. A genome carrying a mistral
-    // finder must render as mistral even if the field says otherwise — the
-    // crossbreeding study produced exactly this inconsistency.
-    const lying = { ...base, finder_provider: "gemini" as const, finder_model: "mistral-medium-latest" };
-    const honest = { ...base, finder_provider: "mistral" as const, finder_model: "mistral-medium-latest" };
-    // Same picture; different identities, because the genomes differ. The clip
-    // id follows identity, so only the drawing is compared here.
-    expect(drawing(avatarSvg(lying))).toBe(drawing(avatarSvg(honest)));
-    expect(avatarSvg(lying)).not.toBe(avatarSvg(honest));
+describe("the provider is read, not derived", () => {
+  it("paints from the stated provider, not from the model name", () => {
+    // The reverse of what this asserted until the prefix table was deleted.
+    // Deriving the palette from the model name meant guessing a vendor, and the
+    // guess refused codellama, mixtral, gemma3 and four others outright. The
+    // producer states it now, so two genomes with the same finder model and
+    // different stated providers are different reviewers and look it.
+    const asGemini = { ...base, finder_provider: "gemini", finder_model: "mistral-medium-latest" };
+    const asMistral = { ...base, finder_provider: "mistral", finder_model: "mistral-medium-latest" };
+    expect(drawing(avatarSvg(asGemini))).not.toBe(drawing(avatarSvg(asMistral)));
+  });
+
+  it("renders a model the old prefix table would have refused", () => {
+    // The whole of #15: providerOf("codellama:13b") threw and stopped the
+    // pipeline, because "codellama" does not start with "llama".
+    const exotic = {
+      ...base,
+      finder_provider: "ollama",
+      finder_model: "codellama:13b",
+      skeptic_provider: "anthropic",
+      skeptic_model: "claude-sonnet-5",
+    };
+    const svg = avatarSvg(exotic);
+    expect(svg).toContain(paletteFor("ollama").body);
+    expect(svg).toContain(paletteFor("anthropic").body);
   });
 
   it("scopes its clip id to the identity so inlined bees cannot collide", () => {
@@ -195,20 +213,28 @@ describe("finder_provider is derived, not trusted", () => {
     expect(idOf(avatarSvg({ ...base }))).toBe(idOf(a));
   });
 
-  it("refuses a model it cannot place", () => {
-    expect(() => avatarSvg({ ...base, finder_model: "gpt-4o" })).toThrow(/unrecognised model/i);
+  it("no longer refuses a model it cannot place, because it no longer places any", () => {
+    // This asserted a throw until the prefix table was deleted. gpt-4o was
+    // unclassifiable and therefore fatal; now the producer says which vendor it
+    // is and the renderer takes its word.
+    expect(() => avatarSvg({ ...base, finder_provider: "openai", finder_model: "gpt-4o" })).not.toThrow();
   });
 });
 
 describe("the bee wears its judge", () => {
   const withSkeptic = (finder: string, skeptic: string | null): Genome => ({
     ...base,
-    finder_provider: providerOf(finder),
+    finder_provider: familyOf(finder),
+    // Set explicitly, not inherited from `base`. The palette reads this field
+    // now rather than deriving it from the model, so a helper that left it
+    // behind would paint every abdomen with base's provider and quietly make
+    // the two-toned assertions meaningless.
+    skeptic_provider: skeptic === null ? null : familyOf(skeptic),
     finder_model: finder,
     skeptic_model: skeptic,
   });
 
-  it("is two-toned when another finder_provider judged it", () => {
+  it("is two-toned when another provider judged it", () => {
     const svg = avatarSvg(withSkeptic("gemini-2.5-flash", "mistral-medium-latest"));
     const head = paletteFor("gemini").body;
     const abdomen = paletteFor("mistral").body;

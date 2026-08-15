@@ -1,6 +1,5 @@
 import { bodyPlan, DRAWING, type BodyPlan } from "./body.js";
 import { esc } from "./escape.js";
-import { providerOf } from "./genome.js";
 import { identityId } from "./identity.js";
 import { paletteFor, UNJUDGED, type Palette } from "./palette.js";
 import type { Genome } from "./types.js";
@@ -122,7 +121,7 @@ function stinger(plan: BodyPlan): string {
  * actually doing the finding.
  */
 export function avatarSvg(genome: Genome, size = 120): string {
-  const finder = paletteFor(providerOf(genome.finder_model));
+  const finder = paletteFor(genome.finder_provider);
 
   // Head, thorax and wings from the finder; abdomen from whoever judged it.
   // `DRIVEN_BY` already gives the head to `finder_model` and the abdomen to
@@ -131,7 +130,7 @@ export function avatarSvg(genome: Genome, size = 120): string {
   // of the same provider yields the same palette, so a self-graded bee comes out
   // one colour without anything testing for it.
   const skeptic =
-    genome.skeptic_model === null ? UNJUDGED : paletteFor(providerOf(genome.skeptic_model));
+    genome.skeptic_provider === null ? UNJUDGED : paletteFor(genome.skeptic_provider);
   const plan = bodyPlan(genome);
 
   // Scoped to the identity, not to a trait: several bees are inlined into one
@@ -144,10 +143,10 @@ export function avatarSvg(genome: Genome, size = 120): string {
   let judged: string;
   if (genome.skeptic_model === null) judged = "judged by nobody";
   else if (genome.skeptic_model === genome.finder_model) judged = "grading its own work";
-  else judged = `judged by ${providerOf(genome.skeptic_model)}`;
+  else judged = `judged by ${genome.skeptic_provider ?? "another model"}`;
 
   const label =
-    `${providerOf(genome.finder_model)} reviewer, ` + `${genome.context_mode} context, ` + judged;
+    `${genome.finder_provider} reviewer, ` + `${genome.context_mode} context, ` + judged;
 
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" ` +

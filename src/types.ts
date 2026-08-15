@@ -1,4 +1,3 @@
-export type Provider = "gemini" | "mistral" | "ollama";
 
 /**
  * `unresolved` is hivemark's own state, not Guardian's.
@@ -18,9 +17,11 @@ export interface Genome {
    * already avoided by giving the head to the finder and the abdomen to the
    * skeptic.
    *
-   * `string` rather than the `Provider` union, deliberately. The union exists so
-   * `providerOf` can refuse a model name it cannot classify; a provider the
-   * producer states needs no such guess.
+   * Plain `string`. There was a `Provider` union whose purpose was to let a
+   * prefix table refuse a model name it could not classify — which stopped the
+   * pipeline on codellama, mixtral, gemma3 and four others. A provider the
+   * producer states needs no such guess, so both the union and the table are
+   * gone.
    */
   readonly finder_provider: string;
   readonly skeptic_provider: string | null;

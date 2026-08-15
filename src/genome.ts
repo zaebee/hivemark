@@ -1,5 +1,5 @@
 import type { ReviewRecord } from "./schema.js";
-import type { Genome, Provider } from "./types.js";
+import type { Genome } from "./types.js";
 
 /**
  * Bump when the genome's field set changes.
@@ -10,30 +10,6 @@ import type { Genome, Provider } from "./types.js";
  * the fact.
  */
 export const GENOME_SCHEMA_VERSION = 2;
-
-const PROVIDER_PREFIXES: ReadonlyArray<readonly [string, Provider]> = [
-  ["gemini-", "gemini"],
-  ["mistral-", "mistral"],
-  ["qwen", "ollama"],
-  ["llama", "ollama"],
-  ["deepseek", "ollama"],
-];
-
-/**
- * Map a model name to its provider.
- *
- * Throws on an unknown name. An "other" bucket would merge genuinely different
- * reviewers into one identity, silently and irreversibly.
- */
-export function providerOf(model: string): Provider {
-  const lower = model.toLowerCase();
-  for (const [prefix, provider] of PROVIDER_PREFIXES) {
-    if (lower.startsWith(prefix)) return provider;
-  }
-  throw new Error(
-    `unrecognised model "${model}" — add it to PROVIDER_PREFIXES rather than bucketing it`,
-  );
-}
 
 /** Fields this version populates, sorted so the value itself is stable. */
 const KNOWN_FIELDS = [
@@ -66,7 +42,7 @@ const KNOWN_FIELDS = [
  * ollama tags can be case-sensitive — and the genome's `finder_model` is
  * published verbatim in a birth attestation. Normalising the case of an
  * identifier for storage risks a permanent record naming a model that cannot be
- * resolved. Comparison is a different matter: `providerOf` above and `judgeOf`
+ * resolved. Comparison is a different matter: `judgeOf`
  * in `derive.ts` both compare case-insensitively, which is free because neither
  * stores the result.
  */
@@ -88,10 +64,11 @@ export function genomeOf(record: ReviewRecord): Genome {
   return {
     schema_version: GENOME_SCHEMA_VERSION,
     known_fields: KNOWN_FIELDS,
-    // Read, not derived. `providerOf` guesses from a model-name prefix and
-    // refuses what it cannot classify, which stops the pipeline on codellama,
-    // mixtral, gemma3 and four others. The producer states this now, and a guess
-    // breaks on the first model whose name does not carry its vendor.
+    // Read, never derived. A prefix table used to guess this from the model
+    // name and refuse what it could not classify, which stopped the pipeline on
+    // codellama, mixtral, gemma3 and four others. The producer states it now,
+    // and a guess breaks on the first model whose name does not carry its
+    // vendor.
     finder_provider: exactly(record.finder_provider, "finder_provider"),
     // Absent and null both mean no skeptic ran. The published contract leaves
     // this field optional while requiring `finder_provider`, so absent is a

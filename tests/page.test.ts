@@ -105,9 +105,16 @@ describe("renderPage", () => {
     expect(html).toContain("&lt;script&gt;");
   });
 
-  it("refuses to render a reviewer whose model cannot be placed", () => {
-    const unplaceable = make({ genome: { ...make().genome, finder_model: "gpt-4o" } });
-    expect(() => renderPage([unplaceable])).toThrow(/unrecognised model/i);
+  it("renders a reviewer the old prefix table could not place", () => {
+    // The reverse of what this asserted. A page refusing to render because a
+    // model name did not match a prefix was #15 reaching the publishing layer:
+    // gpt-4o was unclassifiable and therefore fatal. The producer states the
+    // provider now, and an unfamiliar model is just an unfamiliar model.
+    const exotic = make({
+      genome: { ...make().genome, finder_provider: "openai", finder_model: "gpt-4o" },
+    });
+    expect(() => renderPage([exotic])).not.toThrow();
+    expect(renderPage([exotic])).toContain("openai");
   });
 });
 

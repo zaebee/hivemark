@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { harvest } from "../src/harvest.js";
-import { genomeOf, providerOf } from "../src/genome.js";
+import { genomeOf } from "../src/genome.js";
 import { identityId } from "../src/identity.js";
 import type { ReviewRecord } from "../src/schema.js";
 
@@ -9,15 +9,14 @@ const records = harvest(
   readFileSync("tests/fixtures/martian-reviews.sample.jsonl", "utf8"),
 ).records;
 
-describe("providerOf", () => {
-  it("maps known model prefixes", () => {
-    expect(providerOf("gemini-2.5-flash")).toBe("gemini");
-    expect(providerOf("mistral-medium-latest")).toBe("mistral");
-    expect(providerOf("qwen2.5-coder:7b")).toBe("ollama");
-  });
-
-  it("refuses an unrecognised model rather than bucketing it", () => {
-    expect(() => providerOf("gpt-4o")).toThrow(/unrecognised model/i);
+describe("the provider guess is gone", () => {
+  it("no longer exports providerOf", async () => {
+    // #15 existed because providerOf refused codellama, mixtral, gemma3, phi4,
+    // starcoder2, granite-code and command-r — stopping the pipeline on models
+    // the producer could have named. The producer names them now, so the table
+    // and its refusal are deleted rather than extended.
+    const genome = await import("../src/genome.js");
+    expect(genome).not.toHaveProperty("providerOf");
   });
 });
 
