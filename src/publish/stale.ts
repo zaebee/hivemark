@@ -1,5 +1,6 @@
 import { readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
+import { byCodeUnit } from "../canonical.js";
 
 /**
  * The filenames this tool produces, and therefore the only ones it may delete.
@@ -32,5 +33,10 @@ export function removeStale(outDir: string, produced: ReadonlySet<string>): stri
     rmSync(join(outDir, name));
     removed.push(name);
   }
-  return removed.sort();
+  // An explicit comparator, but `byCodeUnit` rather than `localeCompare`: this
+  // project sorts by code unit everywhere, because locale-aware collation varies
+  // with whatever ICU data the runtime carries and one of these orderings
+  // decides a Merkle root. Two spellings of "sorted" in one codebase is how the
+  // wrong one ends up somewhere that matters.
+  return removed.sort(byCodeUnit);
 }

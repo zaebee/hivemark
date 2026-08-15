@@ -54,6 +54,17 @@ describe("removeStale", () => {
     expect(removeStale(dir, new Set(["index.html"]))).toEqual(["attestations.json"]);
   });
 
+  it("does not claim an uppercase-hex file as its own", () => {
+    // Filenames come from `identity_id`, which is a keccak hash and therefore
+    // lowercase from viem — unlike `entity`, which is a checksummed address and
+    // genuinely mixed-case. Matching case-insensitively would widen this
+    // function's authority to delete files it never wrote, for the sake of a
+    // name it cannot produce.
+    put("avatar-ABCDEF123456.svg", "badge-ABCDEF123456.json");
+    expect(removeStale(dir, new Set())).toEqual([]);
+    expect(readdirSync(dir)).toHaveLength(2);
+  });
+
   it("reports nothing for an empty directory", () => {
     // The first run into a fresh directory, and the degenerate case for a
     // function whose whole job is deciding what to delete.

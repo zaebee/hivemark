@@ -10,16 +10,14 @@ on:
   # So a corpus change upstream can be published without an empty commit here.
   workflow_dispatch:
 
-# `pages: write` and `id-token: write` are what the deploy needs and the whole
-# of what this job may do. `contents: read` stays read — nothing here writes to
-# the repository.
+# Nothing at workflow level, so a job gets only what it names. The build job
+# runs `bun install` over hundreds of packages and must not be able to publish;
+# only `deploy` needs to, and it does nothing else.
 #
-# What is deliberately absent is any secret. The page is built with no signing
-# key, so it carries no attestations; see the note it prints about itself.
-permissions:
-  contents: read
-  pages: write
-  id-token: write
+# What is deliberately absent throughout is any secret. The page is built with
+# no signing key, so it carries no attestations; see the note it prints about
+# itself.
+permissions: {}
 
 # One deployment at a time, and a newer commit wins. `cancel-in-progress: false`
 # would queue a stale build behind a fresh one and publish it second.
@@ -30,6 +28,8 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Check out hivemark
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -95,6 +95,11 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    # The only two write permissions in this workflow, held by the only job that
+    # publishes, which does nothing else.
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
