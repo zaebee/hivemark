@@ -148,9 +148,20 @@ export async function refuseUnlessAffordable(
     }
   }
 
-  const cost = needed * gasPrice;
+  // Held against a fifth more than the quoted price, because the quote is one
+  // reading and the sends happen over the following blocks. Under EIP-1559 the
+  // base fee can climb 12.5% per block, so a batch landing across several
+  // blocks can cost meaningfully more than it quoted.
+  //
+  // The margin is a margin, not a proof: no fixed multiple is provably enough,
+  // since a long enough batch during a long enough fee climb outruns any of
+  // them. It buys the common case — a quiet chain that gets briefly busy — and
+  // the honest guarantee remains "refused when clearly unaffordable", not
+  // "cannot run out".
+  const cost = (needed * gasPrice * 6n) / 5n;
   console.log(
-    `${pending.length} transaction(s) need about ${formatEther(cost)} ETH at ${gasPrice} wei/gas\n`,
+    `${pending.length} transaction(s) need about ${formatEther(cost)} ETH ` +
+      `at ${gasPrice} wei/gas plus a fifth for fee movement\n`,
   );
   if (balance < cost) {
     console.error(

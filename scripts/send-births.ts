@@ -119,29 +119,41 @@ const head = await publicClient.getBlockNumber();
 console.log(`          block ${registration.blockNumber}, head ${head}`);
 
 /**
- * Every birth already attested for this entity, read from the chain rather than
- * from `births.json`.
+ * Every birth on the chain, by entity — read from the chain rather than from
+ * `births.json`.
  *
  * The ledger is the wrong sole authority here: it is a file in a repository,
  * and the failure it cannot detect is its own — a lost commit, a stale
  * checkout, a second machine — each of which makes an already-born identity
  * look unborn. The chain is what the ledger is a record *of*, so it is the copy
  * to ask before doing something permanent.
+ *
+ * Scanned once for the whole schema instead of once per entity. Filtering on
+ * `recipient` at the RPC would push the work to the node, but it multiplies the
+ * request count by the number of identities, and the public Base RPC answers
+ * `-32016 over rate limit` well before that becomes theoretical — measured
+ * during this script's own development. Every birth ever announced fits in
+ * memory by construction: there is at most one per identity, forever.
  */
-async function alreadyAttested(entity: `0x${string}`): Promise<`0x${string}`[]> {
-  const uids: `0x${string}`[] = [];
+async function birthsOnChain(): Promise<Map<string, `0x${string}`[]>> {
+  const byEntity = new Map<string, `0x${string}`[]>();
   for (let from = registration.blockNumber; from <= head; from += LOG_SCAN_CHUNK + 1n) {
     const to = from + LOG_SCAN_CHUNK > head ? head : from + LOG_SCAN_CHUNK;
     const logs = await publicClient.getLogs({
       address: EAS_CONTRACT,
       event: ATTESTED_EVENT,
-      args: { recipient: entity, schemaUID: BIRTH_SCHEMA_UID },
+      args: { schemaUID: BIRTH_SCHEMA_UID },
       fromBlock: from,
       toBlock: to,
     });
-    for (const log of logs) uids.push(log.args.uid as `0x${string}`);
+    for (const log of logs) {
+      // Keyed lowercase: hex casing carries no meaning, and a checksummed
+      // address that missed a lowercase key would read as "not yet born".
+      const key = log.args.recipient!.toLowerCase();
+      byEntity.set(key, [...(byEntity.get(key) ?? []), log.args.uid as `0x${string}`]);
+    }
   }
-  return uids;
+  return byEntity;
 }
 
 const { records, warnings } = harvest(readCorpus(corpusPath).text);
@@ -164,6 +176,10 @@ if (plans.length === 0) {
   console.log("every identity in this corpus already has a birth record. nothing to do.");
   process.exit(0);
 }
+
+const born = await birthsOnChain();
+console.log(`chain     ${born.size} entit${born.size === 1 ? "y" : "ies"} already born under this schema`);
+console.log();
 
 const pending: { plan: BirthPlan; data: `0x${string}`; to: `0x${string}` }[] = [];
 let atEdge = 0;
@@ -201,7 +217,7 @@ for (const plan of plans) {
   console.log(`   first seen ${new Date(plan.firstSeen * 1000).toISOString()}`);
   console.log(`   calldata   ${(data.length - 2) / 2} bytes`);
 
-  const existing = await alreadyAttested(plan.entity);
+  const existing = born.get(plan.entity.toLowerCase()) ?? [];
   if (existing.length > 0) {
     console.error(`   ✗ this entity is ALREADY born on chain: ${existing.join(", ")}`);
     console.error("     the ledger disagrees with the chain. record the attestation above in");
