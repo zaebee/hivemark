@@ -36,6 +36,7 @@ import { loadBirths } from "../src/birth/ledger.js";
 import { corpusSpan, planBirths, type BirthPlan } from "../src/birth/plan.js";
 import { buildBirthRequest } from "../src/birth/submit.js";
 import { BIRTH_SCHEMA_UID } from "../src/birth/schema.js";
+import { indexBirths } from "../src/birth/scan.js";
 
 /**
  * The transaction that registered `BIRTH_SCHEMA_UID`, recorded in
@@ -149,11 +150,8 @@ async function birthsOnChain(): Promise<Map<string, `0x${string}`[]>> {
       fromBlock: from,
       toBlock: to,
     });
-    for (const log of logs) {
-      // Keyed lowercase: hex casing carries no meaning, and a checksummed
-      // address that missed a lowercase key would read as "not yet born".
-      const key = log.args.recipient!.toLowerCase();
-      byEntity.set(key, [...(byEntity.get(key) ?? []), log.args.uid as `0x${string}`]);
+    for (const [entity, uids] of indexBirths(logs)) {
+      byEntity.set(entity, [...(byEntity.get(entity) ?? []), ...uids]);
     }
   }
   return byEntity;
