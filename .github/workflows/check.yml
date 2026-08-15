@@ -1,5 +1,10 @@
 name: check
 
+# Actions are pinned to commit SHAs rather than tags. A tag can be moved to
+# point at different code; a SHA cannot. The trailing comment names the version
+# so a human can read what is pinned, and updating one is a deliberate edit
+# rather than something that happens to a workflow while nobody is looking.
+
 on:
   push:
     branches: [main]
@@ -16,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out hivemark
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           path: hivemark
 
@@ -30,12 +35,12 @@ jobs:
       # upstream commit can redden an unrelated PR; the fix is one line in
       # corpus.json, and that is a decision rather than a breakage.
       - name: Check out the corpus
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: zaebee/codegraph-brain
           path: ownima/codegraph-brain
 
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version: latest
 
@@ -50,7 +55,11 @@ jobs:
 
       - name: Install
         working-directory: hivemark
-        run: bun install --frozen-lockfile
+        # --ignore-scripts: a lockfile pins versions and does not pin behaviour,
+        # so a lifecycle script in any of 427 installed packages would run here
+        # with the workspace checked out. Verified it changes nothing for this
+        # tree — the install completes with no changes either way.
+        run: bun install --frozen-lockfile --ignore-scripts
 
       - name: Typecheck
         working-directory: hivemark
