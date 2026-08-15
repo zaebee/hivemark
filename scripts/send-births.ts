@@ -138,7 +138,10 @@ console.log(`          block ${registration.blockNumber}, head ${head}`);
 async function birthsOnChain(): Promise<Map<string, `0x${string}`[]>> {
   const byEntity = new Map<string, `0x${string}`[]>();
   for (let from = registration.blockNumber; from <= head; from += LOG_SCAN_CHUNK + 1n) {
-    const to = from + LOG_SCAN_CHUNK > head ? head : from + LOG_SCAN_CHUNK;
+    // Not `Math.min`: block numbers are bigint, and Math.min throws
+    // `Conversion from 'BigInt' to 'number' is not allowed` on one.
+    const chunkEnd = from + LOG_SCAN_CHUNK;
+    const to = chunkEnd > head ? head : chunkEnd;
     const logs = await publicClient.getLogs({
       address: EAS_CONTRACT,
       event: ATTESTED_EVENT,

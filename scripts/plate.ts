@@ -38,8 +38,11 @@ const KNOWN_FIELDS = [
  * decides nothing — these genomes never ran, so no record states anything about
  * them, and a wrong guess costs a colour on a study page.
  */
-const familyOf = (model: string): string =>
-  model.startsWith("gemini") ? "gemini" : model.startsWith("mistral") ? "mistral" : "ollama";
+function familyOf(model: string): string {
+  if (model.startsWith("gemini")) return "gemini";
+  if (model.startsWith("mistral")) return "mistral";
+  return "ollama";
+}
 
 /** A genome that has never been run, built only to exercise the trait space. */
 function hypothetical(over: Partial<Genome> & Pick<Genome, "finder_model">): Genome {
