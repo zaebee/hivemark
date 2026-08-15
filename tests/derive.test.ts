@@ -2,8 +2,12 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { harvest } from "../src/harvest.js";
 import { deriveTrackRecords, judgeOf } from "../src/derive.js";
-import { providerOf } from "../src/genome.js";
 import type { Genome, TrackRecord } from "../src/types.js";
+
+/** The vendor a model name belongs to, for building fixtures only. */
+const familyOf = (model: string): string =>
+  model.startsWith("gemini") ? "gemini" : model.startsWith("mistral") ? "mistral" : "ollama";
+
 
 const records = harvest(
   readFileSync("tests/fixtures/martian-reviews.sample.jsonl", "utf8"),
@@ -134,8 +138,8 @@ describe("judgeOf", () => {
   const genome = (finder: string, skeptic: string | null): Genome => ({
     schema_version: 1,
     known_fields: ["context_mode", "finder_model", "finder_provider", "review_fingerprint", "skeptic_model", "skeptic_provider"],
-    finder_provider: providerOf(finder),
-    skeptic_provider: skeptic === null ? null : providerOf(skeptic),
+    finder_provider: familyOf(finder),
+    skeptic_provider: skeptic === null ? null : familyOf(skeptic),
     finder_model: finder,
     skeptic_model: skeptic,
     context_mode: "graph",

@@ -1,5 +1,4 @@
 import { byCodeUnit } from "../canonical.js";
-import { providerOf } from "../genome.js";
 import { identityId } from "../identity.js";
 import type { Genome } from "../types.js";
 import type { Vocabulary } from "./vocabulary.js";
@@ -108,13 +107,26 @@ function candidates(vocabulary: Vocabulary): Genome[] {
   const knownFields = existing[0]?.known_fields ?? [];
   const schemaVersion = existing[0]?.schema_version ?? 1;
 
+  // A proposed configuration has never run, so no record states its providers
+  // and they have to be worked out. Taken from the observed genome that
+  // contributed each model rather than guessed from the name — a model reaches
+  // the vocabulary only from a real record, so this map is total by
+  // construction and cannot invent a vendor.
+  const providerOfModel = new Map<string, string>();
+  for (const g of existing) {
+    providerOfModel.set(g.finder_model, g.finder_provider);
+    if (g.skeptic_model !== null && g.skeptic_provider !== null) {
+      providerOfModel.set(g.skeptic_model, g.skeptic_provider);
+    }
+  }
+
   return vocabulary.finderModels.flatMap((finder) =>
     vocabulary.skepticModels.flatMap((skeptic) =>
       vocabulary.contextModes.map((context) => ({
         schema_version: schemaVersion,
         known_fields: knownFields,
-        finder_provider: providerOf(finder),
-        skeptic_provider: skeptic === null ? null : providerOf(skeptic),
+        finder_provider: providerOfModel.get(finder)!,
+        skeptic_provider: skeptic === null ? null : (providerOfModel.get(skeptic) ?? null),
         finder_model: finder,
         skeptic_model: skeptic,
         context_mode: context,
