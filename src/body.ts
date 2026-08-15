@@ -255,7 +255,7 @@ export function bodyPlan(genome: Genome, unit: number = UNIT): BodyPlan {
       controlY: antennaToY + drawn(DRAWING.antennaControlDropMm),
     },
     eye,
-    bands: bandCount(genome.guardian_version),
+    bands: bandCount(genome.review_fingerprint),
   };
 }
 

@@ -26,14 +26,14 @@ describe("paletteFor", () => {
     expect(new Set(saturations).size).toBe(1);
   });
 
-  it("tells every provider we expect apart from every other", () => {
+  it("tells every finder_provider we expect apart from every other", () => {
     // Hue alone is probabilistic, so lightness is drawn from a different part of
     // the digest. This asserts the property on the names that will actually
     // exist rather than on an arbitrary count: at 200 synthetic providers
     // collisions are unavoidable for any scheme that keeps hue stable per name,
     // and asserting a rate there measures the birthday problem, not this code.
     //
-    // Adding a provider means adding it here. That is a deliberate checkpoint:
+    // Adding a finder_provider means adding it here. That is a deliberate checkpoint:
     // if a new name is indistinguishable from an existing one, this is where it
     // gets noticed, and the lightness steps are the knob.
     const expected = [

@@ -8,15 +8,17 @@ const base: Genome = {
   known_fields: [
     "context_mode",
     "finder_model",
-    "guardian_version",
+    "review_fingerprint",
     "provider",
     "skeptic_model",
   ],
-  provider: "gemini",
+  finder_provider: "gemini",
+
+  skeptic_provider: "gemini",
   finder_model: "gemini-2.5-flash",
   skeptic_model: "gemini-3.5-flash",
   context_mode: "graph",
-  guardian_version: "d0d807ef01c5",
+  review_fingerprint: "d0d807ef01c5",
 };
 
 describe("identityId", () => {
@@ -28,7 +30,7 @@ describe("identityId", () => {
     const id = identityId(base);
     expect(identityId({ ...base, context_mode: "diff-only" })).not.toBe(id);
     expect(identityId({ ...base, skeptic_model: null })).not.toBe(id);
-    expect(identityId({ ...base, guardian_version: "1ecd9629f46c" })).not.toBe(id);
+    expect(identityId({ ...base, review_fingerprint: "1ecd9629f46c" })).not.toBe(id);
     expect(identityId({ ...base, schema_version: 2 })).not.toBe(id);
   });
 

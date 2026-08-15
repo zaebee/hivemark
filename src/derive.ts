@@ -66,6 +66,32 @@ function corpusOf(records: ReviewRecord[]): ReadonlyArray<readonly [string, numb
  * is encoded rather than concatenated. Both exist because the obvious versions
  * made the result depend on the order the file happened to be written in.
  */
+/**
+ * Deliberate repeat runs are collapsed here, and that is a known limitation
+ * rather than a decision.
+ *
+ * `dedupe` exists so an accidental re-run cannot inflate a track record: the
+ * same reviewer, the same commit, keep the newest. Under `guardian_sha` that
+ * never touched the Phase 3 repeat runs, because three runs of one
+ * configuration carried three shas and therefore three identities.
+ *
+ * Keying identity on the review fingerprint makes them one reviewer — correctly,
+ * that is the whole point — and they become indistinguishable from a corrected
+ * re-run. Measured on the current corpus: 115 records deduplicate to 83 where
+ * they previously gave 108, and mistral drops from 45 reviews to 19. Two of
+ * every three noise-floor samples are discarded, which is exactly what those
+ * runs were made to provide.
+ *
+ * Accepted for now, with the numbers stated so nobody rediscovers them as a
+ * bug. The real question is whether a track record should count *runs* or
+ * *distinct commits reviewed*, and nothing in a record distinguishes a
+ * deliberate resample from a correction — so it is a change to what the
+ * project's central number means, and deserves its own design rather than a
+ * widened key here.
+ *
+ * Signing is unaffected: `run()` attests every harvested record, not the
+ * deduplicated set, so an anchor covers all 932 claims either way.
+ */
 export function dedupe(records: readonly ReviewRecord[]): ReviewRecord[] {
   const winners = new Map<string, ReviewRecord>();
   for (const record of records) {

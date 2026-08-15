@@ -22,7 +22,7 @@ import type { Genome } from "./types.js";
  * mutable.
  */
 
-export type Slot = "finder_model" | "skeptic_model" | "context_mode" | "guardian_version";
+export type Slot = "finder_model" | "skeptic_model" | "context_mode" | "review_fingerprint";
 
 /**
  * Which slot builds which part.
@@ -35,7 +35,7 @@ export type Slot = "finder_model" | "skeptic_model" | "context_mode" | "guardian
 export const DRIVEN_BY: Record<CharacterName, Slot> = {
   headHeight: "finder_model",
   headWidth: "finder_model",
-  thoraxLength: "guardian_version",
+  thoraxLength: "review_fingerprint",
   abdomenLength: "skeptic_model",
   forewingLength: "context_mode",
   forewingWidth: "context_mode",

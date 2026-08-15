@@ -5,12 +5,14 @@ import type { Genome } from "../src/types.js";
 
 const base: Genome = {
   schema_version: 1,
-  known_fields: ["context_mode", "finder_model", "guardian_version", "provider", "skeptic_model"],
-  provider: "gemini",
+  known_fields: ["context_mode", "finder_model", "review_fingerprint", "provider", "skeptic_model"],
+  finder_provider: "gemini",
+
+  skeptic_provider: "gemini",
   finder_model: "gemini-2.5-flash",
   skeptic_model: "gemini-3.5-flash",
   context_mode: "graph",
-  guardian_version: "d0d807ef01c556b882dc85b9fc0d2851d92aa1e5",
+  review_fingerprint: "d0d807ef01c556b882dc85b9fc0d2851d92aa1e5",
 };
 
 const names = Object.keys(MORPHOLOGY) as CharacterName[];
@@ -34,8 +36,8 @@ function* genomes(): Generator<Genome> {
   for (const finder_model of finders)
     for (const skeptic_model of skeptics)
       for (const context_mode of modes)
-        for (const guardian_version of versions)
-          yield { ...base, finder_model, skeptic_model, context_mode, guardian_version };
+        for (const review_fingerprint of versions)
+          yield { ...base, finder_model, skeptic_model, context_mode, review_fingerprint };
 }
 
 describe("a character stays inside what was published", () => {
@@ -99,7 +101,7 @@ describe("variation is a function of one slot", () => {
       finder_model: { ...base, finder_model: "mistral-medium-latest" },
       skeptic_model: { ...base, skeptic_model: "mistral-medium-latest" },
       context_mode: { ...base, context_mode: "diff-only" },
-      guardian_version: { ...base, guardian_version: "1ecd9629f46cab10b907dae285d0f58b0eef5e21" },
+      review_fingerprint: { ...base, review_fingerprint: "1ecd9629f46cab10b907dae285d0f58b0eef5e21" },
     };
     for (const name of names) {
       if (MORPHOLOGY[name].range === null) continue;
@@ -143,7 +145,7 @@ describe("variation is a function of one slot", () => {
       ...base,
       schema_version: 99,
       known_fields: ["provider"],
-      provider: "ollama" as const,
+      finder_provider: "ollama" as const,
     };
     for (const name of names) {
       expect(characterMm(name, noisy)).toBe(characterMm(name, base));

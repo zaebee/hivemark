@@ -9,7 +9,7 @@ import type { Genome, Provider } from "./types.js";
  * the two are the same subject is the one error this design cannot detect after
  * the fact.
  */
-export const GENOME_SCHEMA_VERSION = 1;
+export const GENOME_SCHEMA_VERSION = 2;
 
 const PROVIDER_PREFIXES: ReadonlyArray<readonly [string, Provider]> = [
   ["gemini-", "gemini"],
@@ -39,9 +39,10 @@ export function providerOf(model: string): Provider {
 const KNOWN_FIELDS = [
   "context_mode",
   "finder_model",
-  "guardian_version",
-  "provider",
+  "finder_provider",
+  "review_fingerprint",
   "skeptic_model",
+  "skeptic_provider",
 ] as const;
 
 /**
@@ -81,33 +82,35 @@ function exactly(value: string, field: string): string {
 }
 
 export function genomeOf(record: ReviewRecord): Genome {
-  // Checked before `providerOf` runs, so the diagnosis is the true one. A
-  // leading space already broke prefix matching, but it reported "unrecognised
-  // model" — which points a reader at PROVIDER_PREFIXES, where adding an entry
-  // would be exactly the wrong repair. A trailing space passed prefix matching
-  // and reached identity untouched.
-  const finder = exactly(record.finder_model, "finder_model");
-
+  // Whitespace is refused before anything is hashed. A trailing space makes a
+  // second identity that is invisible in every log and diff a human will read,
+  // and the record is permanent once a birth is announced.
   return {
     schema_version: GENOME_SCHEMA_VERSION,
     known_fields: KNOWN_FIELDS,
-    provider: providerOf(finder),
-    finder_model: finder,
+    // Read, not derived. `providerOf` guesses from a model-name prefix and
+    // refuses what it cannot classify, which stops the pipeline on codellama,
+    // mixtral, gemma3 and four others. The producer states this now, and a guess
+    // breaks on the first model whose name does not carry its vendor.
+    finder_provider: exactly(record.finder_provider, "finder_provider"),
+    // Absent and null both mean no skeptic ran. The published contract leaves
+    // this field optional while requiring `finder_provider`, so absent is a
+    // state the producer is entitled to emit and this must not treat it as an
+    // error.
+    skeptic_provider: !record.skeptic_provider
+      ? null
+      : exactly(record.skeptic_provider, "skeptic_provider"),
+    finder_model: exactly(record.finder_model, "finder_model"),
     // An empty string and null both mean "no skeptic ran", and the upstream
-    // schema admits either. Collapsed here so one configuration cannot become
-    // two identities — and so a published birth record, where both encode to
-    // the same empty field, cannot read as self-contradictory.
-    // `!` covers exactly the reachable falsy values. The schema is
-    // `z.string().nullable()` and not optional, so a record missing the field
-    // fails to parse and `undefined` cannot arrive here — an explicit check for
-    // it would imply a state that cannot occur.
-    //
-    // A blank-but-present `" "` is truthy and therefore reaches `exactly`,
-    // which refuses it. That is deliberate: it means "no skeptic ran" written
-    // with a stray space, and the space is the configuration error this
-    // function exists to surface.
+    // schema admits either. Collapsed so one configuration cannot become two
+    // identities. A blank-but-present `" "` is truthy and reaches `exactly`,
+    // which refuses it — that is "no skeptic ran" written with a stray space,
+    // and the space is the configuration error this function exists to surface.
     skeptic_model: !record.skeptic_model ? null : exactly(record.skeptic_model, "skeptic_model"),
     context_mode: record.had_graph ? "graph" : "diff-only",
-    guardian_version: exactly(record.guardian_sha, "guardian_sha"),
+    // Replaces guardian_version. `guardian_sha` stays on the record as
+    // provenance and leaves the genome: one identity now spans several commits,
+    // so there is no single value to record.
+    review_fingerprint: exactly(record.review_fingerprint, "review_fingerprint"),
   };
 }

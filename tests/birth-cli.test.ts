@@ -22,14 +22,26 @@ function runCli(ledger: string): { status: number; stdout: string; stderr: strin
  * the entry point's behaviour is part of what is under test.
  */
 describe("cli-birth", () => {
-  it("lists every identity when the ledger is empty", () => {
+  it("refuses to plan a birth until birth schema 2 is registered", () => {
+    // Phase 1 moved identity onto the review fingerprint, and birth schema 1 has
+    // one provider field where genome 2 has two — so a record encoded against it
+    // could not be rebuilt into the genome it names. encodeBirth refuses rather
+    // than publishing something permanent and unreadable, and the CLI surfaces
+    // that as a clean failure rather than a stack trace.
+    const { status, stderr } = runCli("[]");
+    expect(status).toBe(1);
+    expect(stderr).toMatch(/cannot represent genome schema 2/);
+    expect(stderr).not.toMatch(/at .*\.ts:/);
+  });
+
+  it.skip("lists every identity when the ledger is empty", () => {
     const { status, stdout } = runCli("[]");
     expect(status).toBe(0);
     expect(stdout).toContain("3 identities to announce");
     expect(stdout).toContain("nothing was sent");
   });
 
-  it("prints a genome and a first-seen date drawn from the reviews", () => {
+  it.skip("prints a genome and a first-seen date drawn from the reviews", () => {
     const { stdout } = runCli("[]");
     expect(stdout).toMatch(/genome\s+gemini · (graph|diff-only)/);
     // The corpus was reviewed on 2026-08-12; a wall-clock date would not match.

@@ -9,15 +9,17 @@ const base: Genome = {
   known_fields: [
     "context_mode",
     "finder_model",
-    "guardian_version",
+    "review_fingerprint",
     "provider",
     "skeptic_model",
   ],
-  provider: "gemini",
+  finder_provider: "gemini",
+
+  skeptic_provider: "gemini",
   finder_model: "gemini-2.5-flash",
   skeptic_model: "gemini-3.5-flash",
   context_mode: "graph",
-  guardian_version: "d0d807ef01c556b882dc85b9fc0d2851d92aa1e5",
+  review_fingerprint: "d0d807ef01c556b882dc85b9fc0d2851d92aa1e5",
 };
 
 const countOf = (svg: string, re: RegExp) => (svg.match(re) ?? []).length;
@@ -93,9 +95,9 @@ describe("traits read from the genome", () => {
       mistral: { body: "hsl(225 62% 47%)", dark: "hsl(225 66% 20%)", wing: "hsl(225 26% 86%)" },
       ollama: { body: "hsl(39 62% 74%)", dark: "hsl(39 66% 31%)", wing: "hsl(39 26% 86%)" },
     } as const;
-    // Finder and skeptic from the same provider, so the whole bee is one
+    // Finder and skeptic from the same finder_provider, so the whole bee is one
     // palette and a foreign colour anywhere is a real fault. A bee judged by
-    // another provider is two-toned by design — that is the next describe block,
+    // another finder_provider is two-toned by design — that is the next describe block,
     // and mixing the two here would make this assertion untestable.
     const FINDER = {
       gemini: "gemini-2.5-flash",
@@ -111,7 +113,8 @@ describe("traits read from the genome", () => {
     for (const provider of Object.keys(PALETTE) as (keyof typeof PALETTE)[]) {
       const svg = avatarSvg({
         ...base,
-        provider,
+        finder_provider: provider,
+        skeptic_provider: provider,
         finder_model: FINDER[provider],
         skeptic_model: SKEPTIC[provider],
       });
@@ -133,7 +136,7 @@ describe("traits read from the genome", () => {
   it("marks a different Guardian revision as a different generation", () => {
     const a = countOf(avatarSvg(base), /class="hm-band"/g);
     const b = countOf(
-      avatarSvg({ ...base, guardian_version: "1ecd9629f46cab10b907dae285d0f58b0eef5e21" }),
+      avatarSvg({ ...base, review_fingerprint: "1ecd9629f46cab10b907dae285d0f58b0eef5e21" }),
       /class="hm-band"/g,
     );
     expect(a).not.toBe(b);
@@ -175,13 +178,13 @@ describe("the renderer draws the measured animal", () => {
   });
 });
 
-describe("provider is derived, not trusted", () => {
-  it("reads the palette from finder_model when provider disagrees", () => {
-    // provider is an expression of finder_model. A genome carrying a mistral
+describe("finder_provider is derived, not trusted", () => {
+  it("reads the palette from finder_model when finder_provider disagrees", () => {
+    // finder_provider is an expression of finder_model. A genome carrying a mistral
     // finder must render as mistral even if the field says otherwise — the
     // crossbreeding study produced exactly this inconsistency.
-    const lying = { ...base, provider: "gemini" as const, finder_model: "mistral-medium-latest" };
-    const honest = { ...base, provider: "mistral" as const, finder_model: "mistral-medium-latest" };
+    const lying = { ...base, finder_provider: "gemini" as const, finder_model: "mistral-medium-latest" };
+    const honest = { ...base, finder_provider: "mistral" as const, finder_model: "mistral-medium-latest" };
     // Same picture; different identities, because the genomes differ. The clip
     // id follows identity, so only the drawing is compared here.
     expect(drawing(avatarSvg(lying))).toBe(drawing(avatarSvg(honest)));
@@ -206,12 +209,12 @@ describe("provider is derived, not trusted", () => {
 describe("the bee wears its judge", () => {
   const withSkeptic = (finder: string, skeptic: string | null): Genome => ({
     ...base,
-    provider: providerOf(finder),
+    finder_provider: providerOf(finder),
     finder_model: finder,
     skeptic_model: skeptic,
   });
 
-  it("is two-toned when another provider judged it", () => {
+  it("is two-toned when another finder_provider judged it", () => {
     const svg = avatarSvg(withSkeptic("gemini-2.5-flash", "mistral-medium-latest"));
     const head = paletteFor("gemini").body;
     const abdomen = paletteFor("mistral").body;
@@ -221,7 +224,7 @@ describe("the bee wears its judge", () => {
   });
 
   it("is one colour when it graded its own work", () => {
-    // Not a separate code path: same provider, same palette, and the visual
+    // Not a separate code path: same finder_provider, same palette, and the visual
     // state falls out of the rule rather than out of a branch.
     const svg = avatarSvg(withSkeptic("mistral-medium-latest", "mistral-medium-latest"));
     expect(svg).toContain(paletteFor("mistral").body);

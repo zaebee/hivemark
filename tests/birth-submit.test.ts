@@ -12,15 +12,17 @@ const genome: Genome = {
   known_fields: [
     "context_mode",
     "finder_model",
-    "guardian_version",
+    "review_fingerprint",
     "provider",
     "skeptic_model",
   ],
-  provider: "gemini",
+  finder_provider: "gemini",
+
+  skeptic_provider: "gemini",
   finder_model: "gemini-2.5-flash",
   skeptic_model: "gemini-3.5-flash",
   context_mode: "graph",
-  guardian_version: "d0d807ef01c556b882dc85b9fc0d2851d92aa1e5",
+  review_fingerprint: "d0d807ef01c556b882dc85b9fc0d2851d92aa1e5",
 };
 
 const plan: BirthPlan = {
@@ -66,25 +68,18 @@ describe("buildBirthRequest", () => {
     expect(() => buildBirthRequest(lying)).toThrow(/does not match its genome/i);
   });
 
-  it("refuses a plan whose provider contradicts its finder model", () => {
-    // provider is an expression of finder_model — the rule avatar.ts already
-    // enforces. Publishing the two in disagreement would permanently name a
-    // provider the finder contradicts.
-    //
-    // The plan is internally consistent — identity and entity both derive from
-    // this genome — so the earlier two checks pass and only this one can catch
-    // it. A genome that merely differed would fail the identity check first and
-    // prove nothing about this rule.
-    const lyingGenome: Genome = { ...genome, finder_model: "qwen2.5-coder:7b" };
-    const inconsistent: BirthPlan = {
-      identity_id: identityId(lyingGenome),
-      entity: ownerAddress(identityId(lyingGenome)),
-      genome: lyingGenome,
-      firstSeen: plan.firstSeen,
-      atCorpusEdge: false,
-    };
-    expect(() => buildBirthRequest(inconsistent)).toThrow(/belongs to ollama/i);
-  });
+  // A provider-consistency check stood here and is deleted, not rewritten.
+  //
+  // It compared genome.provider against providerOf(finder_model) — two values
+  // the producer supplies, one derived from the other. That catches a producer
+  // contradicting itself and never a producer that is confidently wrong, which
+  // is the case worth catching. A check that cannot fail independently of the
+  // thing it checks is not a check.
+  //
+  // The job moved upstream, where it fails on evidence: the review-path closure
+  // is computed per provider and raises on a provider name it cannot map to a
+  // module. A weaker version here would restore the comfort without the
+  // guarantee.
 
   it("refuses a plan whose entity is not the address of its identity", () => {
     const wrongEntity = {

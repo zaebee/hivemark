@@ -44,7 +44,7 @@ function main(): void {
 
   console.log(
     `${records.length} reviews · ${vocabulary.existing.length} identities · ` +
-      `newest guardian ${vocabulary.newestGuardian.slice(0, 10)}\n`,
+      `newest fingerprint ${vocabulary.newestFingerprint.slice(0, 12)}\n`,
   );
 
   if (proposals.length === 0) {
@@ -56,7 +56,7 @@ function main(): void {
   for (const p of proposals) {
     const g = p.genome;
     console.log(
-      `${g.provider} · ${g.finder_model} / ${g.skeptic_model ?? "no skeptic"} · ${g.context_mode}`,
+      `${g.finder_provider} · ${g.finder_model} / ${g.skeptic_model ?? "no skeptic"} · ${g.context_mode}`,
     );
     console.log(`  identity   ${p.identity_id}`);
     console.log(`  standing   no birth, no claims — nothing has run yet`);

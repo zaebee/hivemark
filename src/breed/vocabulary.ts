@@ -8,7 +8,16 @@ export interface Vocabulary {
   readonly finderModels: readonly string[];
   readonly skepticModels: readonly (string | null)[];
   readonly contextModes: readonly ("graph" | "diff-only")[];
-  readonly newestGuardian: string;
+  /**
+   * The fingerprint of the newest reviewer in the corpus.
+   *
+   * A proposed configuration has to carry some fingerprint, and the newest is
+   * the only defensible choice: it is the review path a new run would actually
+   * execute. Taking `guardian_sha` here — as this did before identity moved —
+   * would put a commit hash in the field identity is keyed on, minting entities
+   * whose fingerprint corresponds to no review path at all.
+   */
+  readonly newestFingerprint: string;
   readonly existing: readonly Genome[];
 }
 
@@ -45,7 +54,7 @@ export function vocabularyOf(records: readonly ReviewRecord[]): Vocabulary {
     finderModels: distinct(existing.map((g) => g.finder_model)),
     skepticModels: distinct(existing.map((g) => g.skeptic_model)),
     contextModes: distinct(existing.map((g) => g.context_mode)),
-    newestGuardian: newest.guardian_sha,
+    newestFingerprint: newest.review_fingerprint,
     existing,
   };
 }

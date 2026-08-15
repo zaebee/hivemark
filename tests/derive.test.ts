@@ -117,7 +117,7 @@ describe("deriveTrackRecords", () => {
     const summary = deriveTrackRecords(records)
       .map((t) => ({
         context_mode: t.genome.context_mode,
-        guardian_version: t.genome.guardian_version,
+        review_fingerprint: t.genome.review_fingerprint,
         finder_model: t.genome.finder_model,
         skeptic_model: t.genome.skeptic_model,
         reviews: t.reviews,
@@ -133,12 +133,13 @@ describe("deriveTrackRecords", () => {
 describe("judgeOf", () => {
   const genome = (finder: string, skeptic: string | null): Genome => ({
     schema_version: 1,
-    known_fields: ["context_mode", "finder_model", "guardian_version", "provider", "skeptic_model"],
-    provider: providerOf(finder),
+    known_fields: ["context_mode", "finder_model", "finder_provider", "review_fingerprint", "skeptic_model", "skeptic_provider"],
+    finder_provider: providerOf(finder),
+    skeptic_provider: skeptic === null ? null : providerOf(skeptic),
     finder_model: finder,
     skeptic_model: skeptic,
     context_mode: "graph",
-    guardian_version: "d0d807ef",
+    review_fingerprint: "d0d807ef",
   });
 
   it("calls it self-graded when the skeptic is the finder", () => {
@@ -164,7 +165,7 @@ describe("judgeOf", () => {
 
   it("does not merely compare providers", () => {
     // Both are mistral, but a different model did the judging. Keying on
-    // provider instead of model would call this self-graded and be wrong.
+    // finder_provider instead of model would call this self-graded and be wrong.
     expect(judgeOf(genome("mistral-medium-latest", "mistral-nemo"))).toBe("independent");
   });
 });

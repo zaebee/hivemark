@@ -58,7 +58,7 @@ function main(): void {
     console.log(`identity    ${plan.identity_id}`);
     console.log(`entity      ${plan.entity}`);
     console.log(
-      `genome      ${plan.genome.provider} · ${plan.genome.context_mode} · ${plan.genome.guardian_version.slice(0, 7)}`,
+      `genome      ${plan.genome.finder_provider} · ${plan.genome.context_mode} · ${plan.genome.review_fingerprint.slice(0, 7)}`,
     );
     console.log(
       `first seen  ${new Date(plan.firstSeen * 1000).toISOString()}` +

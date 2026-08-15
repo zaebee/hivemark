@@ -7,7 +7,7 @@ import type { Genome } from "../src/types.js";
 const KNOWN = [
   "context_mode",
   "finder_model",
-  "guardian_version",
+  "review_fingerprint",
   "provider",
   "skeptic_model",
 ] as const;
@@ -15,11 +15,13 @@ const KNOWN = [
 const genome = (over: Partial<Genome>): Genome => ({
   schema_version: 1,
   known_fields: KNOWN,
-  provider: "gemini",
+  finder_provider: "gemini",
+
+  skeptic_provider: "gemini",
   finder_model: "gemini-2.5-flash",
   skeptic_model: "gemini-3.5-flash",
   context_mode: "graph",
-  guardian_version: "newest",
+  review_fingerprint: "newest",
   ...over,
 });
 
@@ -28,11 +30,13 @@ const vocab: Vocabulary = {
   finderModels: ["gemini-2.5-flash", "mistral-medium-latest"],
   skepticModels: ["gemini-3.5-flash", "mistral-medium-latest"],
   contextModes: ["graph"],
-  newestGuardian: "newest",
+  newestFingerprint: "newest",
   existing: [
     genome({}),
     genome({
-      provider: "mistral",
+      finder_provider: "mistral",
+
+      skeptic_provider: "mistral",
       finder_model: "mistral-medium-latest",
       skeptic_model: "mistral-medium-latest",
     }),
@@ -61,13 +65,13 @@ describe("proposalsFrom", () => {
   });
 
   it("stamps every proposal with the newest revision", () => {
-    for (const p of proposalsFrom(vocab)) expect(p.genome.guardian_version).toBe("newest");
+    for (const p of proposalsFrom(vocab)) expect(p.genome.review_fingerprint).toBe("newest");
   });
 
-  it("derives provider from the finder rather than carrying it", () => {
+  it("derives finder_provider from the finder rather than carrying it", () => {
     for (const p of proposalsFrom(vocab)) {
       const expected = p.genome.finder_model.startsWith("mistral") ? "mistral" : "gemini";
-      expect(p.genome.provider).toBe(expected);
+      expect(p.genome.finder_provider).toBe(expected);
     }
   });
 
@@ -110,10 +114,12 @@ describe("proposalsFrom", () => {
     const tied: Vocabulary = {
       ...vocab,
       existing: [
-        genome({ guardian_version: "rev-a" }),
-        genome({ guardian_version: "rev-b" }),
+        genome({ review_fingerprint: "rev-a" }),
+        genome({ review_fingerprint: "rev-b" }),
         genome({
-          provider: "mistral",
+          finder_provider: "mistral",
+
+          skeptic_provider: "mistral",
           finder_model: "mistral-medium-latest",
           skeptic_model: "mistral-medium-latest",
         }),
@@ -132,7 +138,7 @@ describe("proposalsFrom", () => {
       finderModels: ["gemini-a b", "gemini-a"],
       skepticModels: ["gemini-c", "gemini-b c"],
       contextModes: ["graph"],
-      newestGuardian: "newest",
+      newestFingerprint: "newest",
       existing: [
         genome({ finder_model: "gemini-a b", skeptic_model: "gemini-c" }),
         genome({ finder_model: "gemini-a", skeptic_model: "gemini-b c" }),
@@ -156,12 +162,14 @@ describe("proposalsFrom", () => {
     // revision, so the case could not arise.
     const onOldRevisions: Vocabulary = {
       ...vocab,
-      newestGuardian: "revision-3",
+      newestFingerprint: "revision-3",
       existing: [
-        genome({ guardian_version: "revision-1" }),
+        genome({ review_fingerprint: "revision-1" }),
         genome({
-          guardian_version: "revision-2",
-          provider: "mistral",
+          review_fingerprint: "revision-2",
+          finder_provider: "mistral",
+
+          skeptic_provider: "mistral",
           finder_model: "mistral-medium-latest",
           skeptic_model: "mistral-medium-latest",
         }),

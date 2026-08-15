@@ -8,15 +8,17 @@ const genome: Genome = {
   known_fields: [
     "context_mode",
     "finder_model",
-    "guardian_version",
+    "review_fingerprint",
     "provider",
     "skeptic_model",
   ],
-  provider: "gemini",
+  finder_provider: "gemini",
+
+  skeptic_provider: "gemini",
   finder_model: "gemini-2.5-flash",
   skeptic_model: "gemini-3.5-flash",
   context_mode: "graph",
-  guardian_version: "d0d807ef01c556b882dc85b9fc0d2851d92aa1e5",
+  review_fingerprint: "d0d807ef01c556b882dc85b9fc0d2851d92aa1e5",
 };
 
 /**
@@ -45,8 +47,8 @@ function* plans() {
   for (const finder_model of finders)
     for (const skeptic_model of skeptics)
       for (const context_mode of modes)
-        for (const guardian_version of versions)
-          yield bodyPlan({ ...genome, finder_model, skeptic_model, context_mode, guardian_version });
+        for (const review_fingerprint of versions)
+          yield bodyPlan({ ...genome, finder_model, skeptic_model, context_mode, review_fingerprint });
 }
 
 describe("bodyPlan scales", () => {
@@ -166,7 +168,7 @@ describe("the body is the measured animal", () => {
     const base = bodyPlan(genome);
     const cases = [
       ["head", { finder_model: "mistral-medium-latest" }, (p: typeof base) => p.head.ry],
-      ["thorax", { guardian_version: "1ecd9629f46cab10b907dae285d0f58b0eef5e21" }, (p: typeof base) => p.thorax.ry],
+      ["thorax", { review_fingerprint: "1ecd9629f46cab10b907dae285d0f58b0eef5e21" }, (p: typeof base) => p.thorax.ry],
       ["abdomen", { skeptic_model: "mistral-medium-latest" }, (p: typeof base) => p.abdomen.ry],
       ["wing", { context_mode: "diff-only" as const }, (p: typeof base) => p.wing.rx],
     ] as const;
@@ -199,7 +201,7 @@ describe("traits reach the plan and nothing else does", () => {
     // generation marker silently gone from the abdomen, past a NaN guard written
     // to catch exactly this kind of input.
     for (const version of ["-2abc", "-1abc", "+5abc", "", "zz", "0", "ffff"]) {
-      const bands = bodyPlan({ ...genome, guardian_version: version }).bands;
+      const bands = bodyPlan({ ...genome, review_fingerprint: version }).bands;
       expect(bands, `"${version}" should still band the abdomen`).toBeGreaterThanOrEqual(1);
     }
   });
@@ -208,7 +210,7 @@ describe("traits reach the plan and nothing else does", () => {
     const a = bodyPlan(genome).bands;
     const b = bodyPlan({
       ...genome,
-      guardian_version: "1ecd9629f46cab10b907dae285d0f58b0eef5e21",
+      review_fingerprint: "1ecd9629f46cab10b907dae285d0f58b0eef5e21",
     }).bands;
     expect(a).not.toBe(b);
   });

@@ -11,15 +11,17 @@ function make(over: Partial<TrackRecord> = {}): TrackRecord {
       known_fields: [
         "context_mode",
         "finder_model",
-        "guardian_version",
+        "review_fingerprint",
         "provider",
         "skeptic_model",
       ],
-      provider: "gemini",
+      finder_provider: "gemini",
+
+      skeptic_provider: "gemini",
       finder_model: "gemini-2.5-flash",
       skeptic_model: "gemini-3.5-flash",
       context_mode: "graph",
-      guardian_version: "d0d807ef",
+      review_fingerprint: "d0d807ef",
     },
     reviews: 10,
     claims: 20,
@@ -98,7 +100,7 @@ describe("renderPage", () => {
   });
 
   it("escapes markup inside a model name it does accept", () => {
-    // The dangerous string is not one the provider table rejects — that one
+    // The dangerous string is not one the finder_provider table rejects — that one
     // never reaches the page. It is a name that passes as gemini and still
     // carries markup, since the value comes straight from the artifact.
     const evil = make({
@@ -120,12 +122,14 @@ describe("a self-graded identity on the page", () => {
     make({
       genome: {
         schema_version: 1,
-        known_fields: ["context_mode", "finder_model", "guardian_version", "provider", "skeptic_model"],
-        provider: "mistral",
+        known_fields: ["context_mode", "finder_model", "review_fingerprint", "provider", "skeptic_model"],
+        finder_provider: "mistral",
+
+        skeptic_provider: "mistral",
         finder_model: "mistral-medium-latest",
         skeptic_model: "mistral-medium-latest",
         context_mode: "graph",
-        guardian_version: "4d1fe6a1234567",
+        review_fingerprint: "4d1fe6a1234567",
       },
       skeptic: { judge: "self", confirmed: 15, refuted: 3, uncertain: 2, unresolved: 0, mean_impact: 4.1 },
     });

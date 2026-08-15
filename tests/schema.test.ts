@@ -164,6 +164,7 @@ describe("the fields identity is keyed on", () => {
     parse_failed: false,
     review_fingerprint: "1a2884400bd7",
     finder_provider: "gemini",
+
     skeptic_provider: "gemini",
     ...over,
   });
@@ -185,13 +186,13 @@ describe("the fields identity is keyed on", () => {
     expect(ReviewRecordSchema.safeParse(without).success).toBe(false);
   });
 
-  it("accepts a null skeptic provider, because a skeptic can be absent", () => {
+  it("accepts a null skeptic finder_provider, because a skeptic can be absent", () => {
     expect(
       ReviewRecordSchema.safeParse(row({ skeptic_model: null, skeptic_provider: null })).success,
     ).toBe(true);
   });
 
-  it("accepts a skeptic provider that is absent, because the contract permits it", () => {
+  it("accepts a skeptic finder_provider that is absent, because the contract permits it", () => {
     // Written the other way round first, by analogy with skeptic_model, and the
     // drift guard caught it: codegraph-brain 0.13.0 requires review_fingerprint
     // and finder_provider and leaves this one optional. Requiring it would
