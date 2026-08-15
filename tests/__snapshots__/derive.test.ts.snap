@@ -20,7 +20,7 @@ exports[`deriveTrackRecords > matches a stable snapshot of the real corpus 1`] =
       ],
     ],
     "finder_model": "gemini-2.5-flash",
-    "guardian_version": "d0d807ef01c556b882dc85b9fc0d2851d92aa1e5",
+    "review_fingerprint": "1a2884400bd7",
     "reviews": 21,
     "skeptic": {
       "confirmed": 53,
@@ -33,29 +33,7 @@ exports[`deriveTrackRecords > matches a stable snapshot of the real corpus 1`] =
     "skeptic_model": "gemini-3.5-flash",
   },
   {
-    "claims": 1,
-    "context_mode": "graph",
-    "corpus": [
-      [
-        "sentry",
-        1,
-      ],
-    ],
-    "finder_model": "gemini-2.5-flash",
-    "guardian_version": "1ecd9629f46cab10b907dae285d0f58b0eef5e21",
-    "reviews": 1,
-    "skeptic": {
-      "confirmed": 0,
-      "judge": "independent",
-      "mean_impact": 2,
-      "refuted": 0,
-      "uncertain": 1,
-      "unresolved": 0,
-    },
-    "skeptic_model": "gemini-3.5-flash",
-  },
-  {
-    "claims": 43,
+    "claims": 44,
     "context_mode": "graph",
     "corpus": [
       [
@@ -66,16 +44,20 @@ exports[`deriveTrackRecords > matches a stable snapshot of the real corpus 1`] =
         "grafana",
         3,
       ],
+      [
+        "sentry",
+        1,
+      ],
     ],
     "finder_model": "gemini-2.5-flash",
-    "guardian_version": "d0d807ef01c556b882dc85b9fc0d2851d92aa1e5",
-    "reviews": 13,
+    "review_fingerprint": "1a2884400bd7",
+    "reviews": 14,
     "skeptic": {
       "confirmed": 32,
       "judge": "independent",
-      "mean_impact": 4.74,
+      "mean_impact": 4.68,
       "refuted": 2,
-      "uncertain": 9,
+      "uncertain": 10,
       "unresolved": 0,
     },
     "skeptic_model": "gemini-3.5-flash",

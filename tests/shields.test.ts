@@ -8,18 +8,14 @@ function track(over: Partial<TrackRecord["skeptic"]>): TrackRecord {
     owner_address: "0x0000000000000000000000000000000000000001",
     genome: {
       schema_version: 1,
-      known_fields: [
-        "context_mode",
-        "finder_model",
-        "guardian_version",
-        "provider",
-        "skeptic_model",
-      ],
-      provider: "gemini",
+      known_fields: ["context_mode", "finder_model", "finder_provider", "review_fingerprint", "skeptic_model", "skeptic_provider"],
+      finder_provider: "gemini",
+
+      skeptic_provider: "gemini",
       finder_model: "gemini-2.5-flash",
       skeptic_model: "gemini-3.5-flash",
       context_mode: "graph",
-      guardian_version: "d0d807ef",
+      review_fingerprint: "d0d807ef",
     },
     reviews: 10,
     claims: 20,
@@ -54,7 +50,7 @@ describe("shieldsEndpoint", () => {
     expect(endpoint.color).toBe("lightgrey");
   });
 
-  it("names the reviewer by provider and context mode", () => {
+  it("names the reviewer by finder_provider and context mode", () => {
     expect(shieldsEndpoint(track({})).label).toBe("gemini · graph");
   });
 });

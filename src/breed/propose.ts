@@ -102,7 +102,7 @@ function configurationKey(genome: Genome): string {
 
 /** Every combination the vocabulary can express, run or not. */
 function candidates(vocabulary: Vocabulary): Genome[] {
-  const { existing, newestGuardian } = vocabulary;
+  const { existing, newestFingerprint } = vocabulary;
   // Every genome in a corpus shares these by construction, since `genomeOf`
   // fixes them; taking them from the first is safe for that reason alone.
   const knownFields = existing[0]?.known_fields ?? [];
@@ -113,11 +113,12 @@ function candidates(vocabulary: Vocabulary): Genome[] {
       vocabulary.contextModes.map((context) => ({
         schema_version: schemaVersion,
         known_fields: knownFields,
-        provider: providerOf(finder),
+        finder_provider: providerOf(finder),
+        skeptic_provider: skeptic === null ? null : providerOf(skeptic),
         finder_model: finder,
         skeptic_model: skeptic,
         context_mode: context,
-        guardian_version: newestGuardian,
+        review_fingerprint: newestFingerprint,
       })),
     ),
   );

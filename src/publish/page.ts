@@ -82,7 +82,7 @@ ${avatarSvg(track.genome, 96)}
 <dt>finder</dt><dd>${esc(track.genome.finder_model)}</dd>
 <dt>skeptic</dt><dd>${esc(track.genome.skeptic_model ?? "none")}${judgeNote(s.judge)}</dd>
 <dt>context</dt><dd>${esc(track.genome.context_mode)}</dd>
-<dt>guardian</dt><dd><code>${esc(track.genome.guardian_version ?? "unknown")}</code></dd>
+<dt>fingerprint</dt><dd><code>${esc(track.genome.review_fingerprint)}</code></dd>
 <dt>corpus</dt><dd>${corpus}</dd>
 <dt>reviews</dt><dd>${track.reviews}</dd>
 <dt>claims</dt><dd>${track.claims}</dd>
@@ -147,7 +147,7 @@ function leastOverlapping(tracks: TrackRecord[]): Divergence | null {
 
 /** Name an identity distinctly: two reviewers can share a context mode. */
 function describe(track: TrackRecord): string {
-  return `${track.genome.provider} · ${track.genome.context_mode} · ${track.genome.guardian_version.slice(0, 7)}`;
+  return `${track.genome.finder_provider} · ${track.genome.context_mode} · ${track.genome.review_fingerprint.slice(0, 7)}`;
 }
 
 function confoundedNote(d: Divergence): string {

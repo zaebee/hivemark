@@ -11,12 +11,31 @@ export type Verdict = "confirmed" | "refuted" | "uncertain" | "unresolved";
 export interface Genome {
   readonly schema_version: number;
   readonly known_fields: readonly string[];
-  readonly provider: Provider;
+  /**
+   * Stated by the producer, not derived from a model-name prefix. Two fields
+   * rather than one: a single `provider` taken from the finder was wrong for
+   * every bee judged by another vendor, which is the same asymmetry the body
+   * already avoided by giving the head to the finder and the abdomen to the
+   * skeptic.
+   *
+   * `string` rather than the `Provider` union, deliberately. The union exists so
+   * `providerOf` can refuse a model name it cannot classify; a provider the
+   * producer states needs no such guess.
+   */
+  readonly finder_provider: string;
+  readonly skeptic_provider: string | null;
   readonly finder_model: string;
   readonly skeptic_model: string | null;
   readonly context_mode: "graph" | "diff-only";
-  /** Never null: the published contract requires it on every record. */
-  readonly guardian_version: string;
+  /**
+   * A digest over the code that decides a review, replacing `guardian_version`.
+   *
+   * `guardian_sha` moved on any commit — a README edit minted a new entity with
+   * an empty track record. Eight identities existed where three configurations
+   * were run, and one of the eight had a track record of a single review. This
+   * is what collapses them.
+   */
+  readonly review_fingerprint: string;
 }
 
 export interface Claim {

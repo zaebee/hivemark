@@ -1,5 +1,4 @@
 import { EAS_CONTRACT } from "../attest/domain.js";
-import { providerOf } from "../genome.js";
 import { identityId, ownerAddress } from "../identity.js";
 import { BIRTH_SCHEMA_UID, encodeBirth } from "./schema.js";
 import type { BirthPlan } from "./plan.js";
@@ -46,17 +45,19 @@ export function buildBirthRequest(plan: BirthPlan): BirthRequest {
     );
   }
 
-  // `provider` is an expression of `finder_model`, not an independent field —
-  // the rule `avatar.ts` already enforces when it derives the palette rather
-  // than trusting the genome. A record published with the two disagreeing would
-  // permanently name a provider the finder contradicts.
-  const stated = plan.genome.provider;
-  const actual = providerOf(plan.genome.finder_model);
-  if (stated !== actual) {
-    throw new Error(
-      `birth plan states provider ${stated}, but its finder ${plan.genome.finder_model} belongs to ${actual}`,
-    );
-  }
+  // The provider consistency check that stood here is deleted rather than
+  // rewritten, and the distinction matters.
+  //
+  // It compared `genome.provider` against `providerOf(finder_model)` — two
+  // values the producer supplies, one of them derived from the other. That
+  // catches a producer contradicting itself and never a producer that is
+  // confidently wrong, which is the case worth catching. A check that cannot
+  // fail independently of the thing it checks is not a check.
+  //
+  // The job moved upstream, where it can fail on evidence: the review-path
+  // closure is computed per provider and raises on a provider name it cannot
+  // map to a module. Rebuilding a weaker version here would restore the comfort
+  // without the guarantee.
 
   return {
     to: EAS_CONTRACT,

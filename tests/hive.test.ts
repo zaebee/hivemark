@@ -4,12 +4,14 @@ import type { Genome, TrackRecord } from "../src/types.js";
 
 const genome = (over: Partial<Genome>): Genome => ({
   schema_version: 1,
-  known_fields: ["context_mode", "finder_model", "guardian_version", "provider", "skeptic_model"],
-  provider: "gemini",
+  known_fields: ["context_mode", "finder_model", "finder_provider", "review_fingerprint", "skeptic_model", "skeptic_provider"],
+  finder_provider: "gemini",
+
+  skeptic_provider: "gemini",
   finder_model: "gemini-2.5-flash",
   skeptic_model: "gemini-3.5-flash",
   context_mode: "graph",
-  guardian_version: "d0d807ef01c556b882dc85b9fc0d2851d92aa1e5",
+  review_fingerprint: "d0d807ef01c556b882dc85b9fc0d2851d92aa1e5",
   ...over,
 });
 
@@ -29,12 +31,12 @@ const track = (over: Partial<Genome>): TrackRecord => {
 };
 
 describe("familiesOf", () => {
-  it("groups by the finder's provider, not the skeptic's", () => {
-    // A cross-provider bee belongs to the reviewer that did the reviewing and
+  it("groups by the finder's finder_provider, not the skeptic's", () => {
+    // A cross-finder_provider bee belongs to the reviewer that did the reviewing and
     // wears where it went for judgement.
     const families = familiesOf([
       track({}),
-      track({ finder_model: "mistral-medium-latest", provider: "mistral", skeptic_model: "gemini-3.5-flash" }),
+      track({ finder_model: "mistral-medium-latest", finder_provider: "mistral", skeptic_model: "gemini-3.5-flash" }),
     ]);
     expect(families.map((f) => f.provider).sort()).toEqual(["gemini", "mistral"]);
     expect(families.find((f) => f.provider === "mistral")!.members).toHaveLength(1);
@@ -42,11 +44,11 @@ describe("familiesOf", () => {
 
   it("orders within a family by context_mode, then guardian_version", () => {
     const family = familiesOf([
-      track({ context_mode: "graph", guardian_version: "ffff" }),
-      track({ context_mode: "diff-only", guardian_version: "bbbb" }),
-      track({ context_mode: "graph", guardian_version: "aaaa" }),
+      track({ context_mode: "graph", review_fingerprint: "ffff" }),
+      track({ context_mode: "diff-only", review_fingerprint: "bbbb" }),
+      track({ context_mode: "graph", review_fingerprint: "aaaa" }),
     ])[0]!;
-    expect(family.members.map((m) => `${m.genome.context_mode}/${m.genome.guardian_version}`)).toEqual([
+    expect(family.members.map((m) => `${m.genome.context_mode}/${m.genome.review_fingerprint}`)).toEqual([
       "diff-only/bbbb",
       "graph/aaaa",
       "graph/ffff",
@@ -54,7 +56,7 @@ describe("familiesOf", () => {
   });
 
   it("orders members that agree on both sorted fields", () => {
-    // One provider covers many finder models, so two members of a family can
+    // One finder_provider covers many finder models, so two members of a family can
     // share context_mode and guardian_version and still be different reviewers.
     // Without a final fallback the comparator returns 0 for them and the input
     // order decides — which the test below claims cannot happen.
@@ -67,9 +69,9 @@ describe("familiesOf", () => {
   });
 
   it("is deterministic regardless of input order", () => {
-    const a = [track({ guardian_version: "aaaa" }), track({ guardian_version: "bbbb" })];
+    const a = [track({ review_fingerprint: "aaaa" }), track({ review_fingerprint: "bbbb" })];
     const names = (t: TrackRecord[]) =>
-      familiesOf(t).flatMap((f) => f.members.map((m) => m.genome.guardian_version));
+      familiesOf(t).flatMap((f) => f.members.map((m) => m.genome.review_fingerprint));
     expect(names(a)).toEqual(names([...a].reverse()));
   });
 });
@@ -80,8 +82,8 @@ describe("renderHive", () => {
     // by eye — measured at bands 4/4 and thorax within 4% — so the text is what
     // says which one this is.
     const html = renderHive([
-      track({ guardian_version: "4d1fe6a8aaaa" }),
-      track({ guardian_version: "112e4373bbbb" }),
+      track({ review_fingerprint: "4d1fe6a8aaaa" }),
+      track({ review_fingerprint: "112e4373bbbb" }),
     ]);
     expect(html).toContain("4d1fe6a");
     expect(html).toContain("112e437");
@@ -90,7 +92,7 @@ describe("renderHive", () => {
   it("names each family", () => {
     const html = renderHive([
       track({}),
-      track({ finder_model: "mistral-medium-latest", provider: "mistral" }),
+      track({ finder_model: "mistral-medium-latest", finder_provider: "mistral" }),
     ]);
     expect(html).toContain("gemini");
     expect(html).toContain("mistral");
@@ -99,8 +101,8 @@ describe("renderHive", () => {
   it("renders one bee per identity", () => {
     const html = renderHive([
       track({}),
-      track({ guardian_version: "cccc" }),
-      track({ guardian_version: "dddd" }),
+      track({ review_fingerprint: "cccc" }),
+      track({ review_fingerprint: "dddd" }),
     ]);
     expect(html.match(/<svg/g) ?? []).toHaveLength(3);
   });
@@ -110,7 +112,7 @@ describe("renderHive", () => {
     // closing tag never reaches the output — assert the property that matters,
     // which is that no genome text arrives as live markup, rather than a
     // specific escaped string.
-    const html = renderHive([track({ guardian_version: "<script>alert(1)</script>" })]);
+    const html = renderHive([track({ review_fingerprint: "<script>alert(1)</script>" })]);
     expect(html).toContain("&lt;script");
     expect(html).not.toMatch(/<script/);
   });
@@ -126,9 +128,9 @@ describe("renderHive", () => {
 describe("near twins", () => {
   it("finds members differing in nothing but guardian_version", () => {
     const family = familiesOf([
-      track({ guardian_version: "aaaa" }),
-      track({ guardian_version: "bbbb" }),
-      track({ context_mode: "diff-only", guardian_version: "cccc" }),
+      track({ review_fingerprint: "aaaa" }),
+      track({ review_fingerprint: "bbbb" }),
+      track({ context_mode: "diff-only", review_fingerprint: "cccc" }),
     ])[0]!;
     const groups = nearTwinsIn(family);
     expect(groups).toHaveLength(1);
@@ -136,15 +138,15 @@ describe("near twins", () => {
   });
 
   it("does not call a lone member a twin", () => {
-    const family = familiesOf([track({ guardian_version: "aaaa" })])[0]!;
+    const family = familiesOf([track({ review_fingerprint: "aaaa" })])[0]!;
     expect(nearTwinsIn(family)).toHaveLength(0);
   });
 
   it("does not group across a differing skeptic", () => {
     // A different skeptic is a different reviewer, not a version bump.
     const family = familiesOf([
-      track({ guardian_version: "aaaa", skeptic_model: "gemini-3.5-flash" }),
-      track({ guardian_version: "bbbb", skeptic_model: null }),
+      track({ review_fingerprint: "aaaa", skeptic_model: "gemini-3.5-flash" }),
+      track({ review_fingerprint: "bbbb", skeptic_model: null }),
     ])[0]!;
     expect(nearTwinsIn(family)).toHaveLength(0);
   });
@@ -152,12 +154,12 @@ describe("near twins", () => {
   it("states it as a suspicion, not a finding", () => {
     // Whether these are one reviewer is upstream's to confirm — it is what
     // codegraph-brain#375 measures — so the page must not assert it.
-    const html = renderHive([track({ guardian_version: "aaaa" }), track({ guardian_version: "bbbb" })]);
+    const html = renderHive([track({ review_fingerprint: "aaaa" }), track({ review_fingerprint: "bbbb" })]);
     expect(html).toMatch(/probably/i);
     expect(html).not.toMatch(/\bare one reviewer\b/);
   });
 
   it("says nothing when a family has no twins", () => {
-    expect(renderHive([track({ guardian_version: "aaaa" })])).not.toMatch(/probably/i);
+    expect(renderHive([track({ review_fingerprint: "aaaa" })])).not.toMatch(/probably/i);
   });
 });

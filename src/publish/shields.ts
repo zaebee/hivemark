@@ -17,7 +17,7 @@ export interface ShieldsEndpoint {
 export function shieldsEndpoint(track: TrackRecord): ShieldsEndpoint {
   const { confirmed, refuted, uncertain } = track.skeptic;
   const resolved = confirmed + refuted + uncertain;
-  const label = `${track.genome.provider} · ${track.genome.context_mode}`;
+  const label = `${track.genome.finder_provider} · ${track.genome.context_mode}`;
 
   if (resolved === 0) {
     return { schemaVersion: 1, label, message: "no data", color: "lightgrey" };

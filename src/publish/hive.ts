@@ -1,7 +1,6 @@
 import { avatarSvg } from "../avatar.js";
 import { byCodeUnit } from "../canonical.js";
 import { esc } from "../escape.js";
-import { providerOf } from "../genome.js";
 import type { TrackRecord } from "../types.js";
 
 /**
@@ -30,7 +29,7 @@ export interface Family {
 export function familiesOf(tracks: readonly TrackRecord[]): Family[] {
   const byProvider = new Map<string, TrackRecord[]>();
   for (const track of tracks) {
-    const provider = providerOf(track.genome.finder_model);
+    const provider = track.genome.finder_provider;
     const held = byProvider.get(provider);
     if (held) held.push(track);
     else byProvider.set(provider, [track]);
@@ -46,7 +45,7 @@ export function familiesOf(tracks: readonly TrackRecord[]): Family[] {
       members: [...members].sort((a, b) => {
         const mode = byCodeUnit(a.genome.context_mode, b.genome.context_mode);
         if (mode !== 0) return mode;
-        const version = byCodeUnit(a.genome.guardian_version, b.genome.guardian_version);
+        const version = byCodeUnit(a.genome.review_fingerprint, b.genome.review_fingerprint);
         // Falls back to identity so the comparator is total. Two members of one
         // family can agree on both sorted fields and still differ — the family
         // is keyed by provider, and one provider covers many finder models. A
@@ -62,11 +61,11 @@ function bee(track: TrackRecord): string {
   let judged: string;
   if (g.skeptic_model === null) judged = "unjudged";
   else if (g.skeptic_model === g.finder_model) judged = "self-graded";
-  else judged = `judged by ${providerOf(g.skeptic_model)}`;
+  else judged = `judged by ${g.skeptic_provider ?? "another model"}`;
 
   return (
     `<figure class="hm-bee">${avatarSvg(g, 96)}` +
-    `<figcaption><code>${esc(g.guardian_version.slice(0, 7))}</code>` +
+    `<figcaption><code>${esc(g.review_fingerprint.slice(0, 7))}</code>` +
     `<span>${esc(g.context_mode)}</span>` +
     `<span>${esc(judged)}</span>` +
     `<span>${track.reviews} reviews</span></figcaption></figure>`

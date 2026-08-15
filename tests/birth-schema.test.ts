@@ -7,19 +7,15 @@ import { identityId, ownerAddress } from "../src/identity.js";
 import type { Genome } from "../src/types.js";
 
 const genome: Genome = {
-  schema_version: 1,
-  known_fields: [
-    "context_mode",
-    "finder_model",
-    "guardian_version",
-    "provider",
-    "skeptic_model",
-  ],
-  provider: "gemini",
+  schema_version: 2,
+  known_fields: ["context_mode", "finder_model", "finder_provider", "review_fingerprint", "skeptic_model", "skeptic_provider"],
+  finder_provider: "gemini",
+
+  skeptic_provider: "gemini",
   finder_model: "gemini-2.5-flash",
   skeptic_model: "gemini-3.5-flash",
   context_mode: "graph",
-  guardian_version: "d0d807ef01c556b882dc85b9fc0d2851d92aa1e5",
+  review_fingerprint: "d0d807ef01c556b882dc85b9fc0d2851d92aa1e5",
 };
 
 const FIRST_SEEN = 1_786_527_600;
@@ -43,59 +39,53 @@ describe("BIRTH_SCHEMA", () => {
   });
 });
 
+/**
+ * Genome 1, which is what birth schema 1 can represent. The tests below describe
+ * that schema's behaviour, and it stays registered until phase 2 replaces it.
+ */
+const legacyGenome = { ...genome, schema_version: 1 } as unknown as Genome;
+
 describe("encodeBirth", () => {
   it("round-trips through the EAS schema encoder", () => {
-    const byName = decode(encodeBirth(genome, FIRST_SEEN));
-    expect(String(byName.identityId)).toBe(identityId(genome));
+    const byName = decode(encodeBirth(legacyGenome, FIRST_SEEN));
+    expect(String(byName.identityId)).toBe(identityId(legacyGenome));
     expect(String(byName.finderModel)).toBe(genome.finder_model);
     expect(Number(byName.firstSeen)).toBe(FIRST_SEEN);
   });
 
   it("names the entity by its derived, keyless address", () => {
-    const byName = decode(encodeBirth(genome, FIRST_SEEN));
+    const byName = decode(encodeBirth(legacyGenome, FIRST_SEEN));
     expect(String(byName.entity).toLowerCase()).toBe(
-      ownerAddress(identityId(genome)).toLowerCase(),
+      ownerAddress(identityId(legacyGenome)).toLowerCase(),
     );
   });
 
   it("writes an absent skeptic as an empty string, not as a missing field", () => {
     // A reader must be able to tell "no skeptic" from "field not published".
-    const byName = decode(encodeBirth({ ...genome, skeptic_model: null }, FIRST_SEEN));
+    const byName = decode(encodeBirth({ ...legacyGenome, skeptic_model: null }, FIRST_SEEN));
     expect(String(byName.skepticModel)).toBe("");
   });
 
-  it("publishes enough to recompute the identity it names", () => {
-    // The property the whole schema exists for.
+  it("refuses a genome this schema cannot represent", () => {
+    // The promise these two tests used to assert — a reader can rebuild the
+    // genome from the record and recompute the identity — is false for genome 2
+    // against birth schema 1, which has one provider field where the genome has
+    // finder_provider and skeptic_provider. `skeptic_provider` would be lost and
+    // the rebuilt identity would differ.
     //
-    // Every field below comes from the decoded record and nothing from the
-    // fixture. The first version of this test passed `known_fields` in from the
-    // genome — supplying the one input the record was missing, so it asserted
-    // the property while hiding that it did not hold.
-    const byName = decode(encodeBirth(genome, FIRST_SEEN));
-    const rebuilt: Genome = {
-      schema_version: Number(byName.genomeSchemaVersion),
-      known_fields: String(byName.knownFields).split(","),
-      provider: String(byName.provider) as Genome["provider"],
-      finder_model: String(byName.finderModel),
-      skeptic_model: String(byName.skepticModel) === "" ? null : String(byName.skepticModel),
-      context_mode: String(byName.contextMode) as Genome["context_mode"],
-      guardian_version: String(byName.guardianVersion),
-    };
-    expect(identityId(rebuilt)).toBe(String(byName.identityId));
+    // Refused rather than encoded with a warning, because a warning does not
+    // stop a broadcast and the record would be permanent. Phase 2 registers a
+    // version 2 of the schema and restores the round trip.
+    expect(() => encodeBirth(genome, FIRST_SEEN)).toThrow(/cannot represent genome schema 2/);
   });
 
-  it("recomputes the identity for a skeptic-less genome too", () => {
-    const without: Genome = { ...genome, skeptic_model: null };
-    const byName = decode(encodeBirth(without, FIRST_SEEN));
-    const rebuilt: Genome = {
-      schema_version: Number(byName.genomeSchemaVersion),
-      known_fields: String(byName.knownFields).split(","),
-      provider: String(byName.provider) as Genome["provider"],
-      finder_model: String(byName.finderModel),
-      skeptic_model: String(byName.skepticModel) === "" ? null : String(byName.skepticModel),
-      context_mode: String(byName.contextMode) as Genome["context_mode"],
-      guardian_version: String(byName.guardianVersion),
-    };
-    expect(identityId(rebuilt)).toBe(String(byName.identityId));
+  it("names both provider fields in the refusal, so the fix is obvious", () => {
+    expect(() => encodeBirth(genome, FIRST_SEEN)).toThrow(/finder_provider and skeptic_provider/);
+  });
+
+  it("still encodes a genome 1 record, which is what is registered", () => {
+    // Nothing has been announced against schema 1, but it is the registered
+    // schema and must keep working until schema 2 replaces it.
+    expect(() => encodeBirth(legacyGenome, FIRST_SEEN)).not.toThrow();
   });
 });
