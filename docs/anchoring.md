@@ -206,6 +206,42 @@ synced on Friday loses the weekend from the only anchor that week will ever have
 `newest`, the time of the latest attestation it covers, next to the period's end.
 If those are far apart, the input is stale, not the week quiet.
 
+## 2026-W33 covers two generations
+
+The genome changed on 2026-08-15 — `GENOME_SCHEMA_VERSION` 1 to 2, keying
+identity on the review fingerprint instead of `guardian_sha`. The same 115
+reviews are therefore signed twice, under different identities, and **one root
+covers both sets**.
+
+```
+generation 1 only   932 attestations   8 identities
+generation 2 only   932 attestations   3 identities
+both              1864 attestations   0 shared uids
+```
+
+An anchor asserts its contents existed no later than the block carrying it, and
+both sets do exist — so the claim is true of both and nothing false is
+published. The findings are identical; only the identity each is attributed to
+changed, which is why the two sets are disjoint by uid and share every
+`claim_hash`.
+
+The alternative was forced rather than chosen. An attestation's period comes
+from `reviewed_at`, so re-signed attestations land in W33 as well, and one
+anchor per period is enforced in `planAnchor` and again in the ledger. A root
+over generation 1 alone would foreclose generation 2 for that week permanently —
+and the whole corpus is 2026-08-12, so W33 is the entire history of all three
+surviving identities.
+
+**Anchor both files, not `dist/attestations.json` alone.** Generation 1 is
+preserved outside `dist/`, which the pipeline overwrites. Concatenate the two
+arrays and pass the result to `planAnchor`; the dry run will report 1864.
+
+Expect the superseded count to be large — 560 of the 1864, across 32
+re-reviewed commits. That is not a defect: the two generations attribute the
+same findings to different identities, and collapsing eight identities into
+three made repeat runs of one configuration look like re-reviews of one commit.
+`derive.ts` records why.
+
 ## A missed week
 
 Leave it missed. An anchor asserts that its contents existed by a date that has
