@@ -183,9 +183,15 @@ this and reports "no signing key configured — claims produced, nothing signed"
 The page needs no signatures. `docs/anchoring.md` is explicit that no key belongs
 in CI, and this project has already lost one key to a transcript.
 
-The corpus is in a private sibling repository, so the CI job either receives a
-token to check it out, or the deployment waits for §6's attestation-backed
-builder and reads what is public. The second is better and is not available yet.
+~~The corpus is in a private sibling repository, so the CI job either receives a
+token to check it out~~ — **corrected 2026-08-15: `codegraph-brain` is public.**
+An unauthenticated fetch of a corpus file returns 200, so CI checks it out into
+a sibling path with no token and the manifest resolves unchanged.
+
+What does gate deployment is the repository's own visibility: GitHub Pages on a
+private repository requires a paid plan, and `hivemark` is private on a free
+one. Either it becomes public — which suits a project whose whole claim is that
+a stranger can check the work — or the page is published somewhere else.
 
 ## 8. What the first implementation covers
 
