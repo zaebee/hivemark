@@ -13,13 +13,100 @@
  * send anyway.
  */
 
-import { createWalletClient, formatEther, http } from "viem";
+import { BaseError, createWalletClient, formatEther, http } from "viem";
 import type { Account, HttpTransport, PublicClient, WalletClient } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { base } from "viem/chains";
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+
+export interface RpcFailure {
+  /** What went wrong, in the voice the rest of these scripts use. */
+  readonly summary: string;
+  /** What the operator should do about it. */
+  readonly advice: string;
+}
+
+/**
+ * Classify a thrown value as an RPC problem, or not one at all.
+ *
+ * Returning `null` is the load-bearing case. A `TypeError` here is a bug in
+ * this code, and a script that reports it as "the RPC is unhappy, try again"
+ * has replaced a stack trace with a confident lie — worse than the trace it
+ * replaced. Only viem's own errors are claimed; everything else is somebody
+ * else's problem and must keep propagating.
+ *
+ * `BaseError` is the discriminator because it is the one viem guarantees:
+ * measured, an unreachable host gives `HttpRequestError extends BaseError`,
+ * and a plain `TypeError` gives `instanceof BaseError === false`.
+ *
+ * Every message ends by saying nothing was sent, because that is the single
+ * fact an operator needs before deciding what to do — and on these scripts it
+ * is always true, since the reads that can fail this way all happen before the
+ * key is opened.
+ */
+export function rpcFailure(error: unknown): RpcFailure | null {
+  if (!(error instanceof BaseError)) return null;
+
+  const nothingSent = "nothing was sent.";
+  const code = (error as unknown as { code?: number }).code;
+  const status = (error as unknown as { status?: number }).status;
+  const details = error.details || error.shortMessage || error.message;
+
+  // -32016 is the RPC envelope's rate limit; 429 is the same condition arriving
+  // at the transport layer instead. Named because the operator's correct
+  // response is to do nothing for a minute, and because this one arriving as a
+  // stack trace already cost an afternoon: it was read as a Bun crash, and the
+  // comparison run to check for a regression was confounded by the same limit.
+  if (code === -32016 || status === 429) {
+    return {
+      summary: `the RPC refused the request: over rate limit (${code ?? status})`,
+      advice: `wait a minute and run it again — ${nothingSent}`,
+    };
+  }
+
+  if (status !== undefined && status >= 500) {
+    return {
+      summary: `the RPC is unavailable: HTTP ${status}`,
+      advice: `the provider is failing, not this script — try again later, ${nothingSent}`,
+    };
+  }
+
+  if (/unable to connect|econnrefused|enotfound|fetch failed/i.test(details)) {
+    return {
+      summary: `cannot reach the RPC: ${details.split("\n")[0]}`,
+      advice: `check the network and the endpoint — ${nothingSent}`,
+    };
+  }
+
+  // Unrecognised is not the same as not-an-RPC-problem. An unfamiliar code must
+  // still be reported as one, or it falls through to the stack trace this
+  // function exists to replace.
+  return {
+    summary: `the RPC call failed: ${details.split("\n")[0]}`,
+    advice: `${nothingSent} re-run once the cause is understood.`,
+  };
+}
+
+/**
+ * Run a pre-flight read, and refuse legibly when the RPC is the problem.
+ *
+ * Not a blanket try/catch: anything `rpcFailure` does not claim is rethrown
+ * untouched, so a real defect still surfaces with its stack.
+ */
+export async function reading<T>(what: string, read: () => Promise<T>): Promise<T> {
+  try {
+    return await read();
+  } catch (error) {
+    const failure = rpcFailure(error);
+    if (!failure) throw error;
+    console.error(`while ${what}:`);
+    console.error(`  ${failure.summary}`);
+    console.error(`  ${failure.advice}`);
+    process.exit(1);
+  }
+}
 
 /** Where the anchoring key lives. Never inside the repository — see docs/anchoring.md. */
 export const KEY_PATH = join(homedir(), ".hivemark", "anchoring.key");

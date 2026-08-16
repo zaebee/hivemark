@@ -25,6 +25,7 @@ import {
   GET_SCHEMA_ABI,
   SCHEMA_REGISTRY,
   ZERO_UID,
+  reading,
   refuseUnlessAffordable,
   signer,
   stopUnlessSending,
@@ -102,12 +103,14 @@ const publicClient = createPublicClient({ chain: base, transport: http() });
 // The schema must exist before anything is attested against it: EAS reverts
 // `attest` on an unregistered schema, so sending first would buy one reverted
 // transaction per identity.
-const registered = await publicClient.readContract({
-  address: SCHEMA_REGISTRY,
-  abi: GET_SCHEMA_ABI,
-  functionName: "getSchema",
-  args: [BIRTH_SCHEMA_UID],
-});
+const registered = await reading("checking the birth schema is registered", () =>
+  publicClient.readContract({
+    address: SCHEMA_REGISTRY,
+    abi: GET_SCHEMA_ABI,
+    functionName: "getSchema",
+    args: [BIRTH_SCHEMA_UID],
+  }),
+);
 if (registered.uid === ZERO_UID) {
   console.error(`birth schema ${BIRTH_SCHEMA_UID} is not registered on Base.`);
   console.error("run `bun scripts/send-schemas.ts` first; nothing here can be attested until it exists.");
@@ -115,8 +118,10 @@ if (registered.uid === ZERO_UID) {
 }
 console.log(`schema    ${BIRTH_SCHEMA_UID} registered`);
 
-const registration = await publicClient.getTransactionReceipt({ hash: SCHEMA_REGISTRATION_TX });
-const head = await publicClient.getBlockNumber();
+const registration = await reading("reading the schema registration receipt", () =>
+  publicClient.getTransactionReceipt({ hash: SCHEMA_REGISTRATION_TX }),
+);
+const head = await reading("reading the chain head", () => publicClient.getBlockNumber());
 console.log(`          block ${registration.blockNumber}, head ${head}`);
 
 /**
@@ -145,13 +150,15 @@ async function birthsOnChain(): Promise<Map<string, `0x${string}`[]>> {
     // simplification is not available here.
     let to = from + LOG_SCAN_CHUNK;
     if (to > head) to = head;
-    const logs = await publicClient.getLogs({
-      address: EAS_CONTRACT,
-      event: ATTESTED_EVENT,
-      args: { schemaUID: BIRTH_SCHEMA_UID },
-      fromBlock: from,
-      toBlock: to,
-    });
+    const logs = await reading(`scanning blocks ${from}-${to} for births already announced`, () =>
+      publicClient.getLogs({
+        address: EAS_CONTRACT,
+        event: ATTESTED_EVENT,
+        args: { schemaUID: BIRTH_SCHEMA_UID },
+        fromBlock: from,
+        toBlock: to,
+      }),
+    );
     for (const [entity, uids] of indexBirths(logs)) {
       byEntity.set(entity, [...(byEntity.get(entity) ?? []), ...uids]);
     }
