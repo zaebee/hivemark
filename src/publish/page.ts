@@ -3,7 +3,7 @@ import { esc } from "../escape.js";
 import { renderHive } from "./hive.js";
 import type { AblationStudy } from "../ablation.js";
 import { shieldsEndpoint } from "./shields.js";
-import type { TrackRecord } from "../types.js";
+import type { SeverityBand, TrackRecord } from "../types.js";
 
 /**
  * Shown when the build produced no signed attestations.
@@ -152,19 +152,26 @@ function unverifiableNote(tracks: TrackRecord[]): string | null {
  */
 function severityLine(skeptic: TrackRecord["skeptic"]): string {
   return skeptic.by_severity
-    .map((band) =>
-      band.resolved === 0
-        ? `${band.severity} <span class="nodata">none</span>`
-        : `${band.severity} ${Math.round((band.confirmed / band.resolved) * 100)}% of ${band.resolved}` +
-          // Shown per band, not folded into the rate. The share the skeptic
-          // could not verify separates these reviewers more sharply than the
-          // rate does, and no denominator can express it — a rate says how the
-          // uncertain ones were counted, this says how many there were.
-          (band.uncertain > 0
-            ? ` <span class="nodata">(${band.uncertain} unverifiable)</span>`
-            : ""),
-    )
+    .map(severityBand)
     .join(" · ");
+}
+
+/**
+ * One band: its rate, and how many of its judged claims went unverified.
+ *
+ * The unverifiable count is shown per band rather than folded into the rate,
+ * because the share separates these reviewers more sharply than the rate does
+ * and no denominator can express it — a rate says how the uncertain ones were
+ * counted, this says how many there were. Omitted at zero so it marks a fact
+ * rather than becoming punctuation on every band.
+ */
+function severityBand(band: SeverityBand): string {
+  if (band.resolved === 0) return `${band.severity} <span class="nodata">none</span>`;
+
+  const rate = Math.round((band.confirmed / band.resolved) * 100);
+  const line = `${band.severity} ${rate}% of ${band.resolved}`;
+  if (band.uncertain === 0) return line;
+  return `${line} <span class="nodata">(${band.uncertain} unverifiable)</span>`;
 }
 
 /**
