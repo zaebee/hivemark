@@ -58,6 +58,44 @@ describe("ReviewRecordSchema is a faithful projection of the published contract"
   const nullableInContract = (name: string): boolean =>
     (contract.properties[name]?.anyOf ?? []).some((v) => v.type === "null");
 
+  /**
+   * Contract fields this project knowingly does not read.
+   *
+   * A ratchet, not a waiver. Everything here is a cost or timing metric that
+   * says nothing about a reviewer's identity or its claims. A new field
+   * appearing upstream fails the test below until somebody puts it in one list
+   * or the other, which is the point: `arm` was declared in the contract,
+   * ignored here, and nothing noticed — until reading `had_graph` without it
+   * led to describing 19 deliberate ablations as a run that had lost its graph.
+   *
+   * The three assertions around this one all check our schema against the
+   * contract. This is the only one that checks the contract against us.
+   */
+  const KNOWINGLY_UNREAD = new Set([
+    "completion_tokens",
+    "duration_s",
+    "prompt_tokens",
+    "review_fingerprint_source",
+    "skeptic_completion_tokens",
+    "skeptic_prompt_tokens",
+    "temperature",
+  ]);
+
+  it("reads every contract field it has not explicitly set aside", () => {
+    const ours = new Set(Object.keys(ReviewRecordSchema.shape));
+    const ignored = [...Object.keys(contract.properties)].filter(
+      (name) => !ours.has(name) && !KNOWINGLY_UNREAD.has(name),
+    );
+    expect(ignored, "declared upstream, read nowhere, and not listed as deliberate").toEqual([]);
+  });
+
+  it("sets aside nothing it actually reads", () => {
+    // The other half of the ratchet: a field that starts being read must leave
+    // the list, or the list stops describing anything.
+    const ours = new Set(Object.keys(ReviewRecordSchema.shape));
+    expect([...KNOWINGLY_UNREAD].filter((name) => ours.has(name))).toEqual([]);
+  });
+
   it("invents no field the contract does not declare", () => {
     for (const name of Object.keys(ours)) {
       expect(Object.keys(contract.properties), `${name} is not in the contract`).toContain(name);

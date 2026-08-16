@@ -86,6 +86,28 @@ export const ReviewRecordSchema = z.object({
   skeptic_provider: z.string().nullable().optional(),
   had_graph: z.boolean(),
   pr_slice: z.string(),
+  /**
+   * Which arm produced this review: `"graph"` is the normal run, `"ablated"` is
+   * the same PR reviewed with the graph **deliberately** withheld.
+   *
+   * A bare string, not `z.enum(["graph", "ablated"])`, even though that is what
+   * the contract declares. An enum here rejects the whole record on any third
+   * value — measured: `arm: "control"` gives `records kept: 0` and one warning
+   * — and losing a review because one metadata field grew a value is the wrong
+   * failure for a project whose record is meant to be cumulative. `harvest`
+   * names an unrecognised arm instead, so nothing is dropped and nothing is
+   * silent.
+   *
+   * Not `.nullable()`: the contract gives this field a default and never null,
+   * and the drift guard fails on `we allow null for arm, the contract does not`.
+   *
+   * Optional because rows predating the field exist in the corpus. Read here
+   * because without it an ablation and an ingest failure are the same row — and
+   * upstream added the field precisely so they would not be. Not reading it
+   * once led this project to describe 19 deliberate ablations as a degraded
+   * run that had lost its graph.
+   */
+  arm: z.string().optional(),
   parse_failed: z.boolean(),
   error: z.string().nullable().optional(),
   findings: z.array(RawFindingSchema),
