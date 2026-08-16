@@ -84,6 +84,23 @@ export function genomeOf(record: ReviewRecord): Genome {
     // which refuses it — that is "no skeptic ran" written with a stray space,
     // and the space is the configuration error this function exists to surface.
     skeptic_model: !record.skeptic_model ? null : exactly(record.skeptic_model, "skeptic_model"),
+    // `had_graph`, not `pr_slice`, and the two disagree more than one would
+    // guess. The design doc named both as the source and set no rule, so this
+    // is the rule.
+    //
+    // `pr_slice` is the arm a run was assigned to; `had_graph` is whether a
+    // graph was actually present. The genome describes how a review was
+    // performed, so the observed condition wins: crediting graph-context
+    // results to a review that had no graph context is the more damaging of the
+    // two errors available here.
+    //
+    // The cost of that choice is not hypothetical. In the current corpus 19
+    // records say `pr_slice: "graph"` with `had_graph: false` — one contiguous
+    // 14-minute window on one Guardian commit, and every one of those PRs has a
+    // graph run elsewhere in the corpus. They are the degraded half of a graph
+    // campaign, and they are counted here as 42% of the `diff-only` identity's
+    // reviews. `harvest` warns about them; changing this line would move them
+    // to a different identity, and both identities are already born on chain.
     context_mode: record.had_graph ? "graph" : "diff-only",
     // Replaces guardian_version. `guardian_sha` stays on the record as
     // provenance and leaves the genome: one identity now spans several commits,

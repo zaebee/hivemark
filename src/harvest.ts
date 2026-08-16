@@ -44,5 +44,45 @@ export function harvest(text: string): HarvestResult {
     records.push(parsed.data);
   });
 
+  warnings.push(...contextModeDisagreements(records));
+
   return { records, warnings };
+}
+
+/**
+ * Report records whose two candidate context sources contradict each other.
+ *
+ * `pr_slice` names the arm a run was assigned to; `had_graph` reports whether a
+ * graph was actually there. `genomeOf` derives `context_mode` — and therefore
+ * `identity_id` — from `had_graph`, so a disagreement silently files a run
+ * under a different reviewer than its own label implies.
+ *
+ * This does not refuse, because `had_graph` is the defensible source and
+ * refusing would stop a corpus that is honestly reporting a degraded run. It
+ * warns, because 19 such records in the current corpus account for 42% of one
+ * published identity's reviews, and that arrived without anything saying so.
+ *
+ * Counted rather than reported per line: nineteen warnings is noise nobody
+ * reads, and one with a number is a fact somebody acts on.
+ */
+function contextModeDisagreements(records: readonly ReviewRecord[]): string[] {
+  let graphArmWithoutGraph = 0;
+  let diffArmWithGraph = 0;
+  for (const record of records) {
+    const labelledGraph = record.pr_slice === "graph";
+    if (labelledGraph === !!record.had_graph) continue;
+    if (labelledGraph) graphArmWithoutGraph += 1;
+    else diffArmWithGraph += 1;
+  }
+
+  const say = (n: number, label: string, reported: string, counted: string): string =>
+    `${n} record${n === 1 ? "" : "s"} have pr_slice=${label} but had_graph=${reported}; ` +
+    `context_mode follows had_graph, so they are counted as ${counted}`;
+
+  const out: string[] = [];
+  if (graphArmWithoutGraph > 0) {
+    out.push(say(graphArmWithoutGraph, "graph", "false", "diff-only"));
+  }
+  if (diffArmWithGraph > 0) out.push(say(diffArmWithGraph, "diff-only", "true", "graph"));
+  return out;
 }
