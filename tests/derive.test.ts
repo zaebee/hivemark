@@ -246,3 +246,43 @@ describe("a review whose output could not be parsed", () => {
     for (const t of deriveTrackRecords(records)) expect(t.unparseable).toBe(0);
   });
 });
+
+describe("a run that failed before producing output", () => {
+  const parsed = records.find((r) => r.findings.length > 0)!;
+  const errored = { ...parsed, error: "429 RESOURCE_EXHAUSTED", findings: [] };
+
+  it("is not counted among the reviews", () => {
+    // A provider outage is not a reviewer that looked and saw nothing wrong.
+    expect(deriveTrackRecords([errored])[0]!.reviews).toBe(0);
+  });
+
+  it("is counted apart from an unparseable run, not lumped with it", () => {
+    // The two failures differ in what they say: one produced output nobody
+    // could read, the other produced none at all. "No readable output" is
+    // simply false about a 429.
+    const t = deriveTrackRecords([errored])[0]!;
+    expect(t.errored).toBe(1);
+    expect(t.unparseable).toBe(0);
+  });
+
+  it("does not supersede an earlier successful review of the same PR", () => {
+    const later = { ...errored, reviewed_at: "2099-01-01T00:00:00Z" };
+    const t = deriveTrackRecords([parsed, later])[0]!;
+    expect(t.reviews).toBe(1);
+    expect(t.claims).toBe(parsed.findings.length);
+    expect(t.errored).toBe(1);
+  });
+
+  it("counts as errored, not unparseable, when it is both", () => {
+    // The parse failure is downstream of the call failing, so the error is the
+    // thing that happened. Counting it twice would report two failed runs.
+    const both = { ...errored, parse_failed: true };
+    const t = deriveTrackRecords([both])[0]!;
+    expect(t.errored).toBe(1);
+    expect(t.unparseable).toBe(0);
+  });
+
+  it("reports zero when no run errored", () => {
+    for (const t of deriveTrackRecords(records)) expect(t.errored).toBe(0);
+  });
+});

@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { renderPage } from "../src/publish/page.js";
 import type { TrackRecord } from "../src/types.js";
 
+const BASE_SKEPTIC = { judge: "independent", confirmed: 15, refuted: 3, uncertain: 2, unresolved: 0, mean_impact: 4.1 } as const;
+
 function make(over: Partial<TrackRecord> = {}): TrackRecord {
   return {
     identity_id: `0x${"11".repeat(32)}`,
@@ -19,6 +21,7 @@ function make(over: Partial<TrackRecord> = {}): TrackRecord {
     },
     reviews: 10,
     unparseable: 0,
+    errored: 0,
     claims: 20,
     corpus: [["cal_dot_com", 10]],
     skeptic: { judge: "independent", confirmed: 15, refuted: 3, uncertain: 2, unresolved: 0, mean_impact: 4.1 },
@@ -181,5 +184,57 @@ describe("unparseable runs on the page", () => {
     // It does record them — `error` and `parse_failed` are on every review row.
     // The page said otherwise until this was checked against the data.
     expect(renderPage([make()])).not.toContain("writes no record");
+  });
+});
+
+describe("runs that failed before producing output", () => {
+  it("are named as their own failure, not as unreadable output", () => {
+    const html = renderPage([make({ reviews: 10, errored: 2 })]);
+    expect(html).toContain("2 runs failed before producing output");
+    expect(html).not.toContain("readable output");
+  });
+
+  it("appear alongside unparseable runs when both happened", () => {
+    const html = renderPage([make({ reviews: 10, unparseable: 1, errored: 3 })]);
+    expect(html).toMatch(
+      /1 further run produced no readable output, 3 runs failed before producing output/,
+    );
+  });
+
+  it("say nothing when every run produced something", () => {
+    expect(renderPage([make({ reviews: 10 })])).not.toContain("failed before producing");
+  });
+});
+
+describe("mean impact", () => {
+  it("states the scale, since 6.31 alone does not say whether that is high", () => {
+    expect(renderPage([make({ skeptic: { ...BASE_SKEPTIC, mean_impact: 6.31 } })])).toContain(
+      "6.31 / 10",
+    );
+  });
+
+  it("is labelled self-graded when the skeptic is the finder", () => {
+    // Upstream assigns impact_score in the skeptic stage. When the skeptic is
+    // the same model as the finder, the number is a model scoring the
+    // importance of its own findings — the same fact the confirmation rate
+    // already renames itself for.
+    const html = renderPage([
+      make({
+        genome: { ...make().genome, skeptic_model: "gemini-2.5-flash" },
+        skeptic: { ...BASE_SKEPTIC, judge: "self", mean_impact: 6.31 },
+      }),
+    ]);
+    expect(html).toContain("self-graded mean impact");
+  });
+
+  it("is not labelled self-graded when a different model judged", () => {
+    const html = renderPage([make({ skeptic: { ...BASE_SKEPTIC, mean_impact: 6.31 } })]);
+    expect(html).toContain("<dt>mean impact</dt>");
+    expect(html).not.toContain("self-graded mean impact");
+  });
+
+  it("says no data rather than a scale when nothing scored", () => {
+    const html = renderPage([make({ skeptic: { ...BASE_SKEPTIC, mean_impact: null } })]);
+    expect(html).not.toContain("/ 10");
   });
 });
