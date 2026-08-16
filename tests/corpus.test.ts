@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import { loadCorpus } from "../src/corpus.js";
+import { loadCorpus, readCorpus } from "../src/corpus.js";
+import { harvest } from "../src/harvest.js";
 
 const made: string[] = [];
 
@@ -206,5 +208,46 @@ describe("the committed manifest", () => {
     const corpus = loadCorpus("corpus.json");
     expect(corpus.files.length).toBeGreaterThan(0);
     expect(corpus.sha256).toMatch(/^[0-9a-f]{64}$/);
+  });
+});
+
+describe("the provenance the corpus points at", () => {
+  // Same sibling checkout, same reason for skipping rather than swallowing.
+  const repo = resolve(dirname(resolve("corpus.json")), "../ownima/codegraph-brain");
+  const present = existsSync(join(repo, ".git"));
+
+  it.skipIf(!present)("resolves every guardian_sha a review claims to come from", () => {
+    // `guardian_sha` left the genome when identity moved to the review
+    // fingerprint, so nothing published depends on it — no identity, no
+    // address, no birth, no anchored root. It stays on the record as
+    // provenance, and provenance is the one thing it is for: a reader asking
+    // what code produced a review.
+    //
+    // Two of these live only on `origin/feat/skip-parse-failed`, reachable from
+    // no tag and not from main. Delete that branch and they become
+    // unreachable, and the field goes on looking resolvable while resolving to
+    // nothing — worse than absent, because absence is honest.
+    //
+    // Upstream hit the sharper form of this: all ten calibration shas existed
+    // in one developer's clone alone, because the branches carrying them were
+    // squash-merged and deleted. They now publish them under
+    // `bench/guardian-sha/` tags. Ours are not tagged yet, so this test is the
+    // alarm until they are.
+    const { records } = harvest(readCorpus("corpus.json").text);
+    const shas = [...new Set(records.map((r) => r.guardian_sha))].sort();
+    expect(shas.length).toBeGreaterThan(0);
+
+    const unreachable = shas.filter((sha) => {
+      const probe = spawnSync("git", ["-C", repo, "cat-file", "-e", `${sha}^{commit}`]);
+      return probe.status !== 0;
+    });
+
+    expect(
+      unreachable,
+      `these guardian_sha values no longer resolve in ${repo}. The commits were ` +
+        `probably on a branch that has since been deleted. Ask upstream to tag them, ` +
+        `as they did for the calibration set under bench/guardian-sha/, or restore the ` +
+        `branch long enough to tag them yourself.`,
+    ).toEqual([]);
   });
 });
