@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
@@ -211,6 +211,138 @@ describe("the committed manifest", () => {
   });
 });
 
+/**
+ * Whether a commit will still be there tomorrow, not merely today.
+ *
+ * Resolving now and surviving are different claims, and the first was the one
+ * being checked while the second was the one being asserted. A commit reachable
+ * only from a branch resolves perfectly until the branch is deleted; then the
+ * `guardian_sha` on a signed review points at nothing while still looking like
+ * a hash that means something.
+ *
+ * Durable means reachable from a tag, or an ancestor of `main`. Tags are the
+ * scheme upstream publishes these under; `main` is not going to be deleted, and
+ * demanding a tag for a commit already on it would redden on the ordinary case
+ * of a review run against released code.
+ *
+ * This catches the next one *before* the branch goes, which resolvability
+ * cannot: a fresh sha arriving on a branch fails immediately, while the remedy
+ * is still one `git tag` away.
+ */
+/**
+ * Whichever ref stands for the trunk here, or null if neither does.
+ *
+ * `origin/main` first, a local `main` second: a clone with a renamed remote, or
+ * none, would otherwise have no trunk to compare against.
+ *
+ * Null is a real answer and not a failure. A checkout whose HEAD is some
+ * feature branch has neither ref — measured, cloning a repository whose HEAD
+ * sits on a working branch produces exactly that — and the caller must treat it
+ * as "cannot tell" rather than let a missing ref read as "nothing is durable".
+ */
+function mainRef(repo: string): string | null {
+  for (const ref of ["origin/main", "main"]) {
+    if (spawnSync("git", ["-C", repo, "rev-parse", "--verify", "--quiet", ref]).status === 0) {
+      return ref;
+    }
+  }
+  return null;
+}
+
+function durablyReachable(repo: string, sha: string): boolean {
+  // `origin/main` first, a local `main` second. A clone that has been renamed,
+  // or has no remote at all, would otherwise report every sha as fragile — and
+  // a false alarm here is the expensive kind, because an alarm that cries wolf
+  // is one somebody switches off.
+  const trunk = mainRef(repo);
+  if (trunk && spawnSync("git", ["-C", repo, "merge-base", "--is-ancestor", sha, trunk]).status === 0) {
+    return true;
+  }
+  const tags = spawnSync("git", ["-C", repo, "tag", "--contains", sha]);
+  return tags.status === 0 && tags.stdout.toString().trim() !== "";
+}
+
+describe("durablyReachable", () => {
+  // Built rather than borrowed: upstream has no branch-only commit left to test
+  // against, which is the fix working and a problem for the test. Three commits
+  // in three states prove the predicate separates them.
+  //
+  // Set up in `beforeAll`, not in the describe body. A body runs during
+  // collection — before any filtering, and even when every test here is
+  // skipped — so a failing `git` there takes down the runner instead of failing
+  // a test. It also made the lifecycle implicit enough that this file's shared
+  // `afterEach` deleted the repository out from under these three tests.
+  let scratch: string;
+  let onMain: string;
+  let tagged: string;
+  let branchOnly: string;
+
+  beforeAll(() => {
+    scratch = mkdtempSync(join(tmpdir(), "hivemark-reach-"));
+    // Throws on a non-zero exit. Ignoring it meant a failed `git init` produced
+    // three confusing assertion failures several steps later instead of one
+    // error naming the command — the same silent-setup problem this file spends
+    // its time refusing to tolerate in the corpus.
+    const git = (...args: string[]) => {
+      const run = spawnSync("git", ["-C", scratch, ...args], {
+        env: {
+          ...process.env,
+          GIT_AUTHOR_NAME: "t",
+          GIT_AUTHOR_EMAIL: "t@t",
+          GIT_COMMITTER_NAME: "t",
+          GIT_COMMITTER_EMAIL: "t@t",
+        },
+      });
+      if (run.status !== 0) {
+        throw new Error(`git ${args.join(" ")} failed: ${run.stderr?.toString().trim() || run.error}`);
+      }
+      return run.stdout.toString().trim();
+    };
+    const head = () => git("rev-parse", "HEAD");
+
+    // No `git init -b`, which needs Git 2.28, and no `git branch -m` on an
+    // unborn branch either, which needs 2.30. The default branch is whatever
+    // this git calls it, so the name is read rather than imposed.
+    git("init", "-q");
+    git("commit", "-q", "--allow-empty", "-m", "root");
+    const trunk = git("rev-parse", "--abbrev-ref", "HEAD");
+    git("checkout", "-q", "-b", "side");
+    git("commit", "-q", "--allow-empty", "-m", "tagged, off main");
+    tagged = head();
+    git("tag", "bench/guardian-sha/test");
+    git("commit", "-q", "--allow-empty", "-m", "branch only");
+    branchOnly = head();
+    // main advances past the branch point, so its tip is contained by no tag.
+    // Without this the "on main" commit was also tag-reachable, and the test
+    // could not tell the predicate's two clauses apart — removing the main
+    // clause entirely still passed.
+    git("checkout", "-q", trunk);
+    git("commit", "-q", "--allow-empty", "-m", "on main, untagged");
+    onMain = head();
+    git("update-ref", "refs/remotes/origin/main", onMain);
+  });
+
+  afterAll(() => {
+    if (scratch) rmSync(scratch, { recursive: true, force: true });
+  });
+
+  it("accepts a commit on main that no tag reaches", () => {
+    expect(spawnSync("git", ["-C", scratch, "tag", "--contains", onMain]).stdout.toString().trim()).toBe("");
+    expect(durablyReachable(scratch, onMain)).toBe(true);
+  });
+
+  it("accepts a commit off main that a tag reaches", () => {
+    expect(durablyReachable(scratch, tagged)).toBe(true);
+  });
+
+  it("rejects a commit reachable only from a branch", () => {
+    // Resolves perfectly today. This is the state a thirteenth sha arrives in,
+    // and the whole reason resolvability was the wrong question.
+    expect(spawnSync("git", ["-C", scratch, "cat-file", "-e", `${branchOnly}^{commit}`]).status).toBe(0);
+    expect(durablyReachable(scratch, branchOnly)).toBe(false);
+  });
+});
+
 describe("the provenance the corpus points at", () => {
   // Same sibling checkout, same reason for skipping rather than swallowing.
   const repo = resolve(dirname(resolve("corpus.json")), "../ownima/codegraph-brain");
@@ -222,13 +354,18 @@ describe("the provenance the corpus points at", () => {
   // this reported all six shas unreachable — a true statement about that clone
   // and a false one about the repository, which is the shape of alarm that gets
   // switched off rather than acted on.
+  // Without a trunk to compare against, every sha off a tag would read as
+  // fragile — an alarm firing because the question could not be asked. Skipped
+  // for the same reason a shallow clone is.
+  const hasTrunk = present && mainRef(repo) !== null;
+
   const deep =
     present &&
     spawnSync("git", ["-C", repo, "rev-parse", "--is-shallow-repository"])
       .stdout.toString()
       .trim() === "false";
 
-  it.skipIf(!deep)("resolves every guardian_sha a review claims to come from", () => {
+  it.skipIf(!deep || !hasTrunk)("resolves every guardian_sha a review claims to come from", () => {
     // `guardian_sha` left the genome when identity moved to the review
     // fingerprint, so nothing published depends on it — no identity, no
     // address, no birth, no anchored root. It stays on the record as
@@ -249,17 +386,14 @@ describe("the provenance the corpus points at", () => {
     const shas = [...new Set(records.map((r) => r.guardian_sha))].sort();
     expect(shas.length).toBeGreaterThan(0);
 
-    const unreachable = shas.filter((sha) => {
-      const probe = spawnSync("git", ["-C", repo, "cat-file", "-e", `${sha}^{commit}`]);
-      return probe.status !== 0;
-    });
+    const fragile = shas.filter((sha) => !durablyReachable(repo, sha));
 
     expect(
-      unreachable,
-      `these guardian_sha values no longer resolve in ${repo}. The commits were ` +
-        `probably on a branch that has since been deleted. Ask upstream to tag them, ` +
-        `as they did for the calibration set under bench/guardian-sha/, or restore the ` +
-        `branch long enough to tag them yourself.`,
+      fragile,
+      `these guardian_sha values resolve today but are reachable only from a branch, ` +
+        `so deleting it makes them unreachable and the field starts pointing at nothing. ` +
+        `Ask upstream to tag them under bench/guardian-sha/, as they did for the ` +
+        `calibration set and for the two this corpus needed.`,
     ).toEqual([]);
   });
 });
