@@ -35,12 +35,14 @@ export function deriveTrackRecords(records: ReviewRecord[]): TrackRecord[] {
   // run whose output could not be parsed corrects nothing, and letting it win
   // would discard real findings because a parser failed. Deduplicated within
   // each class, so two failed runs of one PR are one failure.
-  for (const record of dedupe(records.filter((r) => !r.parse_failed))) {
+  const isFailed = (r: ReviewRecord) => Boolean(r.parse_failed || r.error);
+
+  for (const record of dedupe(records.filter((r) => !isFailed(r)))) {
     const bucket = bucketFor(record);
     bucket.records.push(record);
     bucket.claims.push(...claimsOf(record));
   }
-  for (const record of dedupe(records.filter((r) => r.parse_failed))) {
+  for (const record of dedupe(records.filter((r) => isFailed(r)))) {
     bucketFor(record).unparseable++;
   }
 
