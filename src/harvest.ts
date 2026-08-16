@@ -44,9 +44,34 @@ export function harvest(text: string): HarvestResult {
     records.push(parsed.data);
   });
 
+  warnings.push(...unrecognisedArms(records));
   warnings.push(...contextModeDisagreements(records));
 
   return { records, warnings };
+}
+
+/** The arm values this code knows how to interpret. */
+const KNOWN_ARMS = new Set(["graph", "ablated"]);
+
+/**
+ * Report an `arm` value nothing here understands.
+ *
+ * `arm` is typed as a bare string rather than the contract's enum, so a value
+ * added upstream cannot cost us the record it appears on. The price of that is
+ * that it would otherwise pass unremarked and be treated as "not an ablation",
+ * which is a guess. This says so instead.
+ */
+function unrecognisedArms(records: readonly ReviewRecord[]): string[] {
+  const counts = new Map<string, number>();
+  for (const record of records) {
+    if (record.arm === undefined || KNOWN_ARMS.has(record.arm)) continue;
+    counts.set(record.arm, (counts.get(record.arm) ?? 0) + 1);
+  }
+  return [...counts].map(
+    ([arm, n]) =>
+      `${n} record${n === 1 ? "" : "s"} have arm=${arm}, which this version does not know; ` +
+      `treated as not-ablated, which may be wrong`,
+  );
 }
 
 /**

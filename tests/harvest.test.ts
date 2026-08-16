@@ -110,3 +110,32 @@ describe("runs counted as diff-only for a reason worth knowing", () => {
     expect(harvest(text).warnings.filter((w) => /pr_slice|ablation/.test(w))).toHaveLength(0);
   });
 });
+
+describe("an arm value from the future", () => {
+  const row = (arm: string) =>
+    JSON.stringify({
+      url: "https://github.com/o/r/pull/1", project: "r", base_sha: "a", head_sha: "b",
+      guardian_sha: "1111111111111111", reviewed_at: "2026-08-12T10:00:00+00:00",
+      finder_model: "gemini-2.5-flash", skeptic_model: "gemini-3.5-flash", had_graph: true,
+      pr_slice: "graph", parse_failed: false, findings: [], review_fingerprint: "aaaa11111111",
+      finder_provider: "gemini", skeptic_provider: "gemini", arm,
+    });
+
+  it("does not cost us the record it appears on", () => {
+    // The contract declares an enum. Typed as one here, a third value rejects
+    // the whole row — measured, `records kept: 0`. Losing a review because a
+    // metadata field grew a value is the wrong failure for a cumulative record.
+    expect(harvest(row("control")).records).toHaveLength(1);
+  });
+
+  it("is named rather than passed over", () => {
+    expect(harvest(row("control")).warnings.join(" ")).toMatch(
+      /1 record have arm=control, which this version does not know/i,
+    );
+  });
+
+  it("says nothing about the arms it does know", () => {
+    const w = [...harvest(row("graph")).warnings, ...harvest(row("ablated")).warnings];
+    expect(w.filter((x) => /does not know/.test(x))).toHaveLength(0);
+  });
+});
