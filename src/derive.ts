@@ -27,7 +27,7 @@ export function deriveTrackRecords(records: ReviewRecord[]): TrackRecord[] {
   interface Bucket {
     readonly genome: Genome;
     readonly records: ReviewRecord[];
-    readonly claims: { claim: Claim; weight: number }[];
+    readonly claims: Weighted[];
     unparseable: number;
     errored: number;
   }
@@ -73,14 +73,15 @@ export function deriveTrackRecords(records: ReviewRecord[]): TrackRecord[] {
   // keeps a thrice-sampled pull request from outweighing a singly-reviewed one
   // the way pooling would. Counts become fractional where a subject was
   // repeated; that is the honest shape of a mean and the page says so.
+  const usable = records.filter((r) => !errored(r) && !r.parse_failed);
   const runsPerSubject = new Map<string, number>();
-  for (const record of records.filter((r) => !errored(r) && !r.parse_failed)) {
+  for (const record of usable) {
     const key = subjectKey(record);
     runsPerSubject.set(key, (runsPerSubject.get(key) ?? 0) + 1);
   }
   const subjectsSeen = new Map<`0x${string}`, Set<string>>();
 
-  for (const record of records.filter((r) => !errored(r) && !r.parse_failed)) {
+  for (const record of usable) {
     const bucket = bucketFor(record);
     const key = subjectKey(record);
     const weight = 1 / runsPerSubject.get(key)!;
@@ -185,7 +186,10 @@ function corpusOf(records: ReviewRecord[]): ReadonlyArray<readonly [string, numb
  * is a repeat *of*.
  */
 function subjectKey(record: ReviewRecord): string {
-  // Encoded, not concatenated, for the reason `dedupe` records below.
+  // Encoded, not concatenated. Joining with a delimiter assumes the fields
+  // cannot contain it, and the schema constrains neither alphabet: a url
+  // ending "…/1|abc" with sha "def" collided with url "…/1" and sha "abc|def",
+  // and the loser vanished without a warning.
   return JSON.stringify([record.url, record.head_sha, identityId(genomeOf(record))]);
 }
 
@@ -197,11 +201,7 @@ function round(n: number): number {
 export function dedupe(records: readonly ReviewRecord[]): ReviewRecord[] {
   const winners = new Map<string, ReviewRecord>();
   for (const record of records) {
-    // Encoded, not concatenated. Joining with a delimiter assumes the fields
-    // cannot contain it, and the schema constrains neither alphabet: a url
-    // ending "…/1|abc" with sha "def" collided with url "…/1" and sha "abc|def",
-    // and the loser vanished without a warning.
-    const key = JSON.stringify([record.url, record.head_sha, identityId(genomeOf(record))]);
+    const key = subjectKey(record);
     const held = winners.get(key);
     if (held === undefined || supersedes(record, held)) {
       winners.set(key, record);
