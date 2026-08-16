@@ -3,7 +3,7 @@ import { claimsOf } from "./claims.js";
 import { genomeOf } from "./genome.js";
 import { identityId, ownerAddress } from "./identity.js";
 import type { ReviewRecord } from "./schema.js";
-import type { Claim, Genome, Judge, SkepticAxis, TrackRecord } from "./types.js";
+import type { Claim, Genome, Judge, SeverityBand, SkepticAxis, TrackRecord } from "./types.js";
 
 /**
  * Aggregate claims into one track record per identity.
@@ -190,6 +190,55 @@ export function judgeOf(genome: Genome): Judge {
     : "independent";
 }
 
+/**
+ * Ordered by how much a finding claims to matter, not alphabetically.
+ *
+ * A reader scanning a card for the number that matters most should meet it
+ * first, and `critical, major, minor` is that order. Alphabetical would put
+ * `critical` first by luck and `major` before `minor` by luck, and stop being
+ * right the day a band is added.
+ */
+const SEVERITIES = ["critical", "major", "minor"] as const;
+
+/**
+ * Every band, including the empty ones.
+ *
+ * A reviewer that never raised a critical finding is saying something about
+ * itself, and an omitted row reads as a gap in the page rather than as a fact
+ * about the reviewer.
+ */
+function bySeverity(claims: Claim[]): SeverityBand[] {
+  // One pass. The array-per-band version read well and traversed the claims
+  // nine times; this project already prefers a single pass over data designed
+  // to accumulate — see `src/anchor/plan.ts` and `src/ablation.ts`.
+  //
+  // No `if (severity === "critical" || ...)` guard around the lookup. `severity`
+  // is a zod enum of exactly these three, so the branch could never be taken,
+  // and a guard that cannot fire is indistinguishable from one that works right
+  // up until it matters. If the enum ever widens, `Record` stops type-checking
+  // here, which is the failure worth having.
+  // `-readonly` rather than `Omit`: SeverityBand's fields are readonly, which is
+  // right for the value that leaves this function and wrong for the accumulator
+  // that builds it.
+  type Tally = { -readonly [K in Exclude<keyof SeverityBand, "severity">]: SeverityBand[K] };
+  const tally: Record<SeverityBand["severity"], Tally> = {
+    critical: { claims: 0, resolved: 0, confirmed: 0, uncertain: 0 },
+    major: { claims: 0, resolved: 0, confirmed: 0, uncertain: 0 },
+    minor: { claims: 0, resolved: 0, confirmed: 0, uncertain: 0 },
+  };
+
+  for (const claim of claims) {
+    const band = tally[claim.severity];
+    band.claims += 1;
+    if (claim.verdict === "unresolved") continue;
+    band.resolved += 1;
+    if (claim.verdict === "confirmed") band.confirmed += 1;
+    else if (claim.verdict === "uncertain") band.uncertain += 1;
+  }
+
+  return SEVERITIES.map((severity) => ({ severity, ...tally[severity] }));
+}
+
 function skepticAxis(claims: Claim[], genome: Genome): SkepticAxis {
   const count = (v: Claim["verdict"]) => claims.filter((c) => c.verdict === v).length;
   const scored = claims.map((c) => c.impact_score).filter((s): s is number => s !== null);
@@ -203,5 +252,6 @@ function skepticAxis(claims: Claim[], genome: Genome): SkepticAxis {
     mean_impact: scored.length
       ? Math.round((scored.reduce((a, b) => a + b, 0) / scored.length) * 100) / 100
       : null,
+    by_severity: bySeverity(claims),
   };
 }

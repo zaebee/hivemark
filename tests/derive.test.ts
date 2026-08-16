@@ -286,3 +286,86 @@ describe("a run that failed before producing output", () => {
     for (const t of deriveTrackRecords(records)) expect(t.errored).toBe(0);
   });
 });
+
+describe("the confirmed rate broken out by severity", () => {
+  const claim = (severity: string, verdict: string) => ({
+    file: "f.ts",
+    severity,
+    category: "logic",
+    title: "t",
+    evidence: "e",
+    problem: "p",
+    fix: "x",
+    confidence: 80,
+    verdict,
+  });
+  const withFindings = (...fs: unknown[]) =>
+    ({ ...records[0]!, findings: fs }) as (typeof records)[0];
+
+  it("reports every severity band in order of how much it matters", () => {
+    // Not alphabetical. A reader scanning for the number that matters most
+    // should find it first.
+    const t = deriveTrackRecords([withFindings(claim("minor", "confirmed"))])[0]!;
+    expect(t.skeptic.by_severity.map((b) => b.severity)).toEqual(["critical", "major", "minor"]);
+    // Worth knowing that this assertion is currently weak: for these three
+    // names, alphabetical order and severity order coincide, so a `.sort()`
+    // slipped in here would not fail it. It fails on a reordering, and it
+    // starts earning its place the day a band whose name breaks the
+    // coincidence is added — `blocker`, say.
+  });
+
+  it("counts resolved separately from claimed within a band", () => {
+    const t = deriveTrackRecords([
+      withFindings(
+        claim("critical", "confirmed"),
+        claim("critical", "refuted"),
+        claim("critical", "unresolved"),
+      ),
+    ])[0]!;
+    const critical = t.skeptic.by_severity.find((b) => b.severity === "critical")!;
+    expect(critical).toMatchObject({ claims: 3, resolved: 2, confirmed: 1 });
+  });
+
+  it("shows a band with no claims rather than dropping it", () => {
+    // A reviewer that never raised a critical finding is saying something, and
+    // an absent row looks like a rendering gap rather than a fact.
+    const t = deriveTrackRecords([withFindings(claim("minor", "confirmed"))])[0]!;
+    expect(t.skeptic.by_severity.find((b) => b.severity === "critical")).toMatchObject({
+      claims: 0,
+      resolved: 0,
+      confirmed: 0,
+    });
+  });
+
+  it("counts uncertain within the band, apart from confirmed", () => {
+    // The share the skeptic could not verify differs between reviewers by more
+    // than the rate does — 32%, 10% and 6% on critical across the three
+    // published identities — and no choice of denominator can express that.
+    const t = deriveTrackRecords([
+      withFindings(
+        claim("critical", "confirmed"),
+        claim("critical", "uncertain"),
+        claim("critical", "uncertain"),
+        claim("critical", "refuted"),
+      ),
+    ])[0]!;
+    const critical = t.skeptic.by_severity.find((b) => b.severity === "critical")!;
+    expect(critical).toMatchObject({ resolved: 4, confirmed: 1, uncertain: 2 });
+  });
+
+  it("separates the bands rather than pooling them", () => {
+    // The whole point: an identity can look strong overall and be a coin flip
+    // on the findings that matter. Both gemini identities confirm 50% of their
+    // critical claims behind headline rates of 78% and 70%.
+    const t = deriveTrackRecords([
+      withFindings(
+        claim("critical", "refuted"),
+        claim("minor", "confirmed"),
+        claim("minor", "confirmed"),
+      ),
+    ])[0]!;
+    const band = (s: string) => t.skeptic.by_severity.find((b) => b.severity === s)!;
+    expect(band("critical").confirmed).toBe(0);
+    expect(band("minor").confirmed).toBe(2);
+  });
+});

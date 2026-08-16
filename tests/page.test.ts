@@ -2,7 +2,21 @@ import { describe, expect, it } from "vitest";
 import { renderPage } from "../src/publish/page.js";
 import type { TrackRecord } from "../src/types.js";
 
-const BASE_SKEPTIC = { judge: "independent", confirmed: 15, refuted: 3, uncertain: 2, unresolved: 0, mean_impact: 4.1 } as const;
+// Typed as the interface rather than `as const`, so a test can override a
+// single field without every literal narrowing to itself.
+const BASE_SKEPTIC: TrackRecord["skeptic"] = {
+  judge: "independent",
+  confirmed: 15,
+  refuted: 3,
+  uncertain: 2,
+  unresolved: 0,
+  mean_impact: 4.1,
+  by_severity: [
+    { severity: "critical", claims: 0, resolved: 0, confirmed: 0, uncertain: 0 },
+    { severity: "major", claims: 0, resolved: 0, confirmed: 0, uncertain: 0 },
+    { severity: "minor", claims: 0, resolved: 0, confirmed: 0, uncertain: 0 },
+  ],
+};
 
 function make(over: Partial<TrackRecord> = {}): TrackRecord {
   return {
@@ -24,7 +38,7 @@ function make(over: Partial<TrackRecord> = {}): TrackRecord {
     errored: 0,
     claims: 20,
     corpus: [["cal_dot_com", 10]],
-    skeptic: { judge: "independent", confirmed: 15, refuted: 3, uncertain: 2, unresolved: 0, mean_impact: 4.1 },
+    skeptic: BASE_SKEPTIC,
     human: { available: false },
     ...over,
   };
@@ -140,7 +154,7 @@ describe("a self-graded identity on the page", () => {
         context_mode: "graph",
         review_fingerprint: "4d1fe6a1234567",
       },
-      skeptic: { judge: "self", confirmed: 15, refuted: 3, uncertain: 2, unresolved: 0, mean_impact: 4.1 },
+      skeptic: { ...BASE_SKEPTIC, judge: "self" },
     });
 
   it("warns beside the skeptic that it is the finder", () => {
@@ -290,5 +304,115 @@ describe("the ablation section", () => {
     const html = renderPage([make()], { ablation: study });
     const cards = html.split('<section class="card">').length - 1;
     expect(cards).toBe(1);
+  });
+});
+
+describe("the severity breakdown on a card", () => {
+  // `claims` deliberately exceeds `resolved` in every band. With them equal a
+  // rate taken over the wrong denominator produces the same number, and the
+  // assertions below cannot tell the two apart.
+  const bands = (over: Partial<Record<string, number>>[] = []) => [
+    { severity: "critical" as const, claims: 13, resolved: 10, confirmed: 5, uncertain: 0, ...over[0] },
+    { severity: "major" as const, claims: 40, resolved: 34, confirmed: 29, uncertain: 0, ...over[1] },
+    { severity: "minor" as const, claims: 25, resolved: 20, confirmed: 16, uncertain: 0, ...over[2] },
+  ];
+
+  it("sits under the rate it qualifies, not somewhere else on the card", () => {
+    // The rate is the number a reader takes away; the breakdown is the reason
+    // not to take it at face value. A row away and it is a footnote.
+    const html = renderPage([make({ skeptic: { ...BASE_SKEPTIC, by_severity: bands() } })]);
+    const rate = html.indexOf("confirmed rate");
+    const sev = html.indexOf("<dt>by severity</dt>");
+    expect(sev).toBeGreaterThan(rate);
+    expect(sev - rate).toBeLessThan(200);
+  });
+
+  it("shows each band as a rate over what was resolved", () => {
+    const html = renderPage([make({ skeptic: { ...BASE_SKEPTIC, by_severity: bands() } })]);
+    expect(html).toContain("critical 50% of 10");
+    expect(html).toContain("major 85% of 34");
+    expect(html).toContain("minor 80% of 20");
+  });
+
+  it("says none rather than 0% when a band has nothing resolved", () => {
+    // 0% would assert the reviewer got every critical finding wrong. It raised
+    // none — a different statement, and the opposite one.
+    const html = renderPage([
+      make({ skeptic: { ...BASE_SKEPTIC, by_severity: bands([{ claims: 0, resolved: 0, confirmed: 0 }]) } }),
+    ]);
+    expect(html).toContain("critical <span class=\"nodata\">none</span>");
+    expect(html).not.toContain("critical 0% of 0");
+  });
+});
+
+describe("the unverifiable-claims caveat", () => {
+  const axis = (over: Partial<typeof BASE_SKEPTIC> = {}) => ({ ...BASE_SKEPTIC, ...over });
+
+  it("names the denominator and what an uncertain verdict actually means", () => {
+    const html = renderPage([make({ skeptic: axis({ confirmed: 50, refuted: 8, uncertain: 6 }) })]);
+    expect(html).toContain("could not check the claim");
+    expect(html).toContain("not that the claim was wrong");
+  });
+
+  it("carries the size of the choice, computed rather than asserted", () => {
+    // 50/(50+8+6) = 78.1%, 50/(50+8) = 86.2% — an 8-point swing behind an
+    // unnamed decision. Without the number the caveat is a shrug.
+    const html = renderPage([make({ skeptic: axis({ confirmed: 50, refuted: 8, uncertain: 6 }) })]);
+    expect(html).toMatch(/6 of 64 judged findings/);
+    expect(html).toMatch(/by 8 to 8 points/);
+  });
+
+  it("says nothing when no verdict was uncertain", () => {
+    // Absent rather than "0 findings", so the caveat never becomes furniture.
+    const html = renderPage([make({ skeptic: axis({ uncertain: 0 }) })]);
+    expect(html).not.toContain("could not check the claim");
+  });
+});
+
+describe("the unverifiable share per band", () => {
+  const band = (uncertain: number) => [
+    { severity: "critical" as const, claims: 34, resolved: 34, confirmed: 17, uncertain },
+    { severity: "major" as const, claims: 40, resolved: 34, confirmed: 29, uncertain: 0 },
+    { severity: "minor" as const, claims: 25, resolved: 20, confirmed: 16, uncertain: 0 },
+  ];
+
+  it("shows how many the skeptic could not verify, beside the band's rate", () => {
+    const html = renderPage([make({ skeptic: { ...BASE_SKEPTIC, by_severity: band(11) } })]);
+    expect(html).toContain("critical 50% of 34 <span class=\"nodata\">(11 unverifiable)</span>");
+  });
+
+  it("says nothing for a band where every judged claim got a verdict either way", () => {
+    // Absent rather than "(0 unverifiable)", so the note marks a real fact
+    // rather than becoming punctuation on every band.
+    const html = renderPage([make({ skeptic: { ...BASE_SKEPTIC, by_severity: band(0) } })]);
+    expect(html).not.toContain("(0 unverifiable)");
+    expect(html).toContain("critical 50% of 34");
+  });
+});
+
+describe("the caveat when a reviewer has nothing decided either way", () => {
+  it("prints no NaN, and no range it cannot compute", () => {
+    // Reachable: every judged claim came back uncertain. Unguarded this
+    // rendered a literal "NaN to NaN points" — verified by rendering it, not
+    // reasoned about.
+    const html = renderPage([
+      make({ skeptic: { ...BASE_SKEPTIC, confirmed: 0, refuted: 0, uncertain: 5 } }),
+    ]);
+    expect(html).not.toContain("NaN");
+    expect(html).toContain("5 of 5 judged findings");
+    // Pinned to the sentence, not the bare word: the bee's SVG carries a
+    // `points` attribute, so `not.toContain("points")` fails for a reason that
+    // has nothing to do with this note.
+    expect(html).not.toMatch(/would raise the rates below/);
+  });
+
+  it("still gives a range when at least one reviewer has one", () => {
+    // The undefined track is skipped, not allowed to poison the range.
+    const html = renderPage([
+      make({ skeptic: { ...BASE_SKEPTIC, confirmed: 0, refuted: 0, uncertain: 5 } }),
+      make({ skeptic: { ...BASE_SKEPTIC, confirmed: 50, refuted: 8, uncertain: 6 } }),
+    ]);
+    expect(html).not.toContain("NaN");
+    expect(html).toMatch(/by 8 to 8 points/);
   });
 });

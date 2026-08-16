@@ -82,6 +82,30 @@ export interface Claim {
  */
 export type Judge = "self" | "independent" | "nobody";
 
+/**
+ * One severity band's tally, with `resolved` kept apart from `claims`.
+ *
+ * A rate over `claims` would count unresolved findings as failures, which is
+ * the reading `unresolved` exists to prevent: the skeptic did not run, and an
+ * absence of judgement is not a judgement.
+ */
+export interface SeverityBand {
+  readonly severity: "critical" | "major" | "minor";
+  readonly claims: number;
+  readonly resolved: number;
+  readonly confirmed: number;
+  /**
+   * Judged, but the skeptic reported it could not check the claim.
+   *
+   * Carried per band because the share differs between reviewers by more than
+   * the rate does — on critical findings it runs 32%, 10% and 6% across the
+   * three published identities — and that is a fact about them which no choice
+   * of denominator can express. A rate can only say how the uncertain ones were
+   * counted; this says how many there were.
+   */
+  readonly uncertain: number;
+}
+
 export interface SkepticAxis {
   readonly judge: Judge;
   readonly confirmed: number;
@@ -89,6 +113,21 @@ export interface SkepticAxis {
   readonly uncertain: number;
   readonly unresolved: number;
   readonly mean_impact: number | null;
+  /**
+   * The same tally, split by how much each finding claimed to matter.
+   *
+   * Deliberately a breakdown and **not** a weighted score. Collapsing it would
+   * need weights — critical is worth how many minors? — and no honest source
+   * for them exists here, so any single number would be this project's opinion
+   * wearing the costume of a measurement. The bands are reported and the reader
+   * weighs them.
+   *
+   * It is not decoration. On the current corpus both gemini identities confirm
+   * **50%** of their critical claims behind headline rates of 78% and 70%,
+   * while mistral confirms 87% of its critical claims — a difference the single
+   * rate hides completely, and in the direction that matters most.
+   */
+  readonly by_severity: readonly SeverityBand[];
 }
 
 export interface TrackRecord {

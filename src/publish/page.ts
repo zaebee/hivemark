@@ -3,7 +3,7 @@ import { esc } from "../escape.js";
 import { renderHive } from "./hive.js";
 import type { AblationStudy } from "../ablation.js";
 import { shieldsEndpoint } from "./shields.js";
-import type { TrackRecord } from "../types.js";
+import type { SeverityBand, TrackRecord } from "../types.js";
 
 /**
  * Shown when the build produced no signed attestations.
@@ -46,6 +46,8 @@ export interface PageOptions {
 export function renderPage(tracks: TrackRecord[], options: PageOptions = {}): string {
   const notes = [`<p class="note">${esc(SURVIVORSHIP)}</p>`];
   if (!options.signed) notes.unshift(`<p class="note">${esc(UNSIGNED)}</p>`);
+  const unverifiable = unverifiableNote(tracks);
+  if (unverifiable) notes.push(`<p class="note">${esc(unverifiable)}</p>`);
   const divergence = leastOverlapping(tracks);
   if (divergence) notes.push(`<p class="note">${esc(confoundedNote(divergence))}</p>`);
 
@@ -94,6 +96,100 @@ ${renderAblation(options.ablation ?? null)}
 }
 
 /**
+ * Say that an unverifiable claim costs a reviewer what a disproved one costs.
+ *
+ * Every rate here divides by confirmed + refuted + **uncertain**, and that last
+ * term is a judgement of a different kind: the skeptic ran, and reported it
+ * could not check the claim from the material it was given — all of them carry
+ * a `skeptic_note` saying so. Treating "I could not verify this" as
+ * indistinguishable from "this is wrong" is the same conflation upstream's
+ * `arm` field exists to prevent one level up, where a failure and a deliberate
+ * removal must not look alike.
+ *
+ * The choice is not neutral and the note carries its size, computed rather than
+ * asserted: excluding uncertain raises every rate on this page. Naming the
+ * choice is cheaper than making it, and this project has no basis for deciding
+ * that an unverifiable claim is costless.
+ *
+ * Raised by the codegraph-brain session against the published numbers.
+ */
+function unverifiableNote(tracks: TrackRecord[]): string | null {
+  const uncertain = tracks.reduce((n, t) => n + t.skeptic.uncertain, 0);
+  if (uncertain === 0) return null;
+  const judged = tracks.reduce(
+    (n, t) => n + t.skeptic.confirmed + t.skeptic.refuted + t.skeptic.uncertain,
+    0,
+  );
+  // A reviewer whose every judged claim came back uncertain has no defined
+  // swing: dropping the uncertain ones would leave a rate over nothing. Such a
+  // track is excluded from the range rather than divided by zero — unguarded,
+  // this printed a literal `NaN to NaN points` on the page, reachable and
+  // verified by rendering it.
+  const swings: number[] = [];
+  for (const { skeptic } of tracks) {
+    const decided = skeptic.confirmed + skeptic.refuted;
+    if (decided === 0) continue;
+    const withU = skeptic.confirmed / (decided + skeptic.uncertain);
+    swings.push((skeptic.confirmed / decided - withU) * 100);
+  }
+
+  const preamble =
+    `Every rate here divides by confirmed, refuted and uncertain together. ` +
+    `An uncertain verdict means the skeptic ran and reported it could not check the claim ` +
+    `from what it was given — not that the claim was wrong — yet it costs a reviewer exactly ` +
+    `what a refutation costs. ${uncertain} of ${judged} judged findings are in that state`;
+
+  // No range rather than a made-up one. If nothing here has a defined swing,
+  // the fact that the uncertain claims exist is still worth stating.
+  if (swings.length === 0) return `${preamble}.`;
+
+  let low = swings[0]!;
+  let high = swings[0]!;
+  for (const swing of swings) {
+    if (swing < low) low = swing;
+    if (swing > high) high = swing;
+  }
+  return `${preamble}, and dropping them would raise the rates below by ${low.toFixed(0)} to ${high.toFixed(0)} points.`;
+}
+
+/**
+ * The same rate, split by how much each finding claimed to matter.
+ *
+ * Sits directly under the rate it qualifies, because that is the number a
+ * reader takes away and this is the reason not to take it at face value. On
+ * the current corpus both gemini identities confirm half their critical claims
+ * behind headline rates of 78% and 70%.
+ *
+ * Deliberately three numbers rather than one. Collapsing them needs weights —
+ * critical is worth how many minors? — and there is no honest source for those
+ * here, so a single figure would be this project's opinion dressed as a
+ * measurement. The reader weighs them.
+ */
+function severityLine(skeptic: TrackRecord["skeptic"]): string {
+  return skeptic.by_severity
+    .map(severityBand)
+    .join(" · ");
+}
+
+/**
+ * One band: its rate, and how many of its judged claims went unverified.
+ *
+ * The unverifiable count is shown per band rather than folded into the rate,
+ * because the share separates these reviewers more sharply than the rate does
+ * and no denominator can express it — a rate says how the uncertain ones were
+ * counted, this says how many there were. Omitted at zero so it marks a fact
+ * rather than becoming punctuation on every band.
+ */
+function severityBand(band: SeverityBand): string {
+  if (band.resolved === 0) return `${band.severity} <span class="nodata">none</span>`;
+
+  const rate = Math.round((band.confirmed / band.resolved) * 100);
+  const line = `${band.severity} ${rate}% of ${band.resolved}`;
+  if (band.uncertain === 0) return line;
+  return `${line} <span class="nodata">(${band.uncertain} unverifiable)</span>`;
+}
+
+/**
  * The ceiling of `impact_score`, from the upstream schema — an integer 0-10.
  *
  * Printed with the number because `6.31` alone does not say whether that is
@@ -136,6 +232,7 @@ ${avatarSvg(track.genome, 96)}
 <dt>claims</dt><dd>${track.claims}</dd>
 <dt>skeptic axis</dt><dd>${s.confirmed} confirmed · ${s.refuted} refuted · ${s.uncertain} uncertain · ${s.unresolved} unresolved</dd>
 <dt>${s.judge === "self" ? "self-graded rate" : "confirmed rate"}</dt><dd>${resolved === 0 ? '<span class="nodata">no data</span>' : `${Math.round((s.confirmed / resolved) * 100)}% of ${resolved} resolved`}</dd>
+<dt>by severity</dt><dd>${severityLine(s)}</dd>
 <dt>${s.judge === "self" ? "self-graded mean impact" : "mean impact"}</dt><dd>${s.mean_impact === null ? '<span class="nodata">no data</span>' : `${s.mean_impact} / ${IMPACT_MAX}`}</dd>
 <dt>human axis</dt><dd><span class="nodata">no data</span> — benchmark artifacts carry no findings_applied</dd>
 <dt>badge</dt><dd>${esc(shieldsEndpoint(track).message)}</dd>
