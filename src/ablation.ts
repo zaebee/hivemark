@@ -66,10 +66,24 @@ export function ablationStudy(records: readonly ReviewRecord[]): AblationStudy |
     }
   }
 
-  const pairs: AblationPair[] = [];
+  // Deduplicated by the same rule as the graph side, and this symmetry is the
+  // point: an ablated rerun would otherwise produce two pairs for one pull
+  // request, counting the same comparison twice and moving both the split and
+  // the mean. No such rerun exists in the corpus today, which is exactly why
+  // this needed writing down rather than leaving to the data to enforce.
+  const ablated = new Map<string, ReviewRecord>();
   for (const record of records) {
     if (record.arm !== "ablated" || record.had_graph) continue;
-    const counterpart = withGraph.get(pairKey(record));
+    const key = pairKey(record);
+    const held = ablated.get(key);
+    if (!held || Date.parse(record.reviewed_at) > Date.parse(held.reviewed_at)) {
+      ablated.set(key, record);
+    }
+  }
+
+  const pairs: AblationPair[] = [];
+  for (const [key, record] of ablated) {
+    const counterpart = withGraph.get(key);
     if (!counterpart) continue;
     pairs.push({
       url: record.url,

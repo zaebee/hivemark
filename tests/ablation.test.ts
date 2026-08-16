@@ -104,6 +104,20 @@ describe("ablationStudy", () => {
     expect(study?.pairs[0]?.withGraph).toBe(9);
   });
 
+  it("takes the latest ablated run too, not one pair per rerun", () => {
+    // The graph side was deduplicated and the ablated side was not, so a rerun
+    // ablation would have produced two pairs for one pull request and counted
+    // the same comparison twice — skewing the split and the mean. Both sides of
+    // a paired experiment have to collapse by the same rule.
+    const study = ablationStudy([
+      withN(2, { arm: "ablated", had_graph: false, reviewed_at: "2026-08-12T09:00:00+00:00" }),
+      withN(7, { arm: "ablated", had_graph: false, reviewed_at: "2026-08-12T18:00:00+00:00" }),
+      withN(5, { had_graph: true }),
+    ]);
+    expect(study?.pairs).toHaveLength(1);
+    expect(study?.pairs[0]?.withoutGraph).toBe(7);
+  });
+
   it("splits the pairs by which side found more", () => {
     const study = ablationStudy([
       withN(1, { arm: "ablated", had_graph: false }),
