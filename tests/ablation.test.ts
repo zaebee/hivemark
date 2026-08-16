@@ -118,6 +118,17 @@ describe("ablationStudy", () => {
     expect(study?.pairs[0]?.withoutGraph).toBe(7);
   });
 
+  it("ignores a run labelled ablated that reports a graph", () => {
+    // Self-contradictory, and the shape matters: such a record is already the
+    // graph side, so admitting it to the ablated side pairs it with itself and
+    // manufactures a tie at difference 0 out of one review.
+    const study = ablationStudy([
+      withN(3, { arm: "ablated", had_graph: true }),
+      withN(5, { had_graph: true, head_sha: "c" }),
+    ]);
+    expect(study).toBeNull();
+  });
+
   it("splits the pairs by which side found more", () => {
     const study = ablationStudy([
       withN(1, { arm: "ablated", had_graph: false }),

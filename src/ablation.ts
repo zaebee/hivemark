@@ -49,37 +49,39 @@ function pairKey(record: ReviewRecord): string {
  * corpus without an ablation arm — the ordinary case — produces no section
  * rather than an empty one asserting nothing.
  */
-export function ablationStudy(records: readonly ReviewRecord[]): AblationStudy | null {
-  // Keyed on the observed `had_graph`, not on `arm: "graph"`. Rows predating
-  // the arm field carry the condition without the label, and matching the label
-  // finds 6 of the 19 real pairs where matching the condition finds all 19.
-  const withGraph = new Map<string, ReviewRecord>();
+/**
+ * The most recent run per pair key, among those the predicate accepts.
+ *
+ * One function for both arms, because the two must collapse reruns by the same
+ * rule or the comparison stops being paired — and two copies of a rule are two
+ * chances for one of them to drift. Latest wins, as `dedupe` treats reruns; an
+ * arbitrary pick would make a published number depend on the order the file
+ * happened to be read in, and six of the nineteen real pairs have more than one
+ * candidate.
+ */
+function latestPerPair(
+  records: readonly ReviewRecord[],
+  accepts: (record: ReviewRecord) => boolean,
+): Map<string, ReviewRecord> {
+  const latest = new Map<string, ReviewRecord>();
   for (const record of records) {
-    if (!record.had_graph) continue;
+    if (!accepts(record)) continue;
     const key = pairKey(record);
-    const held = withGraph.get(key);
-    // Latest wins, the rule `dedupe` applies to reruns. Six of nineteen real
-    // pairs have more than one counterpart, so an arbitrary pick would make a
-    // published number depend on the order the file happened to be read in.
+    const held = latest.get(key);
     if (!held || Date.parse(record.reviewed_at) > Date.parse(held.reviewed_at)) {
-      withGraph.set(key, record);
+      latest.set(key, record);
     }
   }
+  return latest;
+}
 
-  // Deduplicated by the same rule as the graph side, and this symmetry is the
-  // point: an ablated rerun would otherwise produce two pairs for one pull
-  // request, counting the same comparison twice and moving both the split and
-  // the mean. No such rerun exists in the corpus today, which is exactly why
-  // this needed writing down rather than leaving to the data to enforce.
-  const ablated = new Map<string, ReviewRecord>();
-  for (const record of records) {
-    if (record.arm !== "ablated" || record.had_graph) continue;
-    const key = pairKey(record);
-    const held = ablated.get(key);
-    if (!held || Date.parse(record.reviewed_at) > Date.parse(held.reviewed_at)) {
-      ablated.set(key, record);
-    }
-  }
+export function ablationStudy(records: readonly ReviewRecord[]): AblationStudy | null {
+  // The graph side is keyed on the observed `had_graph`, not on `arm: "graph"`.
+  // Rows predating the arm field carry the condition without the label, and
+  // matching the label finds 6 of the 19 real pairs where matching the
+  // condition finds all 19.
+  const withGraph = latestPerPair(records, (r) => r.had_graph);
+  const ablated = latestPerPair(records, (r) => r.arm === "ablated" && !r.had_graph);
 
   const pairs: AblationPair[] = [];
   for (const [key, record] of ablated) {
@@ -99,11 +101,32 @@ export function ablationStudy(records: readonly ReviewRecord[]): AblationStudy |
 
   pairs.sort((a, b) => byCodeUnit(a.url, b.url));
 
-  // One pass, and no `Math.min(...differences)`. Spreading an array into a call
-  // has an argument limit — measured in this runtime, Bun throws RangeError
-  // between 500,000 and 1,000,000 elements — and `src/anchor/plan.ts` already
-  // avoids exactly this for exactly this reason. A corpus designed to
-  // accumulate should not carry a ceiling nobody would think to look for.
+  return {
+    pairs,
+    projects: [...new Set(pairs.map((p) => p.project))].sort(byCodeUnit),
+    ...summarise(pairs),
+  };
+}
+
+/**
+ * The split, the mean and the range, in one pass.
+ *
+ * The split comes first in the type for the same reason it comes first on the
+ * page: two arms whose averages match can differ on every single pull request,
+ * and an average cannot tell those apart.
+ *
+ * No `Math.min(...differences)`. Spreading an array into a call has an argument
+ * limit — measured in this runtime, Bun throws RangeError between 500,000 and
+ * 1,000,000 elements — and `src/anchor/plan.ts` already avoids exactly this for
+ * exactly this reason. A corpus designed to accumulate should not carry a
+ * ceiling nobody would think to look for.
+ */
+function summarise(
+  pairs: readonly AblationPair[],
+): Pick<
+  AblationStudy,
+  "graphFoundMore" | "graphFoundFewer" | "tied" | "meanDifference" | "lowest" | "highest"
+> {
   let more = 0;
   let fewer = 0;
   let tied = 0;
@@ -120,11 +143,6 @@ export function ablationStudy(records: readonly ReviewRecord[]): AblationStudy |
   }
 
   return {
-    pairs,
-    projects: [...new Set(pairs.map((p) => p.project))].sort(byCodeUnit),
-    // Counted per pair rather than summarised, because two arms whose averages
-    // match can differ on every single PR, and an average cannot tell those
-    // apart. This split is the finding; the mean is context for it.
     graphFoundMore: more,
     graphFoundFewer: fewer,
     tied,
