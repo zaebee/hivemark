@@ -19,6 +19,7 @@ function make(over: Partial<TrackRecord> = {}): TrackRecord {
     },
     reviews: 10,
     unparseable: 0,
+    errored: 0,
     claims: 20,
     corpus: [["cal_dot_com", 10]],
     skeptic: { judge: "independent", confirmed: 15, refuted: 3, uncertain: 2, unresolved: 0, mean_impact: 4.1 },
@@ -181,5 +182,24 @@ describe("unparseable runs on the page", () => {
     // It does record them — `error` and `parse_failed` are on every review row.
     // The page said otherwise until this was checked against the data.
     expect(renderPage([make()])).not.toContain("writes no record");
+  });
+});
+
+describe("runs that failed before producing output", () => {
+  it("are named as their own failure, not as unreadable output", () => {
+    const html = renderPage([make({ reviews: 10, errored: 2 })]);
+    expect(html).toContain("2 runs failed before producing output");
+    expect(html).not.toContain("readable output");
+  });
+
+  it("appear alongside unparseable runs when both happened", () => {
+    const html = renderPage([make({ reviews: 10, unparseable: 1, errored: 3 })]);
+    expect(html).toMatch(
+      /1 further run produced no readable output, 3 runs failed before producing output/,
+    );
+  });
+
+  it("say nothing when every run produced something", () => {
+    expect(renderPage([make({ reviews: 10 })])).not.toContain("failed before producing");
   });
 });

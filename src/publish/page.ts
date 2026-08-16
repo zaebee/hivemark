@@ -116,7 +116,7 @@ ${avatarSvg(track.genome, 96)}
 <dt>context</dt><dd>${esc(track.genome.context_mode)}</dd>
 <dt>fingerprint</dt><dd><code>${esc(track.genome.review_fingerprint)}</code></dd>
 <dt>corpus</dt><dd>${corpus}</dd>
-<dt>reviews</dt><dd>${track.reviews}${unparseableNote(track)}</dd>
+<dt>reviews</dt><dd>${track.reviews}${attemptedNote(track)}</dd>
 <dt>claims</dt><dd>${track.claims}</dd>
 <dt>skeptic axis</dt><dd>${s.confirmed} confirmed · ${s.refuted} refuted · ${s.uncertain} uncertain · ${s.unresolved} unresolved</dd>
 <dt>${s.judge === "self" ? "self-graded rate" : "confirmed rate"}</dt><dd>${resolved === 0 ? '<span class="nodata">no data</span>' : `${Math.round((s.confirmed / resolved) * 100)}% of ${resolved} resolved`}</dd>
@@ -185,10 +185,20 @@ function leastOverlapping(tracks: TrackRecord[]): Divergence | null {
  * line away from its subject is a caveat that gets skimmed past. Absent
  * entirely when there is nothing to say, so it never becomes furniture.
  */
-function unparseableNote(track: TrackRecord): string {
-  if (track.unparseable === 0) return "";
-  const runs = track.unparseable === 1 ? "run" : "runs";
-  return ` <span class="nodata">(${track.unparseable} further ${runs} produced no readable output)</span>`;
+function attemptedNote(track: TrackRecord): string {
+  const runs = (n: number) => (n === 1 ? "run" : "runs");
+  const parts: string[] = [];
+  if (track.unparseable > 0) {
+    parts.push(`${track.unparseable} further ${runs(track.unparseable)} produced no readable output`);
+  }
+  // Named as its own failure rather than folded into the line above. A provider
+  // 429 did not produce unreadable output; it produced none, and saying
+  // otherwise would describe the wrong event.
+  if (track.errored > 0) {
+    parts.push(`${track.errored} ${runs(track.errored)} failed before producing output`);
+  }
+  if (parts.length === 0) return "";
+  return ` <span class="nodata">(${parts.join(", ")})</span>`;
 }
 
 /** Name an identity distinctly: two reviewers can share a context mode. */

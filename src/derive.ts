@@ -17,6 +17,7 @@ export function deriveTrackRecords(records: ReviewRecord[]): TrackRecord[] {
     readonly records: ReviewRecord[];
     readonly claims: Claim[];
     unparseable: number;
+    errored: number;
   }
   const byIdentity = new Map<`0x${string}`, Bucket>();
 
@@ -25,23 +26,34 @@ export function deriveTrackRecords(records: ReviewRecord[]): TrackRecord[] {
     const id = identityId(genome);
     const existing = byIdentity.get(id);
     if (existing) return existing;
-    const fresh: Bucket = { genome, records: [], claims: [], unparseable: 0 };
+    const fresh: Bucket = { genome, records: [], claims: [], unparseable: 0, errored: 0 };
     byIdentity.set(id, fresh);
     return fresh;
   };
 
-  // Split before deduplicating, not after. `dedupe` keeps the latest run of a
-  // (url, head_sha, identity) on the rule that a rerun is a correction — but a
-  // run whose output could not be parsed corrects nothing, and letting it win
-  // would discard real findings because a parser failed. Deduplicated within
-  // each class, so two failed runs of one PR are one failure.
-  for (const record of dedupe(records.filter((r) => !r.parse_failed))) {
+  // Three classes, split before deduplicating rather than after. `dedupe` keeps
+  // the latest run of a (url, head_sha, identity) on the rule that a rerun is a
+  // correction — but a run that produced nothing usable corrects nothing, and
+  // letting it win would discard real findings because a provider returned 429.
+  // Deduplicated within each class, so two failures of one PR are one failure.
+  //
+  // The two failures are kept apart because they say different things. An
+  // unparseable run produced output nobody could read; an errored one produced
+  // none at all, and "no readable output" is simply false about a 429. A record
+  // carrying both is errored: the parse failure is downstream of the call
+  // failing, and counting it in both classes would report two failed runs.
+  const errored = (r: ReviewRecord): boolean => r.error !== null && r.error !== undefined;
+
+  for (const record of dedupe(records.filter((r) => !errored(r) && !r.parse_failed))) {
     const bucket = bucketFor(record);
     bucket.records.push(record);
     bucket.claims.push(...claimsOf(record));
   }
-  for (const record of dedupe(records.filter((r) => r.parse_failed))) {
+  for (const record of dedupe(records.filter((r) => !errored(r) && r.parse_failed))) {
     bucketFor(record).unparseable++;
+  }
+  for (const record of dedupe(records.filter(errored))) {
+    bucketFor(record).errored++;
   }
 
   return [...byIdentity.entries()].map(([id, bucket]) => ({
@@ -53,6 +65,9 @@ export function deriveTrackRecords(records: ReviewRecord[]): TrackRecord[] {
     // readable is not the same as one that never ran, and only one of those two
     // states can be told from a missing row.
     unparseable: bucket.unparseable,
+    // A provider failure is not a review that found nothing. Kept apart from
+    // `unparseable` because the two are different events with different causes.
+    errored: bucket.errored,
     claims: bucket.claims.length,
     corpus: corpusOf(bucket.records),
     skeptic: skepticAxis(bucket.claims, bucket.genome),

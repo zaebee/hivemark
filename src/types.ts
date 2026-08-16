@@ -105,6 +105,15 @@ export interface TrackRecord {
    * everything else, and inflates it in the flattering direction.
    */
   readonly unparseable: number;
+  /**
+   * Runs that failed before producing output at all — a provider 429 or 503,
+   * recorded by Guardian in `error`.
+   *
+   * Separate from `unparseable` because the two failures are not the same
+   * event: one produced text nobody could read, the other produced none. Both
+   * are excluded from `reviews` for the same reason — neither is a review.
+   */
+  readonly errored: number;
   readonly claims: number;
   /**
    * Projects this identity actually reviewed, with counts.
