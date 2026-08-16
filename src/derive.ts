@@ -3,7 +3,7 @@ import { claimsOf } from "./claims.js";
 import { genomeOf } from "./genome.js";
 import { identityId, ownerAddress } from "./identity.js";
 import type { ReviewRecord } from "./schema.js";
-import type { Claim, Genome, Judge, SkepticAxis, TrackRecord } from "./types.js";
+import type { Claim, Genome, Judge, SeverityBand, SkepticAxis, TrackRecord } from "./types.js";
 
 /**
  * Aggregate claims into one track record per identity.
@@ -190,6 +190,35 @@ export function judgeOf(genome: Genome): Judge {
     : "independent";
 }
 
+/**
+ * Ordered by how much a finding claims to matter, not alphabetically.
+ *
+ * A reader scanning a card for the number that matters most should meet it
+ * first, and `critical, major, minor` is that order. Alphabetical would put
+ * `critical` first by luck and `major` before `minor` by luck, and stop being
+ * right the day a band is added.
+ */
+const SEVERITIES = ["critical", "major", "minor"] as const;
+
+/**
+ * Every band, including the empty ones.
+ *
+ * A reviewer that never raised a critical finding is saying something about
+ * itself, and an omitted row reads as a gap in the page rather than as a fact
+ * about the reviewer.
+ */
+function bySeverity(claims: Claim[]): SeverityBand[] {
+  return SEVERITIES.map((severity) => {
+    const band = claims.filter((c) => c.severity === severity);
+    return {
+      severity,
+      claims: band.length,
+      resolved: band.filter((c) => c.verdict !== "unresolved").length,
+      confirmed: band.filter((c) => c.verdict === "confirmed").length,
+    };
+  });
+}
+
 function skepticAxis(claims: Claim[], genome: Genome): SkepticAxis {
   const count = (v: Claim["verdict"]) => claims.filter((c) => c.verdict === v).length;
   const scored = claims.map((c) => c.impact_score).filter((s): s is number => s !== null);
@@ -203,5 +232,6 @@ function skepticAxis(claims: Claim[], genome: Genome): SkepticAxis {
     mean_impact: scored.length
       ? Math.round((scored.reduce((a, b) => a + b, 0) / scored.length) * 100) / 100
       : null,
+    by_severity: bySeverity(claims),
   };
 }

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { renderPage } from "../src/publish/page.js";
 import type { TrackRecord } from "../src/types.js";
 
-const BASE_SKEPTIC = { judge: "independent", confirmed: 15, refuted: 3, uncertain: 2, unresolved: 0, mean_impact: 4.1 } as const;
+const BASE_SKEPTIC = { judge: "independent", confirmed: 15, refuted: 3, uncertain: 2, unresolved: 0, mean_impact: 4.1 , by_severity: [    { severity: "critical" as const, claims: 0, resolved: 0, confirmed: 0 },    { severity: "major" as const, claims: 0, resolved: 0, confirmed: 0 },    { severity: "minor" as const, claims: 0, resolved: 0, confirmed: 0 },  ], } as const;
 
 function make(over: Partial<TrackRecord> = {}): TrackRecord {
   return {
@@ -24,7 +24,7 @@ function make(over: Partial<TrackRecord> = {}): TrackRecord {
     errored: 0,
     claims: 20,
     corpus: [["cal_dot_com", 10]],
-    skeptic: { judge: "independent", confirmed: 15, refuted: 3, uncertain: 2, unresolved: 0, mean_impact: 4.1 },
+    skeptic: { judge: "independent", confirmed: 15, refuted: 3, uncertain: 2, unresolved: 0, mean_impact: 4.1 , by_severity: [    { severity: "critical" as const, claims: 0, resolved: 0, confirmed: 0 },    { severity: "major" as const, claims: 0, resolved: 0, confirmed: 0 },    { severity: "minor" as const, claims: 0, resolved: 0, confirmed: 0 },  ], },
     human: { available: false },
     ...over,
   };
@@ -140,7 +140,7 @@ describe("a self-graded identity on the page", () => {
         context_mode: "graph",
         review_fingerprint: "4d1fe6a1234567",
       },
-      skeptic: { judge: "self", confirmed: 15, refuted: 3, uncertain: 2, unresolved: 0, mean_impact: 4.1 },
+      skeptic: { judge: "self", confirmed: 15, refuted: 3, uncertain: 2, unresolved: 0, mean_impact: 4.1 , by_severity: [    { severity: "critical" as const, claims: 0, resolved: 0, confirmed: 0 },    { severity: "major" as const, claims: 0, resolved: 0, confirmed: 0 },    { severity: "minor" as const, claims: 0, resolved: 0, confirmed: 0 },  ], },
     });
 
   it("warns beside the skeptic that it is the finder", () => {
@@ -290,5 +290,43 @@ describe("the ablation section", () => {
     const html = renderPage([make()], { ablation: study });
     const cards = html.split('<section class="card">').length - 1;
     expect(cards).toBe(1);
+  });
+});
+
+describe("the severity breakdown on a card", () => {
+  // `claims` deliberately exceeds `resolved` in every band. With them equal a
+  // rate taken over the wrong denominator produces the same number, and the
+  // assertions below cannot tell the two apart.
+  const bands = (over: Partial<Record<string, number>>[] = []) => [
+    { severity: "critical" as const, claims: 13, resolved: 10, confirmed: 5, ...over[0] },
+    { severity: "major" as const, claims: 40, resolved: 34, confirmed: 29, ...over[1] },
+    { severity: "minor" as const, claims: 25, resolved: 20, confirmed: 16, ...over[2] },
+  ];
+
+  it("sits under the rate it qualifies, not somewhere else on the card", () => {
+    // The rate is the number a reader takes away; the breakdown is the reason
+    // not to take it at face value. A row away and it is a footnote.
+    const html = renderPage([make({ skeptic: { ...BASE_SKEPTIC, by_severity: bands() } })]);
+    const rate = html.indexOf("confirmed rate");
+    const sev = html.indexOf("<dt>by severity</dt>");
+    expect(sev).toBeGreaterThan(rate);
+    expect(sev - rate).toBeLessThan(200);
+  });
+
+  it("shows each band as a rate over what was resolved", () => {
+    const html = renderPage([make({ skeptic: { ...BASE_SKEPTIC, by_severity: bands() } })]);
+    expect(html).toContain("critical 50% of 10");
+    expect(html).toContain("major 85% of 34");
+    expect(html).toContain("minor 80% of 20");
+  });
+
+  it("says none rather than 0% when a band has nothing resolved", () => {
+    // 0% would assert the reviewer got every critical finding wrong. It raised
+    // none — a different statement, and the opposite one.
+    const html = renderPage([
+      make({ skeptic: { ...BASE_SKEPTIC, by_severity: bands([{ claims: 0, resolved: 0, confirmed: 0 }]) } }),
+    ]);
+    expect(html).toContain("critical <span class=\"nodata\">none</span>");
+    expect(html).not.toContain("critical 0% of 0");
   });
 });

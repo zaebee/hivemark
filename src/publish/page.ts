@@ -94,6 +94,29 @@ ${renderAblation(options.ablation ?? null)}
 }
 
 /**
+ * The same rate, split by how much each finding claimed to matter.
+ *
+ * Sits directly under the rate it qualifies, because that is the number a
+ * reader takes away and this is the reason not to take it at face value. On
+ * the current corpus both gemini identities confirm half their critical claims
+ * behind headline rates of 78% and 70%.
+ *
+ * Deliberately three numbers rather than one. Collapsing them needs weights —
+ * critical is worth how many minors? — and there is no honest source for those
+ * here, so a single figure would be this project's opinion dressed as a
+ * measurement. The reader weighs them.
+ */
+function severityLine(skeptic: TrackRecord["skeptic"]): string {
+  return skeptic.by_severity
+    .map((band) =>
+      band.resolved === 0
+        ? `${band.severity} <span class="nodata">none</span>`
+        : `${band.severity} ${Math.round((band.confirmed / band.resolved) * 100)}% of ${band.resolved}`,
+    )
+    .join(" · ");
+}
+
+/**
  * The ceiling of `impact_score`, from the upstream schema — an integer 0-10.
  *
  * Printed with the number because `6.31` alone does not say whether that is
@@ -136,6 +159,7 @@ ${avatarSvg(track.genome, 96)}
 <dt>claims</dt><dd>${track.claims}</dd>
 <dt>skeptic axis</dt><dd>${s.confirmed} confirmed · ${s.refuted} refuted · ${s.uncertain} uncertain · ${s.unresolved} unresolved</dd>
 <dt>${s.judge === "self" ? "self-graded rate" : "confirmed rate"}</dt><dd>${resolved === 0 ? '<span class="nodata">no data</span>' : `${Math.round((s.confirmed / resolved) * 100)}% of ${resolved} resolved`}</dd>
+<dt>by severity</dt><dd>${severityLine(s)}</dd>
 <dt>${s.judge === "self" ? "self-graded mean impact" : "mean impact"}</dt><dd>${s.mean_impact === null ? '<span class="nodata">no data</span>' : `${s.mean_impact} / ${IMPACT_MAX}`}</dd>
 <dt>human axis</dt><dd><span class="nodata">no data</span> — benchmark artifacts carry no findings_applied</dd>
 <dt>badge</dt><dd>${esc(shieldsEndpoint(track).message)}</dd>

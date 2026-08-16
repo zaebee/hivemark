@@ -22,7 +22,20 @@ function track(over: Partial<TrackRecord["skeptic"]>): TrackRecord {
     errored: 0,
     claims: 20,
     corpus: [["cal_dot_com", 10]],
-    skeptic: { judge: "independent", confirmed: 15, refuted: 3, uncertain: 2, unresolved: 0, mean_impact: 4.1, ...over },
+    skeptic: {
+      judge: "independent",
+      confirmed: 15,
+      refuted: 3,
+      uncertain: 2,
+      unresolved: 0,
+      mean_impact: 4.1,
+      by_severity: [
+        { severity: "critical", claims: 0, resolved: 0, confirmed: 0 },
+        { severity: "major", claims: 0, resolved: 0, confirmed: 0 },
+        { severity: "minor", claims: 0, resolved: 0, confirmed: 0 },
+      ],
+      ...over,
+    },
     human: { available: false },
   };
 }
