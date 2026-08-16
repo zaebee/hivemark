@@ -30,9 +30,9 @@ function track(over: Partial<TrackRecord["skeptic"]>): TrackRecord {
       unresolved: 0,
       mean_impact: 4.1,
       by_severity: [
-        { severity: "critical", claims: 0, resolved: 0, confirmed: 0 },
-        { severity: "major", claims: 0, resolved: 0, confirmed: 0 },
-        { severity: "minor", claims: 0, resolved: 0, confirmed: 0 },
+        { severity: "critical", claims: 0, resolved: 0, confirmed: 0, uncertain: 0 },
+        { severity: "major", claims: 0, resolved: 0, confirmed: 0, uncertain: 0 },
+        { severity: "minor", claims: 0, resolved: 0, confirmed: 0, uncertain: 0 },
       ],
       ...over,
     },

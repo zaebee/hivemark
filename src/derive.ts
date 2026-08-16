@@ -222,9 +222,9 @@ function bySeverity(claims: Claim[]): SeverityBand[] {
   // that builds it.
   type Tally = { -readonly [K in Exclude<keyof SeverityBand, "severity">]: SeverityBand[K] };
   const tally: Record<SeverityBand["severity"], Tally> = {
-    critical: { claims: 0, resolved: 0, confirmed: 0 },
-    major: { claims: 0, resolved: 0, confirmed: 0 },
-    minor: { claims: 0, resolved: 0, confirmed: 0 },
+    critical: { claims: 0, resolved: 0, confirmed: 0, uncertain: 0 },
+    major: { claims: 0, resolved: 0, confirmed: 0, uncertain: 0 },
+    minor: { claims: 0, resolved: 0, confirmed: 0, uncertain: 0 },
   };
 
   for (const claim of claims) {
@@ -233,6 +233,7 @@ function bySeverity(claims: Claim[]): SeverityBand[] {
     if (claim.verdict === "unresolved") continue;
     band.resolved += 1;
     if (claim.verdict === "confirmed") band.confirmed += 1;
+    else if (claim.verdict === "uncertain") band.uncertain += 1;
   }
 
   return SEVERITIES.map((severity) => ({ severity, ...tally[severity] }));

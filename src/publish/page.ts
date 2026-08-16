@@ -155,7 +155,14 @@ function severityLine(skeptic: TrackRecord["skeptic"]): string {
     .map((band) =>
       band.resolved === 0
         ? `${band.severity} <span class="nodata">none</span>`
-        : `${band.severity} ${Math.round((band.confirmed / band.resolved) * 100)}% of ${band.resolved}`,
+        : `${band.severity} ${Math.round((band.confirmed / band.resolved) * 100)}% of ${band.resolved}` +
+          // Shown per band, not folded into the rate. The share the skeptic
+          // could not verify separates these reviewers more sharply than the
+          // rate does, and no denominator can express it — a rate says how the
+          // uncertain ones were counted, this says how many there were.
+          (band.uncertain > 0
+            ? ` <span class="nodata">(${band.uncertain} unverifiable)</span>`
+            : ""),
     )
     .join(" · ");
 }

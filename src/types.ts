@@ -94,6 +94,16 @@ export interface SeverityBand {
   readonly claims: number;
   readonly resolved: number;
   readonly confirmed: number;
+  /**
+   * Judged, but the skeptic reported it could not check the claim.
+   *
+   * Carried per band because the share differs between reviewers by more than
+   * the rate does — on critical findings it runs 32%, 10% and 6% across the
+   * three published identities — and that is a fact about them which no choice
+   * of denominator can express. A rate can only say how the uncertain ones were
+   * counted; this says how many there were.
+   */
+  readonly uncertain: number;
 }
 
 export interface SkepticAxis {

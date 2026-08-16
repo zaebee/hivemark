@@ -27,7 +27,7 @@ const track = (over: Partial<Genome>): TrackRecord => {
     reviews: 3,
     claims: 9,
     corpus: [["cal_dot_com", 3]],
-    skeptic: { judge: "independent", confirmed: 6, refuted: 1, uncertain: 2, unresolved: 0, mean_impact: 4 , by_severity: [    { severity: "critical" as const, claims: 0, resolved: 0, confirmed: 0 },    { severity: "major" as const, claims: 0, resolved: 0, confirmed: 0 },    { severity: "minor" as const, claims: 0, resolved: 0, confirmed: 0 },  ], },
+    skeptic: { judge: "independent", confirmed: 6, refuted: 1, uncertain: 2, unresolved: 0, mean_impact: 4 , by_severity: [    { severity: "critical" as const, claims: 0, resolved: 0, confirmed: 0, uncertain: 0 },    { severity: "major" as const, claims: 0, resolved: 0, confirmed: 0, uncertain: 0 },    { severity: "minor" as const, claims: 0, resolved: 0, confirmed: 0, uncertain: 0 },  ], },
     human: { available: false },
   } as TrackRecord;
 };

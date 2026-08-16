@@ -337,6 +337,22 @@ describe("the confirmed rate broken out by severity", () => {
     });
   });
 
+  it("counts uncertain within the band, apart from confirmed", () => {
+    // The share the skeptic could not verify differs between reviewers by more
+    // than the rate does — 32%, 10% and 6% on critical across the three
+    // published identities — and no choice of denominator can express that.
+    const t = deriveTrackRecords([
+      withFindings(
+        claim("critical", "confirmed"),
+        claim("critical", "uncertain"),
+        claim("critical", "uncertain"),
+        claim("critical", "refuted"),
+      ),
+    ])[0]!;
+    const critical = t.skeptic.by_severity.find((b) => b.severity === "critical")!;
+    expect(critical).toMatchObject({ resolved: 4, confirmed: 1, uncertain: 2 });
+  });
+
   it("separates the bands rather than pooling them", () => {
     // The whole point: an identity can look strong overall and be a coin flip
     // on the findings that matter. Both gemini identities confirm 50% of their
