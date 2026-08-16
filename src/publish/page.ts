@@ -46,6 +46,8 @@ export interface PageOptions {
 export function renderPage(tracks: TrackRecord[], options: PageOptions = {}): string {
   const notes = [`<p class="note">${esc(SURVIVORSHIP)}</p>`];
   if (!options.signed) notes.unshift(`<p class="note">${esc(UNSIGNED)}</p>`);
+  const unverifiable = unverifiableNote(tracks);
+  if (unverifiable) notes.push(`<p class="note">${esc(unverifiable)}</p>`);
   const divergence = leastOverlapping(tracks);
   if (divergence) notes.push(`<p class="note">${esc(confoundedNote(divergence))}</p>`);
 
@@ -91,6 +93,48 @@ ${renderHive(tracks)}
 ${tracks.map(card).join("\n")}
 ${renderAblation(options.ablation ?? null)}
 </main></body></html>`;
+}
+
+/**
+ * Say that an unverifiable claim costs a reviewer what a disproved one costs.
+ *
+ * Every rate here divides by confirmed + refuted + **uncertain**, and that last
+ * term is a judgement of a different kind: the skeptic ran, and reported it
+ * could not check the claim from the material it was given — all of them carry
+ * a `skeptic_note` saying so. Treating "I could not verify this" as
+ * indistinguishable from "this is wrong" is the same conflation upstream's
+ * `arm` field exists to prevent one level up, where a failure and a deliberate
+ * removal must not look alike.
+ *
+ * The choice is not neutral and the note carries its size, computed rather than
+ * asserted: excluding uncertain raises every rate on this page. Naming the
+ * choice is cheaper than making it, and this project has no basis for deciding
+ * that an unverifiable claim is costless.
+ *
+ * Raised by the codegraph-brain session against the published numbers.
+ */
+function unverifiableNote(tracks: TrackRecord[]): string | null {
+  const uncertain = tracks.reduce((n, t) => n + t.skeptic.uncertain, 0);
+  if (uncertain === 0) return null;
+  const judged = tracks.reduce(
+    (n, t) => n + t.skeptic.confirmed + t.skeptic.refuted + t.skeptic.uncertain,
+    0,
+  );
+  const swings = tracks.map((t) => {
+    const s = t.skeptic;
+    const withU = s.confirmed / (s.confirmed + s.refuted + s.uncertain);
+    const withoutU = s.confirmed / (s.confirmed + s.refuted);
+    return (withoutU - withU) * 100;
+  });
+  const low = Math.min(...swings).toFixed(0);
+  const high = Math.max(...swings).toFixed(0);
+  return (
+    `Every rate here divides by confirmed, refuted and uncertain together. ` +
+    `An uncertain verdict means the skeptic ran and reported it could not check the claim ` +
+    `from what it was given — not that the claim was wrong — yet it costs a reviewer exactly ` +
+    `what a refutation costs. ${uncertain} of ${judged} judged findings are in that state, ` +
+    `and dropping them would raise the rates below by ${low} to ${high} points.`
+  );
 }
 
 /**

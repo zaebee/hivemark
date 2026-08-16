@@ -330,3 +330,27 @@ describe("the severity breakdown on a card", () => {
     expect(html).not.toContain("critical 0% of 0");
   });
 });
+
+describe("the unverifiable-claims caveat", () => {
+  const axis = (over: Partial<typeof BASE_SKEPTIC> = {}) => ({ ...BASE_SKEPTIC, ...over });
+
+  it("names the denominator and what an uncertain verdict actually means", () => {
+    const html = renderPage([make({ skeptic: axis({ confirmed: 50, refuted: 8, uncertain: 6 }) })]);
+    expect(html).toContain("could not check the claim");
+    expect(html).toContain("not that the claim was wrong");
+  });
+
+  it("carries the size of the choice, computed rather than asserted", () => {
+    // 50/(50+8+6) = 78.1%, 50/(50+8) = 86.2% — an 8-point swing behind an
+    // unnamed decision. Without the number the caveat is a shrug.
+    const html = renderPage([make({ skeptic: axis({ confirmed: 50, refuted: 8, uncertain: 6 }) })]);
+    expect(html).toMatch(/6 of 64 judged findings/);
+    expect(html).toMatch(/by 8 to 8 points/);
+  });
+
+  it("says nothing when no verdict was uncertain", () => {
+    // Absent rather than "0 findings", so the caveat never becomes furniture.
+    const html = renderPage([make({ skeptic: axis({ uncertain: 0 }) })]);
+    expect(html).not.toContain("could not check the claim");
+  });
+});
