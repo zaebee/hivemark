@@ -1,4 +1,4 @@
-import { afterAll, afterEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
@@ -238,36 +238,54 @@ function durablyReachable(repo: string, sha: string): boolean {
 
 describe("durablyReachable", () => {
   // Built rather than borrowed: upstream has no branch-only commit left to test
-  // against, which is the point of the fix and a problem for the test. Three
-  // commits in three states prove the predicate separates them.
-  // Not registered in `made`: this file's `afterEach` empties that list after
-  // every test, so the repository was deleted before these three could use it —
-  // and they failed for a reason with nothing to do with what they assert.
-  const scratch = mkdtempSync(join(tmpdir(), "hivemark-reach-"));
-  afterAll(() => rmSync(scratch, { recursive: true, force: true }));
-  const git = (...args: string[]) =>
-    spawnSync("git", ["-C", scratch, ...args], {
-      env: { ...process.env, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t" },
-    });
+  // against, which is the fix working and a problem for the test. Three commits
+  // in three states prove the predicate separates them.
+  //
+  // Set up in `beforeAll`, not in the describe body. A body runs during
+  // collection — before any filtering, and even when every test here is
+  // skipped — so a failing `git` there takes down the runner instead of failing
+  // a test. It also made the lifecycle implicit enough that this file's shared
+  // `afterEach` deleted the repository out from under these three tests.
+  let scratch: string;
+  let onMain: string;
+  let tagged: string;
+  let branchOnly: string;
 
-  const head = () => spawnSync("git", ["-C", scratch, "rev-parse", "HEAD"]).stdout.toString().trim();
+  beforeAll(() => {
+    scratch = mkdtempSync(join(tmpdir(), "hivemark-reach-"));
+    const git = (...args: string[]) =>
+      spawnSync("git", ["-C", scratch, ...args], {
+        env: {
+          ...process.env,
+          GIT_AUTHOR_NAME: "t",
+          GIT_AUTHOR_EMAIL: "t@t",
+          GIT_COMMITTER_NAME: "t",
+          GIT_COMMITTER_EMAIL: "t@t",
+        },
+      });
+    const head = () => spawnSync("git", ["-C", scratch, "rev-parse", "HEAD"]).stdout.toString().trim();
 
-  git("init", "-q", "-b", "main");
-  git("commit", "-q", "--allow-empty", "-m", "root");
-  git("checkout", "-q", "-b", "side");
-  git("commit", "-q", "--allow-empty", "-m", "tagged, off main");
-  const tagged = head();
-  git("tag", "bench/guardian-sha/test");
-  git("commit", "-q", "--allow-empty", "-m", "branch only");
-  const branchOnly = head();
-  // main advances past the branch point, so its tip is contained by no tag.
-  // Without this the "on main" commit was also tag-reachable, and the test
-  // could not tell the predicate's two clauses apart — removing the main clause
-  // entirely still passed.
-  git("checkout", "-q", "main");
-  git("commit", "-q", "--allow-empty", "-m", "on main, untagged");
-  const onMain = head();
-  git("update-ref", "refs/remotes/origin/main", onMain);
+    git("init", "-q", "-b", "main");
+    git("commit", "-q", "--allow-empty", "-m", "root");
+    git("checkout", "-q", "-b", "side");
+    git("commit", "-q", "--allow-empty", "-m", "tagged, off main");
+    tagged = head();
+    git("tag", "bench/guardian-sha/test");
+    git("commit", "-q", "--allow-empty", "-m", "branch only");
+    branchOnly = head();
+    // main advances past the branch point, so its tip is contained by no tag.
+    // Without this the "on main" commit was also tag-reachable, and the test
+    // could not tell the predicate's two clauses apart — removing the main
+    // clause entirely still passed.
+    git("checkout", "-q", "main");
+    git("commit", "-q", "--allow-empty", "-m", "on main, untagged");
+    onMain = head();
+    git("update-ref", "refs/remotes/origin/main", onMain);
+  });
+
+  afterAll(() => {
+    if (scratch) rmSync(scratch, { recursive: true, force: true });
+  });
 
   it("accepts a commit on main that no tag reaches", () => {
     expect(spawnSync("git", ["-C", scratch, "tag", "--contains", onMain]).stdout.toString().trim()).toBe("");
