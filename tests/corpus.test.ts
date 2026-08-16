@@ -216,7 +216,19 @@ describe("the provenance the corpus points at", () => {
   const repo = resolve(dirname(resolve("corpus.json")), "../ownima/codegraph-brain");
   const present = existsSync(join(repo, ".git"));
 
-  it.skipIf(!present)("resolves every guardian_sha a review claims to come from", () => {
+  // A shallow checkout cannot answer this question, and must not pretend to.
+  // CI clones the sibling with `actions/checkout`, which fetches depth 1 by
+  // default: the tip of the default branch and no history at all. Run there,
+  // this reported all six shas unreachable — a true statement about that clone
+  // and a false one about the repository, which is the shape of alarm that gets
+  // switched off rather than acted on.
+  const deep =
+    present &&
+    spawnSync("git", ["-C", repo, "rev-parse", "--is-shallow-repository"])
+      .stdout.toString()
+      .trim() === "false";
+
+  it.skipIf(!deep)("resolves every guardian_sha a review claims to come from", () => {
     // `guardian_sha` left the genome when identity moved to the review
     // fingerprint, so nothing published depends on it — no identity, no
     // address, no birth, no anchored root. It stays on the record as
