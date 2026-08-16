@@ -246,3 +246,12 @@ describe("a review whose output could not be parsed", () => {
     for (const t of deriveTrackRecords(records)) expect(t.unparseable).toBe(0);
   });
 });
+
+describe("a review record with error", () => {
+  it("is not counted among the reviews and is recorded as unparseable", () => {
+    const errored = { ...parsed, error: "503 UNAVAILABLE", findings: [] };
+    const track = deriveTrackRecords([errored])[0]!;
+    expect(track.reviews).toBe(0);
+    expect(track.unparseable).toBe(1);
+  });
+});
