@@ -1,9 +1,20 @@
 import { describe, expect, it } from "vitest";
 import { renderPage } from "../src/publish/page.js";
+import { existsSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { harvest } from "../src/harvest.js";
+import { readCorpus } from "../src/corpus.js";
+import { deriveTrackRecords } from "../src/derive.js";
 import type { TrackRecord } from "../src/types.js";
 
 // Typed as the interface rather than `as const`, so a test can override a
 // single field without every literal narrowing to itself.
+// The corpus lives in a sibling checkout a clean clone will not have. Skipped
+// explicitly rather than swallowed, following `tests/corpus.test.ts`: a skip is
+// visible in the report, and a test that passes when it could not run reports
+// the reassuring answer.
+const CORPUS_BASE = resolve(dirname(resolve("corpus.json")), "../ownima/codegraph-brain/benchmarks");
+
 const BASE_SKEPTIC: TrackRecord["skeptic"] = {
   judge: "independent",
   confirmed: 15,
@@ -414,5 +425,38 @@ describe("the caveat when a reviewer has nothing decided either way", () => {
     ]);
     expect(html).not.toContain("NaN");
     expect(html).toMatch(/by 8 to 8 points/);
+  });
+});
+
+describe("numbers that are means", () => {
+  it("prints no tail for values that are certain to produce one", () => {
+    // 0.1 + 0.2 is 0.30000000000000004 in binary floating point — the shape
+    // this is about, guaranteed rather than hoped for, and reachable without
+    // the sibling checkout.
+    //
+    // My first fixture picked thirds, which summed to 43.33 exactly. It passed
+    // while the live page carried a tail, which is how a fixture that does not
+    // reproduce the arithmetic reports the reassuring answer.
+    const html = renderPage([
+      make({
+        claims: 0.3,
+        skeptic: { ...BASE_SKEPTIC, confirmed: 0.1, refuted: 0.2, uncertain: 0 },
+      }),
+    ]);
+    expect(html.match(/[0-9]+\.[0-9]{3,}/g)).toBeNull();
+  });
+
+  it.skipIf(!existsSync(CORPUS_BASE))("prints no tail anywhere on the real page", () => {
+    // Counts are means once a subject is sampled twice, and summing rounded
+    // means re-grows the tail. The live page read "84% of 297.83000000000004
+    // resolved" before this — a sweep catches every occurrence, where checking
+    // the one line I happened to render did not.
+    // Swept over the real corpus, not a fixture: the fixture I first wrote
+    // rounded cleanly and passed while the live page still carried a tail from
+    // a third place. The corpus is what the page is built from, so it is what
+    // the sweep has to cover.
+    const { records } = harvest(readCorpus("corpus.json").text);
+    const html = renderPage(deriveTrackRecords(records), { signed: true });
+    expect(html.match(/[0-9]+\.[0-9]{3,}/g)).toBeNull();
   });
 });
