@@ -38,7 +38,7 @@ function make(over: Partial<TrackRecord> = {}): TrackRecord {
     errored: 0,
     claims: 20,
     corpus: [["cal_dot_com", 10]],
-    skeptic: { judge: "independent", confirmed: 15, refuted: 3, uncertain: 2, unresolved: 0, mean_impact: 4.1 , by_severity: [    { severity: "critical" as const, claims: 0, resolved: 0, confirmed: 0, uncertain: 0 },    { severity: "major" as const, claims: 0, resolved: 0, confirmed: 0, uncertain: 0 },    { severity: "minor" as const, claims: 0, resolved: 0, confirmed: 0, uncertain: 0 },  ], },
+    skeptic: BASE_SKEPTIC,
     human: { available: false },
     ...over,
   };
@@ -154,7 +154,7 @@ describe("a self-graded identity on the page", () => {
         context_mode: "graph",
         review_fingerprint: "4d1fe6a1234567",
       },
-      skeptic: { judge: "self", confirmed: 15, refuted: 3, uncertain: 2, unresolved: 0, mean_impact: 4.1 , by_severity: [    { severity: "critical" as const, claims: 0, resolved: 0, confirmed: 0, uncertain: 0 },    { severity: "major" as const, claims: 0, resolved: 0, confirmed: 0, uncertain: 0 },    { severity: "minor" as const, claims: 0, resolved: 0, confirmed: 0, uncertain: 0 },  ], },
+      skeptic: { ...BASE_SKEPTIC, judge: "self" },
     });
 
   it("warns beside the skeptic that it is the finder", () => {
