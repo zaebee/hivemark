@@ -84,23 +84,25 @@ export function genomeOf(record: ReviewRecord): Genome {
     // which refuses it — that is "no skeptic ran" written with a stray space,
     // and the space is the configuration error this function exists to surface.
     skeptic_model: !record.skeptic_model ? null : exactly(record.skeptic_model, "skeptic_model"),
-    // `had_graph`, not `pr_slice`, and the two disagree more than one would
-    // guess. The design doc named both as the source and set no rule, so this
-    // is the rule.
+    // `had_graph`, not `pr_slice`, and not `arm`. The design doc named two
+    // sources and set no rule, so this is the rule — and it agrees with
+    // upstream, whose own test is called
+    // `test_had_graph_is_recorded_not_inferred_from_the_slice`: "ingest can fail
+    // on a PR the plan called graph-enabled ... such a row must not count as
+    // evidence for graph context".
     //
-    // `pr_slice` is the arm a run was assigned to; `had_graph` is whether a
-    // graph was actually present. The genome describes how a review was
-    // performed, so the observed condition wins: crediting graph-context
-    // results to a review that had no graph context is the more damaging of the
-    // two errors available here.
+    // The genome describes how a review was performed, and the prompt builder
+    // branches on whether a graph section exists, not on the plan. So a run
+    // without a graph really did behave as diff-only, whatever it was planned
+    // as.
     //
-    // The cost of that choice is not hypothetical. In the current corpus 19
-    // records say `pr_slice: "graph"` with `had_graph: false` — one contiguous
-    // 14-minute window on one Guardian commit, and every one of those PRs has a
-    // graph run elsewhere in the corpus. They are the degraded half of a graph
-    // campaign, and they are counted here as 42% of the `diff-only` identity's
-    // reviews. `harvest` warns about them; changing this line would move them
-    // to a different identity, and both identities are already born on chain.
+    // What this loses is worth stating. 19 records in the corpus are
+    // `arm: "ablated"` — the same PRs reviewed with the graph deliberately
+    // withheld, to measure what it contributes — and they land in the same
+    // identity as 26 runs that were never planned for a graph at all. A
+    // controlled removal and a plain diff-only run are one bee here. `harvest`
+    // says so; separating them would mint a fourth identity, and the three that
+    // exist are already born on chain.
     context_mode: record.had_graph ? "graph" : "diff-only",
     // Replaces guardian_version. `guardian_sha` stays on the record as
     // provenance and leaves the genome: one identity now spans several commits,

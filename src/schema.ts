@@ -86,6 +86,17 @@ export const ReviewRecordSchema = z.object({
   skeptic_provider: z.string().nullable().optional(),
   had_graph: z.boolean(),
   pr_slice: z.string(),
+  /**
+   * Which arm produced this review: `"graph"` is the normal run, `"ablated"` is
+   * the same PR reviewed with the graph **deliberately** withheld.
+   *
+   * Optional because rows predating the field exist in the corpus. Read here
+   * because without it an ablation and an ingest failure are the same row — and
+   * upstream added the field precisely so they would not be. Not reading it
+   * once led this project to describe 19 deliberate ablations as a degraded
+   * run that had lost its graph.
+   */
+  arm: z.enum(["graph", "ablated"]).optional(),
   parse_failed: z.boolean(),
   error: z.string().nullable().optional(),
   findings: z.array(RawFindingSchema),

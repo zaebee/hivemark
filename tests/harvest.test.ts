@@ -41,7 +41,7 @@ describe("harvest", () => {
   });
 });
 
-describe("pr_slice disagreeing with had_graph", () => {
+describe("runs counted as diff-only for a reason worth knowing", () => {
   const row = (over: Record<string, unknown>) =>
     JSON.stringify({
       url: "https://github.com/o/r/pull/1",
@@ -62,30 +62,51 @@ describe("pr_slice disagreeing with had_graph", () => {
       ...over,
     });
 
-  it("warns when a graph-labelled run reports no graph", () => {
-    // context_mode follows had_graph, so such a run is counted as diff-only —
-    // a different identity from the one its own label implies. Resolving that
-    // silently is the thing worth refusing to do.
+  it("names an ablation as a deliberate removal, not a failure", () => {
+    // Upstream added `arm` so that "a failure and a controlled removal must not
+    // look alike in the record". Reading had_graph without it produced exactly
+    // the misreading that field exists to prevent.
+    const { warnings } = harvest(row({ had_graph: false, arm: "ablated" }));
+    expect(warnings.join(" ")).toMatch(/1 record are ablations|1 record .*deliberately withheld/i);
+    expect(warnings.join(" ")).not.toMatch(/found no graph/i);
+  });
+
+  it("names a graph-planned run that found no graph as a failure", () => {
     const { warnings } = harvest(row({ had_graph: false }));
-    expect(warnings.join(" ")).toMatch(/1 record.*pr_slice.*graph.*had_graph/i);
+    expect(warnings.join(" ")).toMatch(/pr_slice=graph but had_graph=false.*found no graph/i);
+    expect(warnings.join(" ")).not.toMatch(/ablation/i);
+  });
+
+  it("keeps the two apart when both occur", () => {
+    const text = [
+      row({ had_graph: false, arm: "ablated" }),
+      row({ had_graph: false, head_sha: "c" }),
+    ].join("\n");
+    const w = harvest(text).warnings;
+    expect(w.filter((x) => /ablation/i.test(x))).toHaveLength(1);
+    expect(w.filter((x) => /found no graph/i.test(x))).toHaveLength(1);
   });
 
   it("counts them once, not once per line", () => {
-    // Nineteen such rows exist in the real corpus. Nineteen warnings would be
-    // noise nobody reads; one with a count is a fact.
-    const text = [row({ had_graph: false }), row({ had_graph: false, head_sha: "c" })].join("\n");
-    const disagreements = harvest(text).warnings.filter((w) => /pr_slice/.test(w));
-    expect(disagreements).toHaveLength(1);
-    expect(disagreements[0]).toContain("2 records");
+    const text = [
+      row({ had_graph: false, arm: "ablated" }),
+      row({ had_graph: false, arm: "ablated", head_sha: "c" }),
+    ].join("\n");
+    const w = harvest(text).warnings.filter((x) => /ablation/i.test(x));
+    expect(w).toHaveLength(1);
+    expect(w[0]).toContain("2 records");
   });
 
-  it("warns in the other direction too", () => {
-    const { warnings } = harvest(row({ pr_slice: "diff-only", had_graph: true }));
-    expect(warnings.join(" ")).toMatch(/pr_slice/i);
+  it("reports the pr_slice it actually read, not an assumed one", () => {
+    // The upstream schema is a bare string with a third value, "unknown".
+    // Hardcoding "diff-only" in the message would state something false.
+    const { warnings } = harvest(row({ pr_slice: "unknown", had_graph: true }));
+    expect(warnings.join(" ")).toMatch(/1 record have pr_slice=unknown but had_graph=true/i);
+    expect(warnings.join(" ")).not.toContain("pr_slice=diff-only");
   });
 
-  it("says nothing when the two agree", () => {
+  it("says nothing when plan and reality agree", () => {
     const text = [row({}), row({ pr_slice: "diff-only", had_graph: false, head_sha: "c" })].join("\n");
-    expect(harvest(text).warnings.filter((w) => /pr_slice/.test(w))).toHaveLength(0);
+    expect(harvest(text).warnings.filter((w) => /pr_slice|ablation/.test(w))).toHaveLength(0);
   });
 });

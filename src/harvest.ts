@@ -50,39 +50,68 @@ export function harvest(text: string): HarvestResult {
 }
 
 /**
- * Report records whose two candidate context sources contradict each other.
+ * Report runs that are counted as `diff-only` for reasons a reader should know.
  *
- * `pr_slice` names the arm a run was assigned to; `had_graph` reports whether a
+ * `pr_slice` names the arm a run was planned for; `had_graph` reports whether a
  * graph was actually there. `genomeOf` derives `context_mode` — and therefore
- * `identity_id` — from `had_graph`, so a disagreement silently files a run
- * under a different reviewer than its own label implies.
+ * `identity_id` — from `had_graph`, so either cause files the run under a
+ * different reviewer than its plan implies. They are not the same event, and
+ * conflating them is a mistake this project has already made once:
  *
- * This does not refuse, because `had_graph` is the defensible source and
- * refusing would stop a corpus that is honestly reporting a degraded run. It
- * warns, because 19 such records in the current corpus account for 42% of one
- * published identity's reviews, and that arrived without anything saying so.
+ * - **Ablation** (`arm: "ablated"`) is a controlled removal. The same PR is
+ *   reviewed with the graph deliberately withheld, to measure what the graph
+ *   contributes. Nothing failed.
+ * - **Ingest failure** is a graph-planned run where the graph turned out
+ *   absent. Something failed.
+ *
+ * Upstream separates them with the `arm` field for exactly this reason, its own
+ * comment saying "a failure and a controlled removal must not look alike in the
+ * record". Reported separately here so they do not look alike downstream
+ * either.
  *
  * Counted rather than reported per line: nineteen warnings is noise nobody
  * reads, and one with a number is a fact somebody acts on.
  */
 function contextModeDisagreements(records: readonly ReviewRecord[]): string[] {
-  let graphArmWithoutGraph = 0;
-  let diffArmWithGraph = 0;
+  let ablated = 0;
+  let ingestFailed = 0;
+  // Keyed by the actual `pr_slice`, not assumed to be "diff-only": the upstream
+  // schema is a bare string and defines a third value, `"unknown"`, so naming
+  // the label in the message means reading it rather than inferring it.
+  const armsWithUnexpectedGraph = new Map<string, number>();
+
   for (const record of records) {
-    const labelledGraph = record.pr_slice === "graph";
-    if (labelledGraph === !!record.had_graph) continue;
-    if (labelledGraph) graphArmWithoutGraph += 1;
-    else diffArmWithGraph += 1;
+    const plannedGraph = record.pr_slice === "graph";
+    if (plannedGraph === !!record.had_graph) continue;
+    if (!plannedGraph) {
+      const n = armsWithUnexpectedGraph.get(record.pr_slice) ?? 0;
+      armsWithUnexpectedGraph.set(record.pr_slice, n + 1);
+    } else if (record.arm === "ablated") {
+      ablated += 1;
+    } else {
+      ingestFailed += 1;
+    }
   }
 
-  const say = (n: number, label: string, reported: string, counted: string): string =>
-    `${n} record${n === 1 ? "" : "s"} have pr_slice=${label} but had_graph=${reported}; ` +
-    `context_mode follows had_graph, so they are counted as ${counted}`;
-
+  const s = (n: number) => (n === 1 ? "" : "s");
   const out: string[] = [];
-  if (graphArmWithoutGraph > 0) {
-    out.push(say(graphArmWithoutGraph, "graph", "false", "diff-only"));
+  if (ablated > 0) {
+    out.push(
+      `${ablated} record${s(ablated)} are ablations — pr_slice=graph with the graph ` +
+        `deliberately withheld (arm=ablated) — so they are counted as diff-only, ` +
+        `alongside runs that were never planned for a graph`,
+    );
   }
-  if (diffArmWithGraph > 0) out.push(say(diffArmWithGraph, "diff-only", "true", "graph"));
+  if (ingestFailed > 0) {
+    out.push(
+      `${ingestFailed} record${s(ingestFailed)} have pr_slice=graph but had_graph=false ` +
+        `and no arm=ablated, so a graph-planned run found no graph; counted as diff-only`,
+    );
+  }
+  for (const [slice, n] of armsWithUnexpectedGraph) {
+    out.push(
+      `${n} record${s(n)} have pr_slice=${slice} but had_graph=true, so they are counted as graph`,
+    );
+  }
   return out;
 }
