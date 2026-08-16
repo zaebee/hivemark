@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, describe, expect, it } from "vitest";
 import { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
@@ -211,6 +211,81 @@ describe("the committed manifest", () => {
   });
 });
 
+/**
+ * Whether a commit will still be there tomorrow, not merely today.
+ *
+ * Resolving now and surviving are different claims, and the first was the one
+ * being checked while the second was the one being asserted. A commit reachable
+ * only from a branch resolves perfectly until the branch is deleted; then the
+ * `guardian_sha` on a signed review points at nothing while still looking like
+ * a hash that means something.
+ *
+ * Durable means reachable from a tag, or an ancestor of `main`. Tags are the
+ * scheme upstream publishes these under; `main` is not going to be deleted, and
+ * demanding a tag for a commit already on it would redden on the ordinary case
+ * of a review run against released code.
+ *
+ * This catches the next one *before* the branch goes, which resolvability
+ * cannot: a fresh sha arriving on a branch fails immediately, while the remedy
+ * is still one `git tag` away.
+ */
+function durablyReachable(repo: string, sha: string): boolean {
+  const onMain = spawnSync("git", ["-C", repo, "merge-base", "--is-ancestor", sha, "origin/main"]);
+  if (onMain.status === 0) return true;
+  const tags = spawnSync("git", ["-C", repo, "tag", "--contains", sha]);
+  return tags.status === 0 && tags.stdout.toString().trim() !== "";
+}
+
+describe("durablyReachable", () => {
+  // Built rather than borrowed: upstream has no branch-only commit left to test
+  // against, which is the point of the fix and a problem for the test. Three
+  // commits in three states prove the predicate separates them.
+  // Not registered in `made`: this file's `afterEach` empties that list after
+  // every test, so the repository was deleted before these three could use it —
+  // and they failed for a reason with nothing to do with what they assert.
+  const scratch = mkdtempSync(join(tmpdir(), "hivemark-reach-"));
+  afterAll(() => rmSync(scratch, { recursive: true, force: true }));
+  const git = (...args: string[]) =>
+    spawnSync("git", ["-C", scratch, ...args], {
+      env: { ...process.env, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t" },
+    });
+
+  const head = () => spawnSync("git", ["-C", scratch, "rev-parse", "HEAD"]).stdout.toString().trim();
+
+  git("init", "-q", "-b", "main");
+  git("commit", "-q", "--allow-empty", "-m", "root");
+  git("checkout", "-q", "-b", "side");
+  git("commit", "-q", "--allow-empty", "-m", "tagged, off main");
+  const tagged = head();
+  git("tag", "bench/guardian-sha/test");
+  git("commit", "-q", "--allow-empty", "-m", "branch only");
+  const branchOnly = head();
+  // main advances past the branch point, so its tip is contained by no tag.
+  // Without this the "on main" commit was also tag-reachable, and the test
+  // could not tell the predicate's two clauses apart — removing the main clause
+  // entirely still passed.
+  git("checkout", "-q", "main");
+  git("commit", "-q", "--allow-empty", "-m", "on main, untagged");
+  const onMain = head();
+  git("update-ref", "refs/remotes/origin/main", onMain);
+
+  it("accepts a commit on main that no tag reaches", () => {
+    expect(spawnSync("git", ["-C", scratch, "tag", "--contains", onMain]).stdout.toString().trim()).toBe("");
+    expect(durablyReachable(scratch, onMain)).toBe(true);
+  });
+
+  it("accepts a commit off main that a tag reaches", () => {
+    expect(durablyReachable(scratch, tagged)).toBe(true);
+  });
+
+  it("rejects a commit reachable only from a branch", () => {
+    // Resolves perfectly today. This is the state a thirteenth sha arrives in,
+    // and the whole reason resolvability was the wrong question.
+    expect(spawnSync("git", ["-C", scratch, "cat-file", "-e", `${branchOnly}^{commit}`]).status).toBe(0);
+    expect(durablyReachable(scratch, branchOnly)).toBe(false);
+  });
+});
+
 describe("the provenance the corpus points at", () => {
   // Same sibling checkout, same reason for skipping rather than swallowing.
   const repo = resolve(dirname(resolve("corpus.json")), "../ownima/codegraph-brain");
@@ -249,17 +324,14 @@ describe("the provenance the corpus points at", () => {
     const shas = [...new Set(records.map((r) => r.guardian_sha))].sort();
     expect(shas.length).toBeGreaterThan(0);
 
-    const unreachable = shas.filter((sha) => {
-      const probe = spawnSync("git", ["-C", repo, "cat-file", "-e", `${sha}^{commit}`]);
-      return probe.status !== 0;
-    });
+    const fragile = shas.filter((sha) => !durablyReachable(repo, sha));
 
     expect(
-      unreachable,
-      `these guardian_sha values no longer resolve in ${repo}. The commits were ` +
-        `probably on a branch that has since been deleted. Ask upstream to tag them, ` +
-        `as they did for the calibration set under bench/guardian-sha/, or restore the ` +
-        `branch long enough to tag them yourself.`,
+      fragile,
+      `these guardian_sha values resolve today but are reachable only from a branch, ` +
+        `so deleting it makes them unreachable and the field starts pointing at nothing. ` +
+        `Ask upstream to tag them under bench/guardian-sha/, as they did for the ` +
+        `calibration set and for the two this corpus needed.`,
     ).toEqual([]);
   });
 });
