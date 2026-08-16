@@ -16,7 +16,7 @@
 
 import { createPublicClient, http, encodeFunctionData, encodePacked, keccak256 } from "viem";
 import { base } from "viem/chains";
-import { GET_SCHEMA_ABI, SCHEMA_REGISTRY, ZERO_UID, refuseUnlessAffordable, signer, stopUnlessSending } from "./wallet.js";
+import { GET_SCHEMA_ABI, SCHEMA_REGISTRY, ZERO_UID, reading, refuseUnlessAffordable, signer, stopUnlessSending } from "./wallet.js";
 import { ANCHOR_SCHEMA } from "../src/anchor/schema.js";
 import { CLAIM_SCHEMA } from "../src/attest/schema.js";
 import { BIRTH_SCHEMA } from "../src/birth/schema.js";
@@ -80,12 +80,14 @@ for (const { name, schema } of SCHEMAS) {
   // and revocable flag, attestations already resolve against it and there is
   // nothing to send. Registering again does not fail into a no-op — EAS rejects
   // it and the gas is spent on a revert.
-  const existing = await publicClient.readContract({
-    address: SCHEMA_REGISTRY,
-    abi: GET_SCHEMA_ABI,
-    functionName: "getSchema",
-    args: [expected],
-  });
+  const existing = await reading(`checking whether the ${name} schema already exists`, () =>
+    publicClient.readContract({
+      address: SCHEMA_REGISTRY,
+      abi: GET_SCHEMA_ABI,
+      functionName: "getSchema",
+      args: [expected],
+    }),
+  );
   const alreadyRegistered = existing.uid !== ZERO_UID;
 
   console.log(`── ${name}`);
