@@ -114,11 +114,12 @@ ${renderAblation(options.ablation ?? null)}
  * Raised by the codegraph-brain session against the published numbers.
  */
 function unverifiableNote(tracks: TrackRecord[]): string | null {
-  const uncertain = tracks.reduce((n, t) => n + t.skeptic.uncertain, 0);
+  const uncertain = round(tracks.reduce((n, t) => n + t.skeptic.uncertain, 0));
   if (uncertain === 0) return null;
-  const judged = tracks.reduce(
-    (n, t) => n + t.skeptic.confirmed + t.skeptic.refuted + t.skeptic.uncertain,
-    0,
+  // Rounded for the same reason as the rate line: these are means, and summing
+  // them across identities re-grows the float tail.
+  const judged = round(
+    tracks.reduce((n, t) => n + t.skeptic.confirmed + t.skeptic.refuted + t.skeptic.uncertain, 0),
   );
   // A reviewer whose every judged claim came back uncertain has no defined
   // swing: dropping the uncertain ones would leave a rate over nothing. Such a
@@ -190,6 +191,15 @@ function severityBand(band: SeverityBand): string {
 }
 
 /**
+ * Counts are means once a subject has been sampled more than once, so they can
+ * carry the usual binary-float tail. Two places is past anything the page shows
+ * and short of the noise.
+ */
+function round(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+/**
  * The ceiling of `impact_score`, from the upstream schema — an integer 0-10.
  *
  * Printed with the number because `6.31` alone does not say whether that is
@@ -215,7 +225,10 @@ function judgeNote(judge: TrackRecord["skeptic"]["judge"]): string {
 
 function card(track: TrackRecord): string {
   const s = track.skeptic;
-  const resolved = s.confirmed + s.refuted + s.uncertain;
+  // Rounded at the point of display. The three terms are already rounded means,
+  // and adding them reintroduces the float error the rounding removed: the live
+  // page read "84% of 297.83000000000004 resolved".
+  const resolved = round(s.confirmed + s.refuted + s.uncertain);
   const corpus = track.corpus.map(([p, n]) => `${esc(p)} ×${n}`).join(", ");
 
   return `<section class="card">

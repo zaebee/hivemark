@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { renderPage } from "../src/publish/page.js";
+import { harvest } from "../src/harvest.js";
+import { readCorpus } from "../src/corpus.js";
+import { deriveTrackRecords } from "../src/derive.js";
 import type { TrackRecord } from "../src/types.js";
 
 // Typed as the interface rather than `as const`, so a test can override a
@@ -414,5 +417,21 @@ describe("the caveat when a reviewer has nothing decided either way", () => {
     ]);
     expect(html).not.toContain("NaN");
     expect(html).toMatch(/by 8 to 8 points/);
+  });
+});
+
+describe("numbers that are means", () => {
+  it("prints no binary-float tails anywhere on the page", () => {
+    // Counts are means once a subject is sampled twice, and summing rounded
+    // means re-grows the tail. The live page read "84% of 297.83000000000004
+    // resolved" before this — a sweep catches every occurrence, where checking
+    // the one line I happened to render did not.
+    // Swept over the real corpus, not a fixture: the fixture I first wrote
+    // rounded cleanly and passed while the live page still carried a tail from
+    // a third place. The corpus is what the page is built from, so it is what
+    // the sweep has to cover.
+    const { records } = harvest(readCorpus("corpus.json").text);
+    const html = renderPage(deriveTrackRecords(records), { signed: true });
+    expect(html.match(/[0-9]+\.[0-9]{3,}/g)).toBeNull();
   });
 });

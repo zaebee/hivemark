@@ -16,7 +16,11 @@ export interface ShieldsEndpoint {
  */
 export function shieldsEndpoint(track: TrackRecord): ShieldsEndpoint {
   const { confirmed, refuted, uncertain } = track.skeptic;
-  const resolved = confirmed + refuted + uncertain;
+  // Rounded: these are means once a subject has been sampled twice, and adding
+  // rounded means re-grows the binary-float tail. This string is served to
+  // shields.io as well as printed on the card, so an unrounded sum read
+  // "84% self-graded (297.83000000000004 resolved)" in a badge.
+  const resolved = Math.round((confirmed + refuted + uncertain) * 100) / 100;
   const label = `${track.genome.finder_provider} · ${track.genome.context_mode}`;
 
   if (resolved === 0) {
