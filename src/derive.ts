@@ -208,15 +208,34 @@ const SEVERITIES = ["critical", "major", "minor"] as const;
  * about the reviewer.
  */
 function bySeverity(claims: Claim[]): SeverityBand[] {
-  return SEVERITIES.map((severity) => {
-    const band = claims.filter((c) => c.severity === severity);
-    return {
-      severity,
-      claims: band.length,
-      resolved: band.filter((c) => c.verdict !== "unresolved").length,
-      confirmed: band.filter((c) => c.verdict === "confirmed").length,
-    };
-  });
+  // One pass. The array-per-band version read well and traversed the claims
+  // nine times; this project already prefers a single pass over data designed
+  // to accumulate — see `src/anchor/plan.ts` and `src/ablation.ts`.
+  //
+  // No `if (severity === "critical" || ...)` guard around the lookup. `severity`
+  // is a zod enum of exactly these three, so the branch could never be taken,
+  // and a guard that cannot fire is indistinguishable from one that works right
+  // up until it matters. If the enum ever widens, `Record` stops type-checking
+  // here, which is the failure worth having.
+  // `-readonly` rather than `Omit`: SeverityBand's fields are readonly, which is
+  // right for the value that leaves this function and wrong for the accumulator
+  // that builds it.
+  type Tally = { -readonly [K in Exclude<keyof SeverityBand, "severity">]: SeverityBand[K] };
+  const tally: Record<SeverityBand["severity"], Tally> = {
+    critical: { claims: 0, resolved: 0, confirmed: 0 },
+    major: { claims: 0, resolved: 0, confirmed: 0 },
+    minor: { claims: 0, resolved: 0, confirmed: 0 },
+  };
+
+  for (const claim of claims) {
+    const band = tally[claim.severity];
+    band.claims += 1;
+    if (claim.verdict === "unresolved") continue;
+    band.resolved += 1;
+    if (claim.verdict === "confirmed") band.confirmed += 1;
+  }
+
+  return SEVERITIES.map((severity) => ({ severity, ...tally[severity] }));
 }
 
 function skepticAxis(claims: Claim[], genome: Genome): SkepticAxis {
