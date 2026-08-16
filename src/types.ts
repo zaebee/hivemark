@@ -96,6 +96,15 @@ export interface TrackRecord {
   readonly owner_address: `0x${string}`;
   readonly genome: Genome;
   readonly reviews: number;
+  /**
+   * Runs whose output could not be parsed, kept out of `reviews`.
+   *
+   * Separate rather than folded in, because the two states differ in what they
+   * say about the reviewer: `reviews` is work it did, this is work it attempted.
+   * Counting these as reviews inflates the denominator a reader uses to weigh
+   * everything else, and inflates it in the flattering direction.
+   */
+  readonly unparseable: number;
   readonly claims: number;
   /**
    * Projects this identity actually reviewed, with counts.

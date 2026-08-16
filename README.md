@@ -136,8 +136,15 @@ itself is not the same measurement as one awarded by a different model, and the
 
 ## Honest limits
 
-- Guardian writes no record for a review that fails, so every track record here
-  is survivorship-biased and systematically optimistic.
+- Every rate here is measured over claims that were made. A defect no reviewer
+  mentioned leaves no row anywhere, so nothing here says how much was missed,
+  and a reviewer that says less is not distinguishable from one that misses
+  less. Recall is measured upstream against golden findings, in
+  `benchmarks/guardian/calibration.jsonl`, but those rows carry no reviewer
+  fingerprint and share no `guardian_sha` with this corpus — so it cannot be
+  attributed to any identity here. Asked for upstream in codegraph-brain#390.
+- Runs whose output could not be parsed are counted separately from reviews and
+  shown on the card. They used to be counted as reviews that found nothing.
 - The human axis (`findings_applied`) has no data in benchmark artifacts and is
   never inferred from the skeptic.
 - Cross-provider comparison is now partly possible and partly not. Matched on

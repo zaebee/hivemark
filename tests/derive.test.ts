@@ -190,3 +190,59 @@ describe("the judge reaches the track record", () => {
     for (const t of deriveTrackRecords(records)) expect(t.skeptic.judge).toBe("independent");
   });
 });
+
+describe("a review whose output could not be parsed", () => {
+  const parsed = records.find((r) => r.findings.length > 0)!;
+
+  it("is not counted among the reviews", () => {
+    // Counting it would credit the reviewer with having reviewed, when what
+    // happened is that its output could not be read.
+    const failed = { ...parsed, parse_failed: true, findings: [] };
+    expect(deriveTrackRecords([failed])[0]!.reviews).toBe(0);
+  });
+
+  it("is counted separately rather than dropped", () => {
+    // Silently discarding it would hide that a run happened at all, which is
+    // the information a reader needs to weigh the rest.
+    const failed = { ...parsed, parse_failed: true, findings: [] };
+    expect(deriveTrackRecords([failed])[0]!.unparseable).toBe(1);
+  });
+
+  it("does not supersede an earlier successful review of the same PR", () => {
+    // `dedupe` treats a rerun as a correction. A run that produced nothing
+    // readable corrects nothing, so letting it win would discard real findings
+    // because a parser failed.
+    const later = {
+      ...parsed,
+      parse_failed: true,
+      findings: [],
+      reviewed_at: "2099-01-01T00:00:00Z",
+    };
+    const track = deriveTrackRecords([parsed, later])[0]!;
+    expect(track.reviews).toBe(1);
+    expect(track.claims).toBe(parsed.findings.length);
+    expect(track.unparseable).toBe(1);
+  });
+
+  it("does not appear in the corpus this identity reviewed", () => {
+    // The corpus line says which projects were reviewed. An unreadable run did
+    // not review one.
+    const failed = { ...parsed, parse_failed: true, findings: [], project: "ghost_project" };
+    const track = deriveTrackRecords([parsed, failed])[0]!;
+    expect(track.corpus.map(([p]) => p)).not.toContain("ghost_project");
+  });
+
+  it("counts two failed runs of one PR as one failure", () => {
+    // Deduplicated within their own class, on the same rule the reviews use:
+    // one run per (url, head_sha, identity). Otherwise a PR that is retried
+    // until it parses accumulates failures faster than reviews.
+    const failed = { ...parsed, parse_failed: true, findings: [] };
+    const again = { ...failed, reviewed_at: "2099-01-01T00:00:00Z" };
+    expect(deriveTrackRecords([failed, again])[0]!.unparseable).toBe(1);
+  });
+
+  it("reports zero when every review parsed", () => {
+    // The ordinary state, and the degenerate case for a counter.
+    for (const t of deriveTrackRecords(records)) expect(t.unparseable).toBe(0);
+  });
+});

@@ -18,6 +18,7 @@ function track(over: Partial<TrackRecord["skeptic"]>): TrackRecord {
       review_fingerprint: "d0d807ef",
     },
     reviews: 10,
+    unparseable: 0,
     claims: 20,
     corpus: [["cal_dot_com", 10]],
     skeptic: { judge: "independent", confirmed: 15, refuted: 3, uncertain: 2, unresolved: 0, mean_impact: 4.1, ...over },
