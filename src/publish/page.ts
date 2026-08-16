@@ -120,21 +120,36 @@ function unverifiableNote(tracks: TrackRecord[]): string | null {
     (n, t) => n + t.skeptic.confirmed + t.skeptic.refuted + t.skeptic.uncertain,
     0,
   );
-  const swings = tracks.map((t) => {
-    const s = t.skeptic;
-    const withU = s.confirmed / (s.confirmed + s.refuted + s.uncertain);
-    const withoutU = s.confirmed / (s.confirmed + s.refuted);
-    return (withoutU - withU) * 100;
-  });
-  const low = Math.min(...swings).toFixed(0);
-  const high = Math.max(...swings).toFixed(0);
-  return (
+  // A reviewer whose every judged claim came back uncertain has no defined
+  // swing: dropping the uncertain ones would leave a rate over nothing. Such a
+  // track is excluded from the range rather than divided by zero — unguarded,
+  // this printed a literal `NaN to NaN points` on the page, reachable and
+  // verified by rendering it.
+  const swings: number[] = [];
+  for (const { skeptic } of tracks) {
+    const decided = skeptic.confirmed + skeptic.refuted;
+    if (decided === 0) continue;
+    const withU = skeptic.confirmed / (decided + skeptic.uncertain);
+    swings.push((skeptic.confirmed / decided - withU) * 100);
+  }
+
+  const preamble =
     `Every rate here divides by confirmed, refuted and uncertain together. ` +
     `An uncertain verdict means the skeptic ran and reported it could not check the claim ` +
     `from what it was given — not that the claim was wrong — yet it costs a reviewer exactly ` +
-    `what a refutation costs. ${uncertain} of ${judged} judged findings are in that state, ` +
-    `and dropping them would raise the rates below by ${low} to ${high} points.`
-  );
+    `what a refutation costs. ${uncertain} of ${judged} judged findings are in that state`;
+
+  // No range rather than a made-up one. If nothing here has a defined swing,
+  // the fact that the uncertain claims exist is still worth stating.
+  if (swings.length === 0) return `${preamble}.`;
+
+  let low = swings[0]!;
+  let high = swings[0]!;
+  for (const swing of swings) {
+    if (swing < low) low = swing;
+    if (swing > high) high = swing;
+  }
+  return `${preamble}, and dropping them would raise the rates below by ${low.toFixed(0)} to ${high.toFixed(0)} points.`;
 }
 
 /**

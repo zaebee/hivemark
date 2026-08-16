@@ -389,3 +389,30 @@ describe("the unverifiable share per band", () => {
     expect(html).toContain("critical 50% of 34");
   });
 });
+
+describe("the caveat when a reviewer has nothing decided either way", () => {
+  it("prints no NaN, and no range it cannot compute", () => {
+    // Reachable: every judged claim came back uncertain. Unguarded this
+    // rendered a literal "NaN to NaN points" — verified by rendering it, not
+    // reasoned about.
+    const html = renderPage([
+      make({ skeptic: { ...BASE_SKEPTIC, confirmed: 0, refuted: 0, uncertain: 5 } }),
+    ]);
+    expect(html).not.toContain("NaN");
+    expect(html).toContain("5 of 5 judged findings");
+    // Pinned to the sentence, not the bare word: the bee's SVG carries a
+    // `points` attribute, so `not.toContain("points")` fails for a reason that
+    // has nothing to do with this note.
+    expect(html).not.toMatch(/would raise the rates below/);
+  });
+
+  it("still gives a range when at least one reviewer has one", () => {
+    // The undefined track is skipped, not allowed to poison the range.
+    const html = renderPage([
+      make({ skeptic: { ...BASE_SKEPTIC, confirmed: 0, refuted: 0, uncertain: 5 } }),
+      make({ skeptic: { ...BASE_SKEPTIC, confirmed: 50, refuted: 8, uncertain: 6 } }),
+    ]);
+    expect(html).not.toContain("NaN");
+    expect(html).toMatch(/by 8 to 8 points/);
+  });
+});
