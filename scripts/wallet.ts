@@ -13,7 +13,7 @@
  * send anyway.
  */
 
-import { BaseError, createWalletClient, formatEther, http } from "viem";
+import { BaseError, TimeoutError, createWalletClient, formatEther, http } from "viem";
 import type { Account, HttpTransport, PublicClient, WalletClient } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { base } from "viem/chains";
@@ -73,7 +73,20 @@ export function rpcFailure(error: unknown): RpcFailure | null {
     };
   }
 
-  if (/unable to connect|econnrefused|enotfound|fetch failed/i.test(details)) {
+  // By type, not by wording. viem's own text is "The request timed out.", so a
+  // `/timeout/i` pattern — the obvious one to reach for — does not match it,
+  // and a classifier keyed on prose would miss the exact case it was written
+  // for. Separate from unreachable because the two differ in what happened:
+  // nothing was listening, versus something answered the connection and then
+  // did not reply.
+  if (error instanceof TimeoutError) {
+    return {
+      summary: "the RPC did not answer in time",
+      advice: `it may be overloaded rather than down — try again, ${nothingSent}`,
+    };
+  }
+
+  if (/unable to connect|econnrefused|enotfound|econnreset|fetch failed/i.test(details)) {
     return {
       summary: `cannot reach the RPC: ${details.split("\n")[0]}`,
       advice: `check the network and the endpoint — ${nothingSent}`,

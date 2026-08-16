@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { HttpRequestError, RpcRequestError } from "viem";
+import { HttpRequestError, RpcRequestError, TimeoutError } from "viem";
 import { rpcFailure } from "../scripts/wallet.js";
 
 const URL_ = "https://mainnet.base.org";
@@ -52,6 +52,22 @@ describe("rpcFailure", () => {
     // `/connect/` matched it too and the assertion could not fail.
     expect(failure?.summary).toMatch(/^cannot reach the RPC:/);
     expect(failure?.advice).toMatch(/check the network/i);
+  });
+
+  it("names a timeout as a timeout, by type rather than by wording", () => {
+    // Detected as `instanceof TimeoutError`, which is what viem actually
+    // throws, rather than by searching the message. Its text reads "The request
+    // timed out." — so a `/timeout/i` pattern does not match it at all, and a
+    // classifier keyed on prose would have silently missed the case it was
+    // written for.
+    const failure = rpcFailure(new TimeoutError({ body: {}, url: URL_ }));
+    expect(failure?.summary).toMatch(/did not answer in time/i);
+    expect(failure?.summary).not.toMatch(/^cannot reach the RPC:/);
+  });
+
+  it("recognises a reset connection as a reachability problem", () => {
+    const failure = rpcFailure(new HttpRequestError({ url: URL_, details: "read ECONNRESET" }));
+    expect(failure?.summary).toMatch(/^cannot reach the RPC:/);
   });
 
   it("still classifies an RPC error it has no special name for", () => {
