@@ -238,3 +238,57 @@ describe("mean impact", () => {
     expect(html).not.toContain("/ 10");
   });
 });
+
+describe("the ablation section", () => {
+  const study = {
+    pairs: [
+      { url: "u1", project: "p", finder_model: "m", withoutGraph: 1, withGraph: 3, difference: 2 },
+      { url: "u2", project: "q", finder_model: "m", withoutGraph: 4, withGraph: 2, difference: -2 },
+    ],
+    projects: ["p", "q"],
+    graphFoundMore: 1,
+    graphFoundFewer: 1,
+    tied: 0,
+    meanDifference: 0,
+    lowest: -2,
+    highest: 2,
+  };
+
+  it("is absent when the corpus contains no ablation", () => {
+    // The ordinary case. An empty section asserting nothing is worse than none.
+    expect(renderPage([make()])).not.toContain("graph removed on purpose");
+  });
+
+  it("leads with the split, not the averages", () => {
+    // Two arms whose means match can differ on every PR, and only the split
+    // tells those apart.
+    const html = renderPage([make()], { ablation: study });
+    // Pinned as the whole term, not a prefix: `toContain("graph found more")`
+    // also matches "graph found more later", so it cannot fail on a renamed
+    // label — the same looseness flagged on #58.
+    expect(html).toContain("<dt>graph found more</dt>");
+    expect(html).toContain("<dt>graph found fewer</dt>");
+    expect(html.indexOf("<dt>graph found more</dt>")).toBeLessThan(
+      html.indexOf("<dt>findings per review</dt>"),
+    );
+  });
+
+  it("states n beside every count", () => {
+    const html = renderPage([make()], { ablation: study });
+    expect(html).toMatch(/1 of 2/);
+    expect(html).toContain("2, across p, q");
+  });
+
+  it("refuses to read the null result as evidence of no effect", () => {
+    const html = renderPage([make()], { ablation: study });
+    expect(html).toContain("not evidence the graph does nothing");
+  });
+
+  it("is not a track record card", () => {
+    // The ablated runs already sit inside the diff-only identity. Presenting
+    // them as a fourth reviewer would count them twice.
+    const html = renderPage([make()], { ablation: study });
+    const cards = html.split('<section class="card">').length - 1;
+    expect(cards).toBe(1);
+  });
+});

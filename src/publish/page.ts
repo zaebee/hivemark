@@ -1,6 +1,7 @@
 import { avatarSvg } from "../avatar.js";
 import { esc } from "../escape.js";
 import { renderHive } from "./hive.js";
+import type { AblationStudy } from "../ablation.js";
 import { shieldsEndpoint } from "./shields.js";
 import type { TrackRecord } from "../types.js";
 
@@ -38,6 +39,8 @@ const SURVIVORSHIP =
 export interface PageOptions {
   /** Whether this build signed anything. Absent means it did not. */
   readonly signed?: boolean;
+  /** The paired ablation comparison, when the corpus contains one. */
+  readonly ablation?: AblationStudy | null;
 }
 
 export function renderPage(tracks: TrackRecord[], options: PageOptions = {}): string {
@@ -70,6 +73,8 @@ code{font-size:.85em;word-break:break-all}
 .nodata{color:var(--muted);font-style:italic}
 .warn{color:#b4690e;font-weight:600}
 .hm-hive{margin:1.5rem 0 0}
+.ablation{margin:2.5rem 0 0;padding:1.25rem;border:1px dashed var(--line);border-radius:12px}
+.ablation h2{margin:0 0 .75rem;font-size:1.15rem}
 .hm-family h3{margin:1rem 0 .5rem;font-size:1rem;color:var(--muted);font-weight:600}
 .hm-row{display:flex;flex-wrap:wrap;gap:1rem}
 .hm-bee{margin:0;width:7rem;text-align:center}
@@ -84,6 +89,7 @@ display:flex;flex-direction:column;overflow-wrap:break-word}
 ${notes.join("\n")}
 ${renderHive(tracks)}
 ${tracks.map(card).join("\n")}
+${renderAblation(options.ablation ?? null)}
 </main></body></html>`;
 }
 
@@ -134,6 +140,51 @@ ${avatarSvg(track.genome, 96)}
 <dt>human axis</dt><dd><span class="nodata">no data</span> — benchmark artifacts carry no findings_applied</dd>
 <dt>badge</dt><dd>${esc(shieldsEndpoint(track).message)}</dd>
 </dl></section>`;
+}
+
+/**
+ * The one comparison on this page that is not confounded.
+ *
+ * Placed after the cards and visually apart from them, because it is a claim
+ * about the graph and not about any reviewer. The ablated runs already sit
+ * inside the diff-only identity's record; a fourth card would count them twice
+ * and repeat the conflation that reading `arm` was meant to end.
+ *
+ * The split is stated before the averages. Two arms whose means match can
+ * differ on every single pull request, and only the split can tell those apart.
+ */
+function renderAblation(study: AblationStudy | null): string {
+  if (!study) return "";
+  const n = study.pairs.length;
+  const totals = study.pairs.reduce(
+    (acc, p) => ({ without: acc.without + p.withoutGraph, with: acc.with + p.withGraph }),
+    { without: 0, with: 0 },
+  );
+  const per = (total: number) => (total / n).toFixed(2);
+
+  return `<section class="ablation">
+<h2>Same code, graph removed on purpose</h2>
+<p class="note">${esc(
+    `Guardian ran ${n} pull requests twice: once with its dependency graph and once with the ` +
+      `graph deliberately withheld, same commit and same model both times. This is the only ` +
+      `comparison here where one thing changed and everything else held still.`,
+  )}</p>
+<dl>
+<dt>pairs</dt><dd>${n}, across ${study.projects.map((p) => esc(p)).join(", ")}</dd>
+<dt>graph found more</dt><dd>${study.graphFoundMore} of ${n}</dd>
+<dt>graph found fewer</dt><dd>${study.graphFoundFewer} of ${n}</dd>
+<dt>tied</dt><dd>${study.tied} of ${n}</dd>
+<dt>findings per review</dt><dd>${per(totals.with)} with the graph · ${per(totals.without)} without</dd>
+<dt>per-PR difference</dt><dd>mean ${study.meanDifference}, from ${study.lowest} to ${study.highest}</dd>
+</dl>
+<p class="note">${esc(
+    `No difference is detectable at this size. That is not evidence the graph does nothing: ` +
+      `${n} pull requests on one Guardian revision, one finder model and ${study.projects.length} ` +
+      `projects cannot settle it either way, and no significance test is applied here. ` +
+      `Guardian measures the question properly against golden findings; this is the small paired ` +
+      `observation that happens to sit in this corpus, reported rather than left in the file.`,
+  )}</p>
+</section>`;
 }
 
 interface Divergence {

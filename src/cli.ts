@@ -6,6 +6,7 @@ import { loadSigner, type Signer } from "./attest/signer.js";
 import { avatarSvg } from "./avatar.js";
 import { claimsOf } from "./claims.js";
 import { nonEmptyLines, readCorpus } from "./corpus.js";
+import { ablationStudy } from "./ablation.js";
 import { deriveTrackRecords } from "./derive.js";
 import { harvest } from "./harvest.js";
 import { renderPage } from "./publish/page.js";
@@ -50,7 +51,10 @@ export async function run(text: string, options: RunOptions = {}): Promise<RunOu
 
   // Written last, because whether anything was signed is only known by now and
   // the page says so out loud.
-  files.set("index.html", renderPage(tracks, { signed: attestations.length > 0 }));
+  files.set(
+    "index.html",
+    renderPage(tracks, { signed: attestations.length > 0, ablation: ablationStudy(records) }),
+  );
 
   return { tracks, files, warnings, attestations };
 }
