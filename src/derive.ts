@@ -6,6 +6,18 @@ import type { ReviewRecord } from "./schema.js";
 import type { Claim, Genome, Judge, SeverityBand, SkepticAxis, TrackRecord } from "./types.js";
 
 /**
+ * A claim and the share of one review it represents.
+ *
+ * `1` for a subject reviewed once; `1/3` for each run of a subject sampled
+ * three times. Carried alongside every claim so each statistic — verdicts,
+ * severity bands, impact — averages the same way without a rule of its own.
+ */
+interface Weighted {
+  readonly claim: Claim;
+  readonly weight: number;
+}
+
+/**
  * Aggregate claims into one track record per identity.
  *
  * Derived on read and never stored, so a track record cannot drift from the
@@ -15,7 +27,7 @@ export function deriveTrackRecords(records: ReviewRecord[]): TrackRecord[] {
   interface Bucket {
     readonly genome: Genome;
     readonly records: ReviewRecord[];
-    readonly claims: Claim[];
+    readonly claims: { claim: Claim; weight: number }[];
     unparseable: number;
     errored: number;
   }
@@ -44,10 +56,44 @@ export function deriveTrackRecords(records: ReviewRecord[]): TrackRecord[] {
   // failing, and counting it in both classes would report two failed runs.
   const errored = (r: ReviewRecord): boolean => r.error !== null && r.error !== undefined;
 
-  for (const record of dedupe(records.filter((r) => !errored(r) && !r.parse_failed))) {
+  // Usable runs are **averaged per subject**, not deduplicated. A repeat here is
+  // another sample, not a correction: the phase-3 arm fixed temperature at 0.7
+  // precisely so that runs would differ, and its whole point is that three runs
+  // of one review are three draws from one distribution.
+  //
+  // Keeping the latest was the old rule, and it is defensible for a corpus of
+  // corrections. On this corpus it selects, and the selection is arbitrary in
+  // both directions: for `gemini · graph` it raised the headline by 2.5 points
+  // and lowered the critical rate by 13.6. The published 50% on that band was
+  // the bottom of a 50.0–63.6 range, chosen by nothing but which run happened
+  // to be last.
+  //
+  // Weighting each claim by 1/runs gives every tally the same treatment at once
+  // — verdicts, severity bands, impact — instead of a rule per statistic, and
+  // keeps a thrice-sampled pull request from outweighing a singly-reviewed one
+  // the way pooling would. Counts become fractional where a subject was
+  // repeated; that is the honest shape of a mean and the page says so.
+  const runsPerSubject = new Map<string, number>();
+  for (const record of records.filter((r) => !errored(r) && !r.parse_failed)) {
+    const key = subjectKey(record);
+    runsPerSubject.set(key, (runsPerSubject.get(key) ?? 0) + 1);
+  }
+  const subjectsSeen = new Map<`0x${string}`, Set<string>>();
+
+  for (const record of records.filter((r) => !errored(r) && !r.parse_failed)) {
     const bucket = bucketFor(record);
-    bucket.records.push(record);
-    bucket.claims.push(...claimsOf(record));
+    const key = subjectKey(record);
+    const weight = 1 / runsPerSubject.get(key)!;
+    const id = identityId(bucket.genome);
+    const seen = subjectsSeen.get(id) ?? new Set<string>();
+    // The corpus line counts pull requests, so a subject enters it once however
+    // many times it was sampled. Dropping this was a regression: `corpusOf`
+    // reads `bucket.records`, and leaving it empty emptied the corpus on every
+    // card while every rate still looked right.
+    if (!seen.has(key)) bucket.records.push(record);
+    seen.add(key);
+    subjectsSeen.set(id, seen);
+    for (const claim of claimsOf(record)) bucket.claims.push({ claim, weight });
   }
   for (const record of dedupe(records.filter((r) => !errored(r) && r.parse_failed))) {
     bucketFor(record).unparseable++;
@@ -60,7 +106,7 @@ export function deriveTrackRecords(records: ReviewRecord[]): TrackRecord[] {
     identity_id: id,
     owner_address: ownerAddress(id),
     genome: bucket.genome,
-    reviews: bucket.records.length,
+    reviews: subjectsSeen.get(id)?.size ?? 0,
     // Counted rather than dropped. A reviewer that ran and produced nothing
     // readable is not the same as one that never ran, and only one of those two
     // states can be told from a missing row.
@@ -68,7 +114,7 @@ export function deriveTrackRecords(records: ReviewRecord[]): TrackRecord[] {
     // A provider failure is not a review that found nothing. Kept apart from
     // `unparseable` because the two are different events with different causes.
     errored: bucket.errored,
-    claims: bucket.claims.length,
+    claims: round(bucket.claims.reduce((n, c) => n + c.weight, 0)),
     corpus: corpusOf(bucket.records),
     skeptic: skepticAxis(bucket.claims, bucket.genome),
     human: { available: false as const },
@@ -133,6 +179,21 @@ function corpusOf(records: ReviewRecord[]): ReadonlyArray<readonly [string, numb
  * Signing is unaffected: `run()` attests every harvested record, not the
  * deduplicated set, so an anchor covers all 932 claims either way.
  */
+/**
+ * What counts as one thing reviewed: this pull request, at this commit, by this
+ * identity. Shared with `dedupe` so the two cannot drift apart on what a repeat
+ * is a repeat *of*.
+ */
+function subjectKey(record: ReviewRecord): string {
+  // Encoded, not concatenated, for the reason `dedupe` records below.
+  return JSON.stringify([record.url, record.head_sha, identityId(genomeOf(record))]);
+}
+
+/** Sums of weights land on values like 0.30000000000000004; two places is plenty. */
+function round(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
 export function dedupe(records: readonly ReviewRecord[]): ReviewRecord[] {
   const winners = new Map<string, ReviewRecord>();
   for (const record of records) {
@@ -207,7 +268,7 @@ const SEVERITIES = ["critical", "major", "minor"] as const;
  * itself, and an omitted row reads as a gap in the page rather than as a fact
  * about the reviewer.
  */
-function bySeverity(claims: Claim[]): SeverityBand[] {
+function bySeverity(claims: readonly Weighted[]): SeverityBand[] {
   // One pass. The array-per-band version read well and traversed the claims
   // nine times; this project already prefers a single pass over data designed
   // to accumulate — see `src/anchor/plan.ts` and `src/ablation.ts`.
@@ -227,21 +288,37 @@ function bySeverity(claims: Claim[]): SeverityBand[] {
     minor: { claims: 0, resolved: 0, confirmed: 0, uncertain: 0 },
   };
 
-  for (const claim of claims) {
+  for (const { claim, weight } of claims) {
     const band = tally[claim.severity];
-    band.claims += 1;
+    band.claims += weight;
     if (claim.verdict === "unresolved") continue;
-    band.resolved += 1;
-    if (claim.verdict === "confirmed") band.confirmed += 1;
-    else if (claim.verdict === "uncertain") band.uncertain += 1;
+    band.resolved += weight;
+    if (claim.verdict === "confirmed") band.confirmed += weight;
+    else if (claim.verdict === "uncertain") band.uncertain += weight;
   }
 
-  return SEVERITIES.map((severity) => ({ severity, ...tally[severity] }));
+  return SEVERITIES.map((severity) => ({
+    severity,
+    claims: round(tally[severity].claims),
+    resolved: round(tally[severity].resolved),
+    confirmed: round(tally[severity].confirmed),
+    uncertain: round(tally[severity].uncertain),
+  }));
 }
 
-function skepticAxis(claims: Claim[], genome: Genome): SkepticAxis {
-  const count = (v: Claim["verdict"]) => claims.filter((c) => c.verdict === v).length;
-  const scored = claims.map((c) => c.impact_score).filter((s): s is number => s !== null);
+function skepticAxis(claims: readonly Weighted[], genome: Genome): SkepticAxis {
+  const count = (v: Claim["verdict"]) =>
+    round(claims.reduce((n, c) => (c.claim.verdict === v ? n + c.weight : n), 0));
+  // Impact is averaged over the claims that carry a score, each contributing
+  // its own weight, so a thrice-sampled review does not count three times here
+  // either.
+  let impactWeight = 0;
+  let impactTotal = 0;
+  for (const { claim, weight } of claims) {
+    if (claim.impact_score === null) continue;
+    impactWeight += weight;
+    impactTotal += claim.impact_score * weight;
+  }
 
   return {
     judge: judgeOf(genome),
@@ -249,9 +326,7 @@ function skepticAxis(claims: Claim[], genome: Genome): SkepticAxis {
     refuted: count("refuted"),
     uncertain: count("uncertain"),
     unresolved: count("unresolved"),
-    mean_impact: scored.length
-      ? Math.round((scored.reduce((a, b) => a + b, 0) / scored.length) * 100) / 100
-      : null,
+    mean_impact: impactWeight > 0 ? round(impactTotal / impactWeight) : null,
     by_severity: bySeverity(claims),
   };
 }

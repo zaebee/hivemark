@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { harvest } from "../src/harvest.js";
-import { deriveTrackRecords, judgeOf } from "../src/derive.js";
+import { dedupe, deriveTrackRecords, judgeOf } from "../src/derive.js";
 import type { Genome, TrackRecord } from "../src/types.js";
 
 /** The vendor a model name belongs to, for building fixtures only. */
@@ -77,19 +77,27 @@ describe("deriveTrackRecords", () => {
   it("orders reruns by instant, not by string form", () => {
     // 14:00+03:00 is 11:00Z — an hour EARLIER than 12:00Z, though it sorts
     // later as a string. Lexicographic comparison fails this; parsing passes it.
+    //
+    // Asserted against `dedupe` rather than through `deriveTrackRecords`: usable
+    // runs are now averaged rather than deduplicated, but `dedupe` still decides
+    // which failed run counts and which record a birth is planned from, so the
+    // ordering still has to be right.
     const first = { ...records[0]!, reviewed_at: "2026-08-12T12:00:00+00:00", findings: [] };
     const earlierButSortsLater = { ...records[0]!, reviewed_at: "2026-08-12T14:00:00+03:00" };
-    const track = deriveTrackRecords([first, earlierButSortsLater]);
-    expect(track).toHaveLength(1);
-    expect(track[0]!.claims).toBe(0); // the 12:00Z record won, as it should
+    const kept = dedupe([first, earlierButSortsLater]);
+    expect(kept).toHaveLength(1);
+    expect(kept[0]!.findings).toHaveLength(0); // the 12:00Z record won, as it should
   });
 
   it("keeps the later review when a rerun supersedes", () => {
+    // Still true of `dedupe`, which the failed-run classes and `planBirths`
+    // both rely on. It is no longer true of the published rates: a repeat of a
+    // usable run is another sample and is averaged, not discarded.
     const first = records[0]!;
     const rerun = { ...first, reviewed_at: "2099-01-01T00:00:00Z", findings: [] };
-    const track = deriveTrackRecords([first, rerun]);
-    expect(track).toHaveLength(1);
-    expect(track[0]!.claims).toBe(0);
+    const kept = dedupe([first, rerun]);
+    expect(kept).toHaveLength(1);
+    expect(kept[0]!.findings).toHaveLength(0);
   });
 
   it("records which projects each identity reviewed", () => {
@@ -367,5 +375,102 @@ describe("the confirmed rate broken out by severity", () => {
     const band = (s: string) => t.skeptic.by_severity.find((b) => b.severity === s)!;
     expect(band("critical").confirmed).toBe(0);
     expect(band("minor").confirmed).toBe(2);
+  });
+});
+
+describe("repeated runs of one subject are sampled, not corrected", () => {
+  const finding = (verdict: string, severity = "major") => ({
+    file: "f.ts", severity, category: "logic", title: "t", evidence: "e",
+    problem: "p", fix: "x", confidence: 80, verdict,
+  });
+  const run = (over: Record<string, unknown>) =>
+    ({ ...records[0]!, findings: [], ...over }) as (typeof records)[0];
+
+  it("leaves a subject with one run exactly as it was", () => {
+    // The regression that matters: 45 of the diff-only bee's reviews were never
+    // re-run, and averaging must not move a number that had nothing to average.
+    const t = deriveTrackRecords([run({ findings: [finding("confirmed"), finding("refuted")] })])[0]!;
+    expect(t.skeptic).toMatchObject({ confirmed: 1, refuted: 1 });
+    expect(t.claims).toBe(2);
+    expect(t.reviews).toBe(1);
+  });
+
+  it("averages the runs of a subject instead of picking one", () => {
+    // Two samples of the same review at temperature 0.7: one found two
+    // confirmed, the other none. The subject contributes their mean, not
+    // whichever ran last.
+    const t = deriveTrackRecords([
+      run({ findings: [finding("confirmed"), finding("confirmed")], reviewed_at: "2026-08-12T09:00:00Z" }),
+      run({ findings: [], reviewed_at: "2026-08-12T18:00:00Z" }),
+    ])[0]!;
+    expect(t.claims).toBe(1);
+    expect(t.skeptic.confirmed).toBe(1);
+  });
+
+  it("counts the subject once however many times it was run", () => {
+    // `reviews` answers how many pull requests were reviewed. Three samples of
+    // one PR are one review, and were under the old rule too.
+    const t = deriveTrackRecords([
+      run({ reviewed_at: "2026-08-12T09:00:00Z" }),
+      run({ reviewed_at: "2026-08-12T12:00:00Z" }),
+      run({ reviewed_at: "2026-08-12T18:00:00Z" }),
+    ])[0]!;
+    expect(t.reviews).toBe(1);
+  });
+
+  it("does not let a re-run subject outweigh a singly-run one", () => {
+    // The failure the old rule had in the other direction: pooling would give a
+    // thrice-sampled PR three times the weight of one reviewed once.
+    const thrice = ["09", "12", "18"].map((h) =>
+      run({ findings: [finding("confirmed")], reviewed_at: `2026-08-12T${h}:00:00Z` }),
+    );
+    const once = run({ head_sha: "other", findings: [finding("refuted")] });
+    const t = deriveTrackRecords([...thrice, once])[0]!;
+    expect(t.skeptic).toMatchObject({ confirmed: 1, refuted: 1 });
+  });
+
+  it("counts a repeated subject once in the corpus line", () => {
+    // The corpus answers which projects were reviewed, so three samples of one
+    // pull request are one entry. Counting runs would inflate a project purely
+    // by how often it was re-sampled.
+    const t = deriveTrackRecords([
+      run({ project: "alpha", reviewed_at: "2026-08-12T09:00:00Z" }),
+      run({ project: "alpha", reviewed_at: "2026-08-12T12:00:00Z" }),
+      run({ project: "alpha", reviewed_at: "2026-08-12T18:00:00Z" }),
+    ])[0]!;
+    expect(t.corpus).toEqual([["alpha", 1]]);
+  });
+
+  it("weights a band's claim count, not only its verdicts", () => {
+    // `claims` and `resolved` are different denominators and both are shown;
+    // weighting one and not the other would make a band's own numbers
+    // inconsistent with each other.
+    const t = deriveTrackRecords([
+      run({ findings: [finding("confirmed", "critical"), finding("confirmed", "critical")], reviewed_at: "2026-08-12T09:00:00Z" }),
+      run({ findings: [finding("confirmed", "critical")], reviewed_at: "2026-08-12T18:00:00Z" }),
+    ])[0]!;
+    expect(t.skeptic.by_severity.find((b) => b.severity === "critical")!.claims).toBe(1.5);
+  });
+
+  it("weights impact too, so a re-sampled review does not pull the mean", () => {
+    // Two samples: one scored 10, the other 2. The subject contributes 6, not
+    // a mean dragged toward whichever side had more runs.
+    const scored = (impact: number, at: string) =>
+      run({ findings: [{ ...finding("confirmed"), impact_score: impact }], reviewed_at: at });
+    const t = deriveTrackRecords([
+      scored(10, "2026-08-12T09:00:00Z"),
+      scored(2, "2026-08-12T18:00:00Z"),
+    ])[0]!;
+    expect(t.skeptic.mean_impact).toBe(6);
+  });
+
+  it("averages the severity bands the same way", () => {
+    const t = deriveTrackRecords([
+      run({ findings: [finding("confirmed", "critical"), finding("confirmed", "critical")], reviewed_at: "2026-08-12T09:00:00Z" }),
+      run({ findings: [finding("refuted", "critical")], reviewed_at: "2026-08-12T18:00:00Z" }),
+    ])[0]!;
+    const critical = t.skeptic.by_severity.find((b) => b.severity === "critical")!;
+    expect(critical.confirmed).toBe(1);
+    expect(critical.resolved).toBe(1.5);
   });
 });
