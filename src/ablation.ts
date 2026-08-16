@@ -98,7 +98,26 @@ export function ablationStudy(records: readonly ReviewRecord[]): AblationStudy |
   if (pairs.length === 0) return null;
 
   pairs.sort((a, b) => byCodeUnit(a.url, b.url));
-  const differences = pairs.map((p) => p.difference);
+
+  // One pass, and no `Math.min(...differences)`. Spreading an array into a call
+  // has an argument limit — measured in this runtime, Bun throws RangeError
+  // between 500,000 and 1,000,000 elements — and `src/anchor/plan.ts` already
+  // avoids exactly this for exactly this reason. A corpus designed to
+  // accumulate should not carry a ceiling nobody would think to look for.
+  let more = 0;
+  let fewer = 0;
+  let tied = 0;
+  let total = 0;
+  let lowest = Number.POSITIVE_INFINITY;
+  let highest = Number.NEGATIVE_INFINITY;
+  for (const { difference } of pairs) {
+    if (difference > 0) more += 1;
+    else if (difference < 0) fewer += 1;
+    else tied += 1;
+    total += difference;
+    if (difference < lowest) lowest = difference;
+    if (difference > highest) highest = difference;
+  }
 
   return {
     pairs,
@@ -106,12 +125,11 @@ export function ablationStudy(records: readonly ReviewRecord[]): AblationStudy |
     // Counted per pair rather than summarised, because two arms whose averages
     // match can differ on every single PR, and an average cannot tell those
     // apart. This split is the finding; the mean is context for it.
-    graphFoundMore: differences.filter((d) => d > 0).length,
-    graphFoundFewer: differences.filter((d) => d < 0).length,
-    tied: differences.filter((d) => d === 0).length,
-    meanDifference:
-      Math.round((differences.reduce((a, b) => a + b, 0) / differences.length) * 100) / 100,
-    lowest: Math.min(...differences),
-    highest: Math.max(...differences),
+    graphFoundMore: more,
+    graphFoundFewer: fewer,
+    tied,
+    meanDifference: Math.round((total / pairs.length) * 100) / 100,
+    lowest,
+    highest,
   };
 }

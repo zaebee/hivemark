@@ -142,6 +142,19 @@ describe("ablationStudy", () => {
     expect(study).toMatchObject({ meanDifference: 0, lowest: -3, highest: 3 });
   });
 
+  it("computes a mean that is not zero", () => {
+    // The spread test above asserts a mean of 0, which a broken accumulator
+    // also produces — `total += 0` passed it. A non-zero expectation is what
+    // makes the assertion able to fail.
+    const study = ablationStudy([
+      withN(1, { arm: "ablated", had_graph: false }),
+      withN(4, { had_graph: true }),
+      withN(2, { arm: "ablated", had_graph: false, head_sha: "c" }),
+      withN(3, { had_graph: true, head_sha: "c" }),
+    ]);
+    expect(study?.meanDifference).toBe(2);
+  });
+
   it("names every project the pairs cover", () => {
     const study = ablationStudy([
       withN(1, { arm: "ablated", had_graph: false }),
