@@ -12,24 +12,50 @@ import type { Claim, Genome, Judge, SkepticAxis, TrackRecord } from "./types.js"
  * claims underneath it and cannot be tuned.
  */
 export function deriveTrackRecords(records: ReviewRecord[]): TrackRecord[] {
-  const byIdentity = new Map<`0x${string}`, { records: ReviewRecord[]; claims: Claim[] }>();
+  interface Bucket {
+    readonly genome: Genome;
+    readonly records: ReviewRecord[];
+    readonly claims: Claim[];
+    unparseable: number;
+  }
+  const byIdentity = new Map<`0x${string}`, Bucket>();
 
-  for (const record of dedupe(records)) {
-    const id = identityId(genomeOf(record));
-    const bucket = byIdentity.get(id) ?? { records: [], claims: [] };
+  const bucketFor = (record: ReviewRecord): Bucket => {
+    const genome = genomeOf(record);
+    const id = identityId(genome);
+    const existing = byIdentity.get(id);
+    if (existing) return existing;
+    const fresh: Bucket = { genome, records: [], claims: [], unparseable: 0 };
+    byIdentity.set(id, fresh);
+    return fresh;
+  };
+
+  // Split before deduplicating, not after. `dedupe` keeps the latest run of a
+  // (url, head_sha, identity) on the rule that a rerun is a correction — but a
+  // run whose output could not be parsed corrects nothing, and letting it win
+  // would discard real findings because a parser failed. Deduplicated within
+  // each class, so two failed runs of one PR are one failure.
+  for (const record of dedupe(records.filter((r) => !r.parse_failed))) {
+    const bucket = bucketFor(record);
     bucket.records.push(record);
     bucket.claims.push(...claimsOf(record));
-    byIdentity.set(id, bucket);
+  }
+  for (const record of dedupe(records.filter((r) => r.parse_failed))) {
+    bucketFor(record).unparseable++;
   }
 
   return [...byIdentity.entries()].map(([id, bucket]) => ({
     identity_id: id,
     owner_address: ownerAddress(id),
-    genome: genomeOf(bucket.records[0]!),
+    genome: bucket.genome,
     reviews: bucket.records.length,
+    // Counted rather than dropped. A reviewer that ran and produced nothing
+    // readable is not the same as one that never ran, and only one of those two
+    // states can be told from a missing row.
+    unparseable: bucket.unparseable,
     claims: bucket.claims.length,
     corpus: corpusOf(bucket.records),
-    skeptic: skepticAxis(bucket.claims, genomeOf(bucket.records[0]!)),
+    skeptic: skepticAxis(bucket.claims, bucket.genome),
     human: { available: false as const },
   }));
 }

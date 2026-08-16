@@ -22,6 +22,7 @@ const track = (over: Partial<Genome>): TrackRecord => {
     identity_id: `0x${String(seq).padStart(64, "0")}`,
     owner_address: `0x${String(seq).padStart(40, "0")}`,
     genome: genome(over),
+    unparseable: 0,
     reviews: 3,
     claims: 9,
     corpus: [["cal_dot_com", 3]],

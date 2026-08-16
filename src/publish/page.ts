@@ -19,10 +19,21 @@ const UNSIGNED =
   "attestations and nothing here is independently checkable. Signed runs are " +
   "made by hand; see docs/anchoring.md.";
 
+/**
+ * Corrected once it was checked. This previously read "Guardian writes no
+ * record for a review that fails", which is false: every review row carries
+ * `error` and `parse_failed`, and unreadable runs are now counted separately
+ * from reviews rather than passed off as reviews that found nothing.
+ *
+ * The bias is real, but it is about the other direction — a defect nobody
+ * reported leaves no row anywhere, so what can be measured here is the fate of
+ * claims that were made, and never the fraction of defects that were missed.
+ */
 const SURVIVORSHIP =
-  "Guardian writes no record for a review that fails, so this data is " +
-  "survivorship-biased by construction: every track record here is " +
-  "systematically optimistic.";
+  "Every rate here is measured over claims that were made. A defect no " +
+  "reviewer mentioned leaves no record, so nothing on this page says how much " +
+  "was missed — a reviewer that says less is not distinguishable from one that " +
+  "misses less.";
 
 export interface PageOptions {
   /** Whether this build signed anything. Absent means it did not. */
@@ -105,7 +116,7 @@ ${avatarSvg(track.genome, 96)}
 <dt>context</dt><dd>${esc(track.genome.context_mode)}</dd>
 <dt>fingerprint</dt><dd><code>${esc(track.genome.review_fingerprint)}</code></dd>
 <dt>corpus</dt><dd>${corpus}</dd>
-<dt>reviews</dt><dd>${track.reviews}</dd>
+<dt>reviews</dt><dd>${track.reviews}${unparseableNote(track)}</dd>
 <dt>claims</dt><dd>${track.claims}</dd>
 <dt>skeptic axis</dt><dd>${s.confirmed} confirmed · ${s.refuted} refuted · ${s.uncertain} uncertain · ${s.unresolved} unresolved</dd>
 <dt>${s.judge === "self" ? "self-graded rate" : "confirmed rate"}</dt><dd>${resolved === 0 ? '<span class="nodata">no data</span>' : `${Math.round((s.confirmed / resolved) * 100)}% of ${resolved} resolved`}</dd>
@@ -164,6 +175,20 @@ function leastOverlapping(tracks: TrackRecord[]): Divergence | null {
   }
 
   return worst;
+}
+
+/**
+ * Say when runs are missing from the reviews count, and why.
+ *
+ * Printed beside the count rather than as a separate row: the number it
+ * qualifies is the one a reader uses to weigh everything else, and a caveat one
+ * line away from its subject is a caveat that gets skimmed past. Absent
+ * entirely when there is nothing to say, so it never becomes furniture.
+ */
+function unparseableNote(track: TrackRecord): string {
+  if (track.unparseable === 0) return "";
+  const runs = track.unparseable === 1 ? "run" : "runs";
+  return ` <span class="nodata">(${track.unparseable} further ${runs} produced no readable output)</span>`;
 }
 
 /** Name an identity distinctly: two reviewers can share a context mode. */

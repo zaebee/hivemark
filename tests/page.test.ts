@@ -18,6 +18,7 @@ function make(over: Partial<TrackRecord> = {}): TrackRecord {
       review_fingerprint: "d0d807ef",
     },
     reviews: 10,
+    unparseable: 0,
     claims: 20,
     corpus: [["cal_dot_com", 10]],
     skeptic: { judge: "independent", confirmed: 15, refuted: 3, uncertain: 2, unresolved: 0, mean_impact: 4.1 },
@@ -27,8 +28,12 @@ function make(over: Partial<TrackRecord> = {}): TrackRecord {
 }
 
 describe("renderPage", () => {
-  it("states the survivorship bias disclaimer", () => {
-    expect(renderPage([make()]).toLowerCase()).toContain("survivorship");
+  it("states that nothing here measures what was missed", () => {
+    // Asserted on the substance rather than the word "survivorship". The text
+    // that used the word also claimed Guardian records nothing for a failed
+    // review, which is false — so a test pinned to the vocabulary would have
+    // kept the wrong sentence alive.
+    expect(renderPage([make()]).toLowerCase()).toContain("how much was missed");
   });
 
   it("marks the human axis as having no data", () => {
@@ -151,5 +156,30 @@ describe("a self-graded identity on the page", () => {
     const html = renderPage([make()]);
     expect(html).not.toMatch(/grades its own work/);
     expect(html).toMatch(/confirmed rate/);
+  });
+});
+
+describe("unparseable runs on the page", () => {
+  it("says so beside the reviews count when there are any", () => {
+    // Beside the number it qualifies, not a row away: the reviews count is what
+    // a reader uses to weigh everything else on the card.
+    const html = renderPage([make({ reviews: 10, unparseable: 2 })]);
+    expect(html).toMatch(/reviews<\/dt><dd>10.*2 further runs produced no readable output/);
+  });
+
+  it("says nothing when every run parsed", () => {
+    // Absent rather than "0", so the note never becomes furniture a reader
+    // learns to skip.
+    expect(renderPage([make({ reviews: 10, unparseable: 0 })])).not.toContain("readable output");
+  });
+
+  it("uses the singular for one", () => {
+    expect(renderPage([make({ reviews: 10, unparseable: 1 })])).toContain("1 further run produced");
+  });
+
+  it("no longer claims Guardian records nothing for a failed review", () => {
+    // It does record them — `error` and `parse_failed` are on every review row.
+    // The page said otherwise until this was checked against the data.
+    expect(renderPage([make()])).not.toContain("writes no record");
   });
 });
