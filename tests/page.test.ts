@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { renderPage } from "../src/publish/page.js";
 import type { TrackRecord } from "../src/types.js";
 
+const BASE_SKEPTIC = { judge: "independent", confirmed: 15, refuted: 3, uncertain: 2, unresolved: 0, mean_impact: 4.1 } as const;
+
 function make(over: Partial<TrackRecord> = {}): TrackRecord {
   return {
     identity_id: `0x${"11".repeat(32)}`,
@@ -201,5 +203,38 @@ describe("runs that failed before producing output", () => {
 
   it("say nothing when every run produced something", () => {
     expect(renderPage([make({ reviews: 10 })])).not.toContain("failed before producing");
+  });
+});
+
+describe("mean impact", () => {
+  it("states the scale, since 6.31 alone does not say whether that is high", () => {
+    expect(renderPage([make({ skeptic: { ...BASE_SKEPTIC, mean_impact: 6.31 } })])).toContain(
+      "6.31 / 10",
+    );
+  });
+
+  it("is labelled self-graded when the skeptic is the finder", () => {
+    // Upstream assigns impact_score in the skeptic stage. When the skeptic is
+    // the same model as the finder, the number is a model scoring the
+    // importance of its own findings — the same fact the confirmation rate
+    // already renames itself for.
+    const html = renderPage([
+      make({
+        genome: { ...make().genome, skeptic_model: "gemini-2.5-flash" },
+        skeptic: { ...BASE_SKEPTIC, judge: "self", mean_impact: 6.31 },
+      }),
+    ]);
+    expect(html).toContain("self-graded mean impact");
+  });
+
+  it("is not labelled self-graded when a different model judged", () => {
+    const html = renderPage([make({ skeptic: { ...BASE_SKEPTIC, mean_impact: 6.31 } })]);
+    expect(html).toContain("<dt>mean impact</dt>");
+    expect(html).not.toContain("self-graded mean impact");
+  });
+
+  it("says no data rather than a scale when nothing scored", () => {
+    const html = renderPage([make({ skeptic: { ...BASE_SKEPTIC, mean_impact: null } })]);
+    expect(html).not.toContain("/ 10");
   });
 });

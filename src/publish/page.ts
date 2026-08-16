@@ -88,6 +88,16 @@ ${tracks.map(card).join("\n")}
 }
 
 /**
+ * The ceiling of `impact_score`, from the upstream schema — an integer 0-10.
+ *
+ * Printed with the number because `6.31` alone does not say whether that is
+ * high. A bare figure invites the reader to supply their own scale, and the two
+ * plausible guesses (out of 5, out of 10) put it on opposite sides of the
+ * middle.
+ */
+const IMPACT_MAX = 10;
+
+/**
  * The warning that belongs beside a skeptic who is the finder.
  *
  * Placed on the skeptic row and repeated in the rate's own label, because those
@@ -120,7 +130,7 @@ ${avatarSvg(track.genome, 96)}
 <dt>claims</dt><dd>${track.claims}</dd>
 <dt>skeptic axis</dt><dd>${s.confirmed} confirmed · ${s.refuted} refuted · ${s.uncertain} uncertain · ${s.unresolved} unresolved</dd>
 <dt>${s.judge === "self" ? "self-graded rate" : "confirmed rate"}</dt><dd>${resolved === 0 ? '<span class="nodata">no data</span>' : `${Math.round((s.confirmed / resolved) * 100)}% of ${resolved} resolved`}</dd>
-<dt>mean impact</dt><dd>${s.mean_impact ?? '<span class="nodata">no data</span>'}</dd>
+<dt>${s.judge === "self" ? "self-graded mean impact" : "mean impact"}</dt><dd>${s.mean_impact === null ? '<span class="nodata">no data</span>' : `${s.mean_impact} / ${IMPACT_MAX}`}</dd>
 <dt>human axis</dt><dd><span class="nodata">no data</span> — benchmark artifacts carry no findings_applied</dd>
 <dt>badge</dt><dd>${esc(shieldsEndpoint(track).message)}</dd>
 </dl></section>`;

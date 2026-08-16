@@ -99,9 +99,15 @@ From 35 real reviews and 112 claims:
 
 | identity | reviews | claims | confirmed | refuted | uncertain | mean impact |
 |---|---|---|---|---|---|---|
-| graph | 13 | 43 | 32 | 2 | 9 | 4.74 |
-| diff-only | 21 | 68 | 53 | 7 | 8 | 3.90 |
-| graph (older Guardian) | 1 | 1 | 0 | 0 | 1 | 2.00 |
+| graph | 13 | 43 | 32 | 2 | 9 | 4.74 / 10 |
+| diff-only | 21 | 68 | 53 | 7 | 8 | 3.90 / 10 |
+| graph (older Guardian) | 1 | 1 | 0 | 0 | 1 | 2.00 / 10 |
+
+`impact_score` is an integer 0-10 assigned upstream **by the skeptic**, so where
+the skeptic is the finder it is a model rating the importance of its own
+findings — the page labels that case `self-graded mean impact`. Upstream has
+also measured the axis as largely a restatement of `verdict` rather than an
+independent signal (codegraph-brain#271), so read it as provisional.
 
 **Do not read that as a controlled comparison.** The two reviewers saw almost
 disjoint corpora — graph reviewed cal.com and sentry, diff-only reviewed
