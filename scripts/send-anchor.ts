@@ -22,9 +22,15 @@
 import { createPublicClient, encodeFunctionData, http, parseAbiItem, parseEventLogs } from "viem";
 import { base } from "viem/chains";
 import { readFileSync, writeFileSync } from "node:fs";
-import { reading, refuseUnlessAffordable, signer, stopUnlessSending } from "./wallet.js";
-import { GET_SCHEMA_ABI, SCHEMA_REGISTRY } from "./wallet.js";
-import { loadLedger, type AnchorRecord } from "../src/anchor/ledger.js";
+import {
+  GET_SCHEMA_ABI,
+  SCHEMA_REGISTRY,
+  reading,
+  refuseUnlessAffordable,
+  signer,
+  stopUnlessSending,
+} from "./wallet.js";
+import { loadLedger, recordFor, type AnchorRecord } from "../src/anchor/ledger.js";
 import { periodId } from "../src/anchor/period.js";
 import { planAnchor } from "../src/anchor/plan.js";
 import { buildAnchorRequest } from "../src/anchor/submit.js";
@@ -66,14 +72,31 @@ const ATTEST_ABI = [
 ] as const;
 
 const send = process.argv.includes("--send");
-const [attestationsPath, ledgerPath = "anchors.json", period] = process.argv
-  .slice(2)
-  .filter((a) => a !== "--send");
+const args = process.argv.slice(2).filter((a) => a !== "--send");
 
-if (!attestationsPath || !period) {
+/**
+ * All three, named. No defaults, unlike the siblings — and the difference is
+ * deliberate rather than an oversight.
+ *
+ * `send-births.ts` can default its two positionals because neither is followed
+ * by a required one. Here `period` is required and last, so a default on
+ * `ledgerPath` is not merely useless: given two arguments it binds the period to
+ * the ledger path and leaves the period undefined. The default can never be the
+ * value that is used, and its presence suggests an optional argument that is
+ * not.
+ *
+ * Inferring the shape from the count would work and is the wrong trade for this
+ * script. The ledger is what the already-anchored guard reads, so guessing which
+ * argument it is means guessing at the one input that decides whether a period
+ * can be anchored twice. Three arguments, stated.
+ */
+if (args.length !== 3) {
   console.error("usage: bun scripts/send-anchor.ts <attestations.json> <anchors.json> <period> [--send]");
+  console.error("all three are required; nothing is defaulted, because the ledger path decides");
+  console.error("whether the already-anchored guard is reading the right file.");
   process.exit(1);
 }
+const [attestationsPath, ledgerPath, period] = args as [string, string, string];
 
 /**
  * Read the inputs and plan, reporting a refusal as a sentence.
@@ -85,9 +108,12 @@ if (!attestationsPath || !period) {
  */
 function planOrRefuse() {
   try {
-    const envelopes = JSON.parse(readFileSync(attestationsPath!, "utf8")) as AttestationEnvelope[];
+    const envelopes = JSON.parse(readFileSync(attestationsPath, "utf8")) as AttestationEnvelope[];
+    // Deliberately not returned. The ledger is read again immediately before the
+    // write, and keeping this copy in scope would invite appending to the stale
+    // one — which is the bug the re-read exists to prevent.
     const records = loadLedger(readFileSync(ledgerPath, "utf8"));
-    return { records, plan: planAnchor(envelopes, records, periodId(period!)) };
+    return planAnchor(envelopes, records, periodId(period));
   } catch (error) {
     console.error(`hivemark: ${error instanceof Error ? error.message : "unknown error"}`);
     console.error("nothing was sent.");
@@ -95,7 +121,7 @@ function planOrRefuse() {
   }
 }
 
-const { records, plan } = planOrRefuse();
+const plan = planOrRefuse();
 if (!plan) {
   console.log(`${period}: nothing to anchor — no attestations fall in this period`);
   process.exit(0);
@@ -192,5 +218,30 @@ const record: AnchorRecord = {
   attestation_uid: attestationUid,
   anchored_at: new Date().toISOString(),
 };
-writeFileSync(ledgerPath, `${JSON.stringify([...records, record], null, 2)}\n`, "utf8");
+
+// Re-read rather than append to the copy loaded before the network calls. Minutes
+// can pass waiting for a receipt, and a ledger written from a stale snapshot
+// drops whatever landed in between.
+//
+// Re-checking the period is the part that matters, and it is why this is not
+// simply a re-read. Appending blindly to the fresher file would put a second
+// record for one period into the ledger, and `loadLedger` refuses duplicates —
+// so the next read of the file fails entirely. That turns a lost update into an
+// unreadable ledger, which is the worse of the two.
+//
+// If the period did arrive meanwhile, the transaction has already succeeded and
+// nothing here can undo it. The only useful act left is to refuse the write and
+// put the values on screen where an operator can reconcile them by hand.
+const current = loadLedger(readFileSync(ledgerPath, "utf8"));
+if (recordFor(current, plan.period)) {
+  console.error(`\n${ledgerPath} gained a record for ${plan.period} while this was sending.`);
+  console.error("refusing to write a second one — two roots for a week makes a proof ambiguous.");
+  console.error("this anchor was broadcast and is on chain. reconcile by hand:");
+  console.error(`  period          ${plan.period}`);
+  console.error(`  root            ${plan.root}`);
+  console.error(`  tx_hash         ${hash}`);
+  console.error(`  attestation_uid ${attestationUid}`);
+  process.exit(1);
+}
+writeFileSync(ledgerPath, `${JSON.stringify([...current, record], null, 2)}\n`, "utf8");
 console.log(`\nrecorded in ${ledgerPath}. commit it — the ledger is what makes a proof checkable.`);
