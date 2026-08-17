@@ -181,9 +181,15 @@ on the screen at the moment they are least likely to be read.
 **2. Broadcast, and record it in the same act.**
 
 ```bash
-bun scripts/send-anchor.ts <attestations.json> anchors.json 2026-W33          # prints, sends nothing
-bun scripts/send-anchor.ts <attestations.json> anchors.json 2026-W33 --send   # spends money
+bun scripts/send-anchor.ts dist/attestations.json anchors.json 2026-W33          # prints, sends nothing
+bun scripts/send-anchor.ts dist/attestations.json anchors.json 2026-W33 --send   # spends money
 ```
+
+A real path, not `<attestations.json>`. Angle brackets are redirection to a
+shell, so the placeholder form does not fail — it runs `> anchors.json` and
+**overwrites the ledger** with whatever the rest of the line prints, before the
+script starts. Demonstrated, not reasoned about: a ledger holding one W33 record
+came back as the text `bun scripts/send-anchor.ts 2026-W33`.
 
 Dry by default, and the key is opened only on the `--send` path. It refuses a
 period already in the ledger and a week that has not closed — both with `--send`

@@ -1,8 +1,14 @@
 /**
  * Broadcast one weekly anchor, and record it.
  *
- *   bun scripts/send-anchor.ts <attestations.json> anchors.json 2026-W33
- *   bun scripts/send-anchor.ts <attestations.json> anchors.json 2026-W33 --send
+ *   bun scripts/send-anchor.ts dist/attestations.json anchors.json 2026-W33
+ *   bun scripts/send-anchor.ts dist/attestations.json anchors.json 2026-W33 --send
+ *
+ * A real path in the examples rather than `<attestations.json>`: angle brackets
+ * are redirection, so copying the placeholder form runs `> anchors.json` and
+ * overwrites the ledger before this script starts. The usage line printed on a
+ * bad invocation keeps the brackets, because a synopsis is notation and is not
+ * meant to be run.
  *
  * The third sibling of `send-schemas.ts` and `send-births.ts`. Its dangerous
  * half is not written here: the key, the affordability gate and the RPC error
@@ -198,15 +204,27 @@ if (receipt.status !== "success") {
 // Read from the receipt's own logs rather than by re-reading chain state: an
 // RPC node that has not applied the block yet reports a good send as a failure.
 // That mistake is already documented in `send-births.ts`.
-const attested = parseEventLogs({ abi: [ATTESTED_EVENT], logs: receipt.logs }).filter(
-  (log) => log.args.schemaUID.toLowerCase() === ANCHOR_SCHEMA_UID.toLowerCase(),
-);
-if (attested.length !== 1) {
-  console.error(`expected exactly one Attested log for the anchor schema, saw ${attested.length}.`);
-  console.error(`the transaction ${hash} succeeded — record it by hand, see docs/anchoring.md.`);
-  process.exit(1);
+//
+// Under the same guarantee as the ledger write below, and for the same reason.
+// Everything from here on runs after a successful broadcast, so any exit that
+// is not `reconcileByHand` is an exit that loses an anchor which exists on
+// chain. There are three ways out of this block — no matching log, more than
+// one, or a throw from the parse — and all three end the same way.
+let attestationUid: `0x${string}`;
+try {
+  const attested = parseEventLogs({ abi: [ATTESTED_EVENT], logs: receipt.logs }).filter(
+    (log) => log.args.schemaUID.toLowerCase() === ANCHOR_SCHEMA_UID.toLowerCase(),
+  );
+  if (attested.length !== 1) {
+    reconcileByHand(`expected exactly one Attested log for the anchor schema, saw ${attested.length}.`);
+  }
+  attestationUid = attested[0]!.args.uid;
+} catch (error) {
+  reconcileByHand(
+    `could not read the attestation UID from the receipt: ` +
+      `${error instanceof Error ? error.message : "unknown error"}`,
+  );
 }
-const attestationUid = attested[0]!.args.uid;
 console.log(`uid    ${attestationUid}`);
 
 const record: AnchorRecord = {
@@ -244,13 +262,16 @@ const record: AnchorRecord = {
  * exit without saying what it was — a stack trace here loses an anchor that
  * exists on chain.
  */
-function reconcileByHand(reason: string): never {
+function reconcileByHand(reason: string, uid?: `0x${string}`): never {
   console.error(`\n${reason}`);
   console.error("this anchor was broadcast and is on chain. record it by hand:");
   console.error(`  period          ${plan!.period}`);
   console.error(`  root            ${plan!.root}`);
   console.error(`  tx_hash         ${hash}`);
-  console.error(`  attestation_uid ${attestationUid}`);
+  // Optional because the earliest caller runs before the UID has been read, and
+  // that caller is the one that most needs to say something. The transaction
+  // hash is always known by then, and the UID is recoverable from it.
+  console.error(`  attestation_uid ${uid ?? "unknown — read it from the transaction on basescan"}`);
   console.error("see docs/anchoring.md — the ledger is what makes a proof checkable.");
   process.exit(1);
 }
@@ -261,6 +282,7 @@ try {
     reconcileByHand(
       `${ledgerPath} gained a record for ${plan.period} while this was sending; ` +
         "refusing to write a second one, because two roots for a week make a proof ambiguous.",
+      attestationUid,
     );
   }
 
@@ -279,5 +301,6 @@ try {
   // covers a period arriving concurrently and does not cover any of these.
   reconcileByHand(
     `could not update ${ledgerPath}: ${error instanceof Error ? error.message : "unknown error"}`,
+    attestationUid,
   );
 }
