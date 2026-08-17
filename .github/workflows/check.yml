@@ -34,11 +34,23 @@ jobs:
       # backfill covered 89 of 115 rows and nobody noticed. The cost is that an
       # upstream commit can redden an unrelated PR; the fix is one line in
       # corpus.json, and that is a decision rather than a breakage.
+      # `fetch-depth: 0` because the corpus sweep asks an ancestry question.
+      # `durablyReachable` runs `merge-base --is-ancestor` against the trunk, and
+      # the default depth-1 clone cannot answer it for anything but the tip — so
+      # the test correctly declined, and `corpus.test.ts` reported 484 passed
+      # with 1 skipped here while a developer's deep clone reported 485 and 0.
+      # The sweep over real guardian_shas had therefore never run in CI at all.
+      #
+      # A skip is the honest outcome of a question that cannot be asked; the
+      # environment was what was wrong. Note that comparing run totals would not
+      # have caught it — a skipped test is still collected and counted, so both
+      # sides read 485.
       - name: Check out the corpus
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: zaebee/codegraph-brain
           path: ownima/codegraph-brain
+          fetch-depth: 0
 
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:

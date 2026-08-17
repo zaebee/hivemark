@@ -349,11 +349,17 @@ describe("the provenance the corpus points at", () => {
   const present = existsSync(join(repo, ".git"));
 
   // A shallow checkout cannot answer this question, and must not pretend to.
-  // CI clones the sibling with `actions/checkout`, which fetches depth 1 by
-  // default: the tip of the default branch and no history at all. Run there,
-  // this reported all six shas unreachable — a true statement about that clone
-  // and a false one about the repository, which is the shape of alarm that gets
-  // switched off rather than acted on.
+  // `actions/checkout` fetches depth 1 by default: the tip of the default branch
+  // and no history at all. Run against that, this reported all six shas
+  // unreachable — a true statement about that clone and a false one about the
+  // repository, which is the shape of alarm that gets switched off rather than
+  // acted on.
+  //
+  // CI no longer clones that way. `check.yml` passes `fetch-depth: 0` for the
+  // corpus, because skipping was the honest answer to a question CI could not
+  // ask — and the consequence was that this sweep never ran there at all: 484
+  // passed with 1 skipped, against 485 and 0 on a developer's deep clone. The
+  // skip stays for every other environment that cannot answer.
   // Without a trunk to compare against, every sha off a tag would read as
   // fragile — an alarm firing because the question could not be asked. Skipped
   // for the same reason a shallow clone is.
