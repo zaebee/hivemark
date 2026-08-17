@@ -21,7 +21,7 @@
 
 import { createPublicClient, encodeFunctionData, http, parseAbiItem, parseEventLogs } from "viem";
 import { base } from "viem/chains";
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, renameSync, writeFileSync } from "node:fs";
 import {
   GET_SCHEMA_ABI,
   SCHEMA_REGISTRY,
@@ -232,16 +232,52 @@ const record: AnchorRecord = {
 // If the period did arrive meanwhile, the transaction has already succeeded and
 // nothing here can undo it. The only useful act left is to refuse the write and
 // put the values on screen where an operator can reconcile them by hand.
-const current = loadLedger(readFileSync(ledgerPath, "utf8"));
-if (recordFor(current, plan.period)) {
-  console.error(`\n${ledgerPath} gained a record for ${plan.period} while this was sending.`);
-  console.error("refusing to write a second one — two roots for a week makes a proof ambiguous.");
-  console.error("this anchor was broadcast and is on chain. reconcile by hand:");
-  console.error(`  period          ${plan.period}`);
-  console.error(`  root            ${plan.root}`);
+/**
+ * Everything an operator needs to write the record themselves, then stop.
+ *
+ * One copy, called from both failure paths. The two would otherwise be the same
+ * eight lines maintained twice, and a correction to one silently missing the
+ * other is the exact hazard `wallet.ts` was factored out to avoid.
+ *
+ * Anything reaching here has already broadcast. The transaction cannot be
+ * undone and the anchor is real, so the only remaining way to do harm is to
+ * exit without saying what it was — a stack trace here loses an anchor that
+ * exists on chain.
+ */
+function reconcileByHand(reason: string): never {
+  console.error(`\n${reason}`);
+  console.error("this anchor was broadcast and is on chain. record it by hand:");
+  console.error(`  period          ${plan!.period}`);
+  console.error(`  root            ${plan!.root}`);
   console.error(`  tx_hash         ${hash}`);
   console.error(`  attestation_uid ${attestationUid}`);
+  console.error("see docs/anchoring.md — the ledger is what makes a proof checkable.");
   process.exit(1);
 }
-writeFileSync(ledgerPath, `${JSON.stringify([...current, record], null, 2)}\n`, "utf8");
-console.log(`\nrecorded in ${ledgerPath}. commit it — the ledger is what makes a proof checkable.`);
+
+try {
+  const current = loadLedger(readFileSync(ledgerPath, "utf8"));
+  if (recordFor(current, plan.period)) {
+    reconcileByHand(
+      `${ledgerPath} gained a record for ${plan.period} while this was sending; ` +
+        "refusing to write a second one, because two roots for a week make a proof ambiguous.",
+    );
+  }
+
+  // Written to a sibling and renamed, because `rename` is atomic on POSIX and a
+  // direct write is not. `loadLedger` refuses a truncated file outright — "a
+  // corruption to notice, not a state to tolerate" — so a write interrupted
+  // partway would leave a ledger nothing can read, at the one moment when what
+  // it holds cannot be reconstructed from anywhere else.
+  const temp = `${ledgerPath}.tmp`;
+  writeFileSync(temp, `${JSON.stringify([...current, record], null, 2)}\n`, "utf8");
+  renameSync(temp, ledgerPath);
+  console.log(`\nrecorded in ${ledgerPath}. commit it — the ledger is what makes a proof checkable.`);
+} catch (error) {
+  // Reached when the ledger cannot be read, parsed or replaced: deleted, made
+  // unreadable, corrupted by another writer, or a full disk. The re-check above
+  // covers a period arriving concurrently and does not cover any of these.
+  reconcileByHand(
+    `could not update ${ledgerPath}: ${error instanceof Error ? error.message : "unknown error"}`,
+  );
+}
