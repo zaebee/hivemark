@@ -171,15 +171,49 @@ The second command prints the period, the root, the count and the exact
 transaction that would be sent — and sends nothing. Read it before continuing.
 Gaps in earlier weeks are printed too; they stay gaps.
 
-**2. Broadcast.** Send the printed request from your wallet, calling `attest` on
-the EAS contract at `0x4200000000000000000000000000000000000021` with the
-printed schema, data, and a zero recipient, zero expiration and zero refUID.
-Anything that can send a transaction to a contract will do.
+`cli-anchor.ts` is the one to read from, and `send-anchor.ts` below is the one
+that sends. The sender prints a leaner summary on purpose: the inspection step
+carries the things a human should weigh before spending — where the
+attestations came from, how many were superseded, which earlier weeks are
+missing — and burying those in the command that also broadcasts would put them
+on the screen at the moment they are least likely to be read.
 
-**3. Record it.** Append to `anchors.json` — period, root, count, the uid list,
-the transaction hash, the resulting attestation UID, and the time. Commit it.
-The ledger is what makes a proof checkable later, so an anchor that is not
-recorded may as well not have happened.
+**2. Broadcast, and record it in the same act.**
+
+```bash
+bun scripts/send-anchor.ts <attestations.json> anchors.json 2026-W33          # prints, sends nothing
+bun scripts/send-anchor.ts <attestations.json> anchors.json 2026-W33 --send   # spends money
+```
+
+Dry by default, and the key is opened only on the `--send` path. It refuses a
+period already in the ledger and a week that has not closed — both with `--send`
+passed, so neither guard depends on being in a dry run — and it checks the
+anchor schema is registered before sending, since EAS reverts `attest` on an
+unregistered schema.
+
+On success it appends the record to `anchors.json` itself: period, root, count,
+the uid list, the transaction hash, the resulting attestation UID and the time.
+**Commit it.** The ledger is what makes a proof checkable later, so an anchor
+that is not recorded may as well not have happened — which is exactly why the
+recording is no longer a separate step performed by a human at whatever hour the
+week happens to close.
+
+The attestation UID comes from the receipt's own logs rather than a follow-up
+read of chain state, for the reason recorded in `send-births.ts`: an RPC node
+that has not applied the block yet reports a good send as a failure.
+
+**By hand instead, if you prefer.** Nothing requires the script. Call `attest`
+on the EAS contract at `0x4200000000000000000000000000000000000021` with the
+printed schema and data, and a zero recipient, zero expiration and zero refUID;
+anything that can send a transaction to a contract will do. Note the printed
+`data` is the schema data that goes *inside* the request, not the calldata —
+your wallet or tool assembles the `attest` call around it. Then append to
+`anchors.json` yourself.
+
+**Not tabulated here.** Sent anchors live in `anchors.json` and nowhere else in
+this repository. A table in this document would be a second copy of a list that
+grows every week, and the copy that is not the one the proof checker reads is
+the copy that drifts.
 
 ## Anchoring keys
 
@@ -245,13 +279,31 @@ surviving identities.
 preserved outside `dist/`, which the pipeline overwrites. Concatenate the two
 arrays and pass the result to `planAnchor`; the dry run will report 1864.
 
-### The root this week must produce
+### The root this week must produce — and did
 
 ```
 period   2026-W33          2026-08-10T00:00Z … 2026-08-17T00:00Z
 leaves   1864
 root     0xddccdfaf5164921bd5ba217fb7b6daffdc98b7b5ff3e12624bf8927ade961df9
 ```
+
+**Anchored 2026-08-17, and the root matched.**
+
+| | |
+|---|---|
+| tx | [`0x94e5bd32…`](https://basescan.org/tx/0x94e5bd320382f9d707e22c498bdd5495c0ac6816327d928f48d6d1610dba9913) |
+| attestation | `0xf2aec31b43d7af20639add78677160017d22b9a4b1da6e7450cc2c6b856214ca` |
+| block | 50082898, 331675 gas, about half a cent |
+
+Read back from Base afterwards rather than trusted: the on-chain attestation
+carries this root, this count, these period bounds and the anchoring key as
+attester, and is unrevoked. The ledger entry in `anchors.json` was cross-checked
+against that read, not against the sending script's own output.
+
+The prediction above is left exactly as it was written on 2026-08-15. It is the
+evidence that the check was made in advance, which is the only thing that made
+it worth making; rewriting it in the past tense afterwards would leave a
+document that agrees with the outcome and proves nothing about the process.
 
 Computed on 2026-08-15 by planning the anchor at the first instant the guard
 permits — `planAnchor` takes `now` as a parameter, so the week's contents can be
