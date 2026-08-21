@@ -14,6 +14,11 @@
   `bun run breed <corpus.jsonl>...` proposes reviewer configurations nobody has run yet.
 - Broadcasting is separate: `scripts/send-*.ts` are dry by default; only `--send` opens a key or
   spends gas.
+- GitHub over SSH drops mid-push here (`kex_exchange_identification` closed). Retry once or twice,
+  then push over HTTPS without touching git config:
+  `git -c credential.helper='!gh auth git-credential' push https://github.com/zaebee/hivemark.git HEAD`
+  — plain `HEAD` pushes the current branch to its own name, so the command is paste-safe; a
+  `<branch>` placeholder is how this repository once lost a ledger to shell redirection.
 
 ## Corpus lives in a sibling checkout
 
@@ -53,3 +58,10 @@
   shipped once).
 - Runbooks: `docs/anchoring.md`, `docs/birth.md`, `docs/attestation-signers.md`, `docs/breeding.md`;
   design specs in `docs/superpowers/specs/`.
+- Merging is the human's call: wait for review comments, CI and Sonar to settle, then ask. Never
+  merge a PR on your own authority, even with green checks.
+- `gemini-code-assist[bot]` reviews every PR. Check its suggestions against reality before taking
+  them — it has prescribed a flag bun silently ignores (`--no-env`, which still loads `.env`).
+- Sonar's "0% Coverage on New Code" is settled, not broken: no coverage reports and no `SONAR_TOKEN`
+  in CI, by decision; the criterion is disabled in the SonarCloud UI. Do not fix it with dependencies
+  or secrets.
