@@ -25,6 +25,11 @@
     "martian-p3-judged-run1.jsonl": "judge output, same shape as martian-judged.jsonl",
     "martian-repeat-judged.jsonl": "judge output, same shape as martian-judged.jsonl",
     "guardian/results.jsonl": "Phase 1 bench scores, not reviews — 150 rows carrying model/precision/recall/matched/missed, none with finder_model, and 0 parse as ReviewRecord because none has a url",
-    "guardian/calibration.jsonl": "calibration sweep, not reviews — 236 rows carrying finder_model but no findings, and 0 parse as ReviewRecord because none has a url"
+    "guardian/calibration.jsonl": "calibration sweep, not reviews — 236 rows carrying finder_model but no findings, and 0 parse as ReviewRecord because none has a url",
+    "guardian/experiments/246-cross-vendor/free-nemotron-quota-cutoff.jsonl": "quota-cutoff bench scores, not reviews — 74 rows carrying arm/precision/recall/noise keyed by pr and pass, and 0 parse as ReviewRecord because none has a url",
+    "guardian/experiments/401-evidence/pr-399-control-rows.jsonl": "per-finding skeptic re-rulings for the upstream PR 399 evidence experiment, not reviews — 24 rows carrying was/now/cites_a_checker/rationale, and 0 parse as ReviewRecord because none has a url",
+    "guardian/experiments/401-evidence/pr-399-treatment-rows.jsonl": "same shape as pr-399-control-rows.jsonl — re-rulings, not reviews",
+    "guardian/experiments/407-no-checker-appeal/pr-399-control-directive-rows.jsonl": "same shape as pr-399-control-rows.jsonl — re-rulings, not reviews",
+    "guardian/experiments/407-no-checker-appeal/pr-399-control-prohibition-rows.jsonl": "same shape as pr-399-control-rows.jsonl — re-rulings, not reviews"
   }
 }
