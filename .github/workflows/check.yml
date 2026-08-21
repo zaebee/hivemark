@@ -9,6 +9,14 @@ on:
   push:
     branches: [main]
   pull_request:
+  # The corpus checkout is deliberately unpinned, so codegraph-brain can grow
+  # new .jsonl files at any moment and the manifest ratchet here is what
+  # notices. Between pushes of this repository nothing rings that alarm: it
+  # fired through an unrelated PR once (#75) because scheduled runs did not
+  # exist. Mondays shortly after the week closes, so the anchor routine in
+  # docs/anchoring.md starts from a check that already ran.
+  schedule:
+    - cron: "0 4 * * 1"
 
 # No secrets are used by this workflow, deliberately. `docs/anchoring.md` says
 # no key belongs in CI, and this project has already lost one to a transcript.
