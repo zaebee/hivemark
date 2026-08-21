@@ -6,9 +6,14 @@
 - Install: `bun install --frozen-lockfile --ignore-scripts` (both flags are deliberate; CI uses them).
 - Tests: `bun run test` (vitest, not `bun test`). One file: `bun run test tests/claims.test.ts`.
 - Before finishing: `bun run typecheck`, then `bun run test` (CI order).
-- Page pipeline: `bun src/cli.ts corpus.json dist` — always pass the `corpus.json` manifest, never a
-  raw `.jsonl`. The manifest feeds Merkle roots and birth `firstSeen`; omitting a file is irreversible.
-- Broadcast scripts (`scripts/send-*.ts`) are dry by default; only `--send` opens a key or spends gas.
+- Page pipeline: `bun src/cli.ts corpus.json dist` (alias: `bun run generate ...`) — always pass the
+  `corpus.json` manifest, never a raw `.jsonl`. The manifest feeds Merkle roots and birth `firstSeen`;
+  omitting a file is irreversible.
+- Inspect-only CLIs, all dry: `bun run anchor <attestations.json> <anchors.json>` plans the weekly
+  root; `bun run birth <corpus.json> [births.json]` prints calldata for unborn identities;
+  `bun run breed <corpus.jsonl>...` proposes reviewer configurations nobody has run yet.
+- Broadcasting is separate: `scripts/send-*.ts` are dry by default; only `--send` opens a key or
+  spends gas.
 
 ## Corpus lives in a sibling checkout
 
