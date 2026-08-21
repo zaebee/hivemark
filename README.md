@@ -22,13 +22,13 @@ genome-derived bee badges. No wallet, no contract, no gas.
 attestation bound to the Base mainnet domain, and verifies against the public key
 alone — no wallet, no transaction, no key in CI.
 
-**Milestone 2, step 2 (this):** one Merkle root per calendar week, published as
+**Milestone 2, step 2:** one Merkle root per calendar week, published as
 an EAS onchain attestation, so an attestation can be shown to have existed no
 later than a given block. Run by hand — see `docs/anchoring.md`. A skipped week
 stays a gap and is never backfilled, because an anchor published late would
 assert that its contents existed by a date that has now passed.
 
-**Milestone 2, step 3 (this):** each identity is announced once as an EAS birth
+**Milestone 2, step 3:** each identity is announced once as an EAS birth
 attestation carrying its whole genome, so an outsider can recompute the entity —
 its id, its address and its bee — from the record alone. Run by hand, see
 `docs/birth.md`.
@@ -115,7 +115,15 @@ discourse and keycloak, overlapping only on grafana. A difference between the
 rows may be a difference between codebases rather than between reviewers. The
 generated page says so on its face, and the corpus is printed on every card.
 
-## Where it stands now
+## Where the corpus stood on 2026-08-12
+
+A dated snapshot, kept because the reasoning below it still reads. These are
+**generation-1 identities**, keyed on `guardian_sha` — the genome has since
+moved to the review fingerprint (`GENOME_SCHEMA_VERSION` 2), collapsing the
+eight rows into three; `docs/anchoring.md` records how one W33 root covers
+both generations. The numbers are not maintained in prose: the generated page
+recomputes them from whatever `corpus.json` names, and a second copy here
+would only drift.
 
 108 deduplicated reviews, 800 claims, 8 identities across two providers.
 
