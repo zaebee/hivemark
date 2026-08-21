@@ -16,7 +16,9 @@
   spends gas.
 - GitHub over SSH drops mid-push here (`kex_exchange_identification` closed). Retry once or twice,
   then push over HTTPS without touching git config:
-  `git -c credential.helper='!gh auth git-credential' push https://github.com/zaebee/hivemark.git HEAD:refs/heads/<branch>`.
+  `git -c credential.helper='!gh auth git-credential' push https://github.com/zaebee/hivemark.git HEAD`
+  — plain `HEAD` pushes the current branch to its own name, so the command is paste-safe; a
+  `<branch>` placeholder is how this repository once lost a ledger to shell redirection.
 
 ## Corpus lives in a sibling checkout
 
