@@ -26,8 +26,10 @@
 ## Secrets
 
 - **Bun auto-loads `.env` from the working directory.** `env -u HIVEMARK_SIGNING_KEY ...` does not unset
-  it, and printing `process.env` has already leaked a key here. To rehearse a keyless run, change
-  directory out of the repo — don't change the environment.
+  it, and printing `process.env` has already leaked a key here. To rehearse a keyless run:
+  `bun --no-env-file src/cli.ts ...` — that exact spelling; bun ignores unknown flags silently, so
+  `--no-env` still loads `.env`. Changing directory out of the repo works too
+  (`docs/attestation-signers.md`).
 - Keys never belong in CI; both workflows refuse `HIVEMARK_SIGNING_KEY`. Signing key: env var, local
   only. Anchoring key: `~/.hivemark/anchoring.key`, outside the repo. A key that reached a transcript
   is compromised — rotate it.
